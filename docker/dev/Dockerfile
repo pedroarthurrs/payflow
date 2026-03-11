@@ -1,6 +1,6 @@
 FROM golang:1.26.1-alpine
 
-WORKDIR /api
+WORKDIR /app
 
 # Instala o Air
 RUN go install github.com/air-verse/air@latest
