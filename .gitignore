@@ -1,0 +1,15 @@
+# Binários
+bin/
+main
+
+# Variáveis de ambiente
+.env
+
+# Dependências
+vendor/
+
+# IDEs
+.vscode/
+.idea/
+
+/tmp
