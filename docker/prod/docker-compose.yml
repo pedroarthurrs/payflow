@@ -1,9 +1,8 @@
 services:
-  i9pay:
+  api:
     build:
       context: ../../
       dockerfile: docker/prod/Dockerfile
-    container_name: i9pay
     ports:
       - "8080:8080"
     depends_on:

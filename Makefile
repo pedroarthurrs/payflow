@@ -7,7 +7,7 @@ DOCKER_COMPOSE_DEV = docker/dev/docker-compose.yml
 MIGRATIONS_PATH = migrations
 DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?sslmode=disable
 
-.PHONY: dev stop build-dev sqlc migrate-up migrate-down migrate-create tidy test help
+.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test help
 
 # --- DOCKER COMMANDS ---
 
@@ -15,9 +15,13 @@ DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?ss
 dev:
 	docker compose -f $(DOCKER_COMPOSE_DEV) up
 
-## stop: Para os containers
-stop:
+## down: Para os containers
+down:
 	docker compose -f $(DOCKER_COMPOSE_DEV) down
+
+## remove: Remove os containers
+remove:
+	docker compose -f $(DOCKER_COMPOSE_DEV) down -v --remove-orphans
 
 ## build-dev: Força o build das imagens de dev
 build-dev:

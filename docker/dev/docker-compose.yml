@@ -1,9 +1,9 @@
 services:
-  i9pay:
+  api:
     build:
       context: ../../
       dockerfile: docker/dev/Dockerfile
-    container_name: i9pay_dev
+    container_name: api_dev
     ports:
       - "8080:8080"
     volumes:
