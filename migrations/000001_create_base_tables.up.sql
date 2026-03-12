@@ -271,6 +271,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     quantity DECIMAL(12, 4) NOT NULL DEFAULT 1.0 CHECK (quantity > 0),
     unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0),
     total_price_cents INTEGER NOT NULL CHECK (total_price_cents >= 0),
+    metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_invoice_items_invoice_tenant

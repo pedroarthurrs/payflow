@@ -298,14 +298,15 @@ type Invoice struct {
 }
 
 type InvoiceItem struct {
-	ID              uuid.UUID    `json:"id"`
-	TenantID        uuid.UUID    `json:"tenant_id"`
-	InvoiceID       uuid.UUID    `json:"invoice_id"`
-	Description     string       `json:"description"`
-	Quantity        string       `json:"quantity"`
-	UnitPriceCents  int32        `json:"unit_price_cents"`
-	TotalPriceCents int32        `json:"total_price_cents"`
-	CreatedAt       sql.NullTime `json:"created_at"`
+	ID              uuid.UUID             `json:"id"`
+	TenantID        uuid.UUID             `json:"tenant_id"`
+	InvoiceID       uuid.UUID             `json:"invoice_id"`
+	Description     string                `json:"description"`
+	Quantity        string                `json:"quantity"`
+	UnitPriceCents  int32                 `json:"unit_price_cents"`
+	TotalPriceCents int32                 `json:"total_price_cents"`
+	Metadata        pqtype.NullRawMessage `json:"metadata"`
+	CreatedAt       sql.NullTime          `json:"created_at"`
 }
 
 type InvoiceLog struct {
