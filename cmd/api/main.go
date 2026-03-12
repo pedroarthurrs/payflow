@@ -1,10 +1,10 @@
 package main
 
 import (
+	"i9pay/internal/api/router"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
 	"log"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,13 +30,7 @@ func main() {
 	}
 	defer db.Close()
 
-	r := gin.Default()
-
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "live",
-		})
-	})
+	r := router.New(cfg.JwtSecret)
 
 	r.Run(":8080")
 }

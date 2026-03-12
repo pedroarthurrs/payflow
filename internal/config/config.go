@@ -15,6 +15,7 @@ type Config struct {
 	DbName     string
 	ServerPort string
 	GoEnv      string
+	JwtSecret  string
 }
 
 func Load() *Config {
@@ -54,5 +55,6 @@ func Load() *Config {
 		DbPort:     env("DB_PORT", "5432"),
 		DbName:     mustEnv("DB_NAME"),
 		ServerPort: env("SERVER_PORT", "8080"),
+		JwtSecret:  mustEnv("JWT_SECRET"),
 	}
 }
