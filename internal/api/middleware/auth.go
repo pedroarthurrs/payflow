@@ -1,24 +1,22 @@
 package middleware
 
 import (
+	i9token "i9pay/internal/token"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-type Claims struct {
-	TenantID string `json:"sub"`
-	jwt.RegisteredClaims
-}
-
+// ClaimsKey is the gin context key under which *token.Claims is stored after
+// successful authentication. Handlers retrieve claims via c.MustGet(ClaimsKey).
 const ClaimsKey = "claims"
 
-func Auth(jwtSecret string) gin.HandlerFunc {
-	secret := []byte(jwtSecret)
-
+// Auth returns a middleware that validates a Bearer access token on every
+// request. On success the parsed *token.Claims are stored in the context under
+// ClaimsKey and the next handler in the chain is called. On failure the
+// request is aborted with 401 Unauthorized.
+func Auth(svc *i9token.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -32,26 +30,13 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		token, err := jwt.ParseWithClaims(
-			parts[1],
-			&Claims{},
-			func(t *jwt.Token) (any, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, jwt.ErrSignatureInvalid
-				}
-				return secret, nil
-			},
-			jwt.WithIssuer("i9pay"),
-			jwt.WithLeeway(5*time.Second),
-			jwt.WithExpirationRequired(),
-		)
-
-		if err != nil || !token.Valid {
+		claims, err := svc.Verify(parts[1], i9token.TypeAccess)
+		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
 		}
 
-		c.Set(ClaimsKey, token.Claims)
+		c.Set(ClaimsKey, claims)
 		c.Next()
 	}
 }
