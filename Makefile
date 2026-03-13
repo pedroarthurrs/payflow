@@ -41,6 +41,10 @@ tidy:
 test:
 	go test -v ./...
 
+## vet: Roda o vet do projeto
+vet:
+	go vet -v ./...
+
 # --- MIGRATIONS COMMANDS ---
 
 ## migrate-up: Aplica todas as migrations no banco de dados

@@ -1,0 +1,249 @@
+# Arquitetura
+
+## Visão Geral da Arquitetura
+
+A arquitetura segue o padrão **Modular com Camadas Lógicas**, sem usar Clean Architecture, DDD ou Hexagonal. É pragmática e escalável:
+
+```
+┌─────────────────────────────────────────────┐
+│   HTTP Layer (router + middleware)          │
+├─────────────────────────────────────────────┤
+│   HTTP Handlers (por feature em http/)      │
+├─────────────────────────────────────────────┤
+│   Business Logic (services/)                │
+├─────────────────────────────────────────────┤
+│   Domain Models (domain/)                   │
+├─────────────────────────────────────────────┤
+│   Database Access (database/)               │
+└─────────────────────────────────────────────┘
+```
+
+## Fluxo de Dados
+
+```
+HTTP Request
+    ↓
+Router + Middleware (Auth, Errors)
+    ↓
+Handler (recebe payload HTTP)
+    ↓
+Service (lógica de negócio)
+    ↓
+Domain (validações e modelos)
+    ↓
+Database (SQLC queries)
+    ↓
+Response JSON
+```
+
+## Camadas
+
+### 1. HTTP Layer (`api/`)
+
+**Router** (`api/router/router.go`)
+- Definição de todas as rotas
+- Injeção de dependências (services, handlers)
+- Configuração de middleware
+
+**Handlers** (`api/http/{feature}/`)
+- Recebem requisições HTTP
+- Validam payload
+- Chamam services
+- Retornam respostas JSON
+- Organizados por feature (auth, health, me, etc.)
+
+**Middleware** (`api/middleware/`)
+- `auth.go`: Valida JWT e extrai claims
+- `errors.go`: Transforma erros de domínio em respostas HTTP
+
+**Error Handling** (`api/err/`)
+- `apierr.go`: Tipos de erro customizados (BadRequest, Unauthorized, etc.)
+- Mapeamento para status HTTP
+
+### 2. Service Layer (`service/`)
+
+**AuthService** (`service/auth.go`)
+- Orquestra fluxo de autenticação
+- Valida credentials contra database
+- Coordena token service
+- Lógica de negócio isolada de HTTP
+
+Futura expansão:
+- `user_service.go` - Gerenciamento de usuários
+- `subscription_service.go` - Lógica de assinaturas
+- `invoice_service.go` - Geração de faturas
+
+### 3. Domain Layer (`domain/`)
+
+**Models**
+- `tenant.go`: Estruturas de dados puras (Credentials, etc.)
+- `errors.go`: Erros tipados de domínio
+
+Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
+
+### 4. Database Layer (`database/`)
+
+**Conexão** (`database/postgres.go`)
+- Gerencia conexão com PostgreSQL
+- Expõe interface para queries via SQLC
+
+**SQLC Generated** (`database/dbgen/`)
+- `db.go`: Configuração do DB
+- `models.go`: Structs geradas do schema
+- `querier.go`: Interface de queries
+- `queries.sql.go`: Implementação type-safe das queries
+
+**SQL** (`database/queries.sql`)
+- Queries acima dessa arquivo geram código Go automaticamente
+- Versionadas com migrations
+
+### 5. Token Service (`token/`)
+
+**JWT Service** (`token/token.go`)
+- Criação de tokens (access + refresh)
+- Validação e parsing de JWT
+- Isolado da lógica HTTP
+
+### 6. Config (`config/`)
+
+**Configuration** (`config/config.go`)
+- Carrega variáveis de ambiente
+- Validações de valores obrigatórios
+- Suporte a múltiplos ambientes (dev/staging/prod)
+
+## Padrões e Decisões
+
+### Padrão de Handlers
+
+Cada handler é um pacote separado com:
+- Uma struct `Handler` com dependências
+- Um função `New{Feature}Handler()` para construção
+- Métodos para cada ação HTTP
+
+```go
+package auth
+
+type Handler struct {
+    authSvc *service.AuthService
+}
+
+func NewHandler(authSvc *service.AuthService) *Handler {
+    return &Handler{authSvc: authSvc}
+}
+
+func (h *Handler) Login(c *gin.Context) { /* ... */ }
+```
+
+### Injeção de Dependências
+
+Sem usar framework DI. Dependências são passadas explicitamente no `router.go`:
+
+```go
+tokenSvc := token.NewService(secret, ttl1, ttl2)
+authSvc := service.NewAuthService(tokenSvc)
+authHandler := auth.NewHandler(authSvc)
+```
+
+### Tratamento de Erros
+
+1. Services retornam erros de domínio
+2. Handlers convertem em `apierr.{Type}`
+3. Middleware `Errors()` serializa para JSON
+
+```go
+// Service
+pair, err := h.authSvc.Login(creds)
+if err != nil {
+    _ = c.Error(err.Unauthorized("invalid credentials"))
+}
+
+// Middleware converte para JSON
+{
+  "error": "invalid credentials"
+}
+```
+
+## Extensibilidade
+
+### Adicionar Nova Feature
+
+1. Crie pacote em `internal/api/http/{feature}/`:
+   ```bash
+   mkdir internal/api/http/products
+   touch internal/api/http/products/handler.go
+   ```
+
+2. Implemente handlers com dependências
+
+3. Se necessário, crie service em `internal/service/`
+
+4. Use domain models em `internal/domain/`
+
+5. Registre no router
+
+Exemplo: Feature de Produtos
+
+```
+internal/
+├── api/http/products/handler.go    # HTTP API
+├── service/product.go              # Business logic
+└── domain/product.go               # Models
+```
+
+### Usar Queries Geradas pelo SQLC
+
+1. Escreva query em `queries.sql`:
+```sql
+-- name: GetProduct :one
+SELECT id, name, price FROM products WHERE id = $1;
+```
+
+2. Gere código: `make sqlc`
+
+3. Use em service:
+```go
+product, err := s.db.Queries.GetProduct(ctx, productID)
+```
+
+## Testing Strategy
+
+**Unittests**
+- Services: mock dependency (database)
+- Handlers: mock service
+- Domain: sem dependências, 100% testável
+
+**Integration Tests**
+- API endpoints com test database
+- Database transactions com rollback
+
+Exemplo test de handler:
+
+```go
+func TestLoginHandler(t *testing.T) {
+    // Mock service
+    mockAuthSvc := &mockAuthService{}
+    h := auth.NewHandler(mockAuthSvc)
+    
+    // Test
+    c := &gin.Context{...}
+    h.Login(c)
+    
+    // Assert
+    assert.Equal(t, http.StatusOK, c.Writer.Status())
+}
+```
+
+## Segurança
+
+- **JWT Signing**: HMAC SHA-256
+- **Token TTLs**: Access curto (15min), Refresh longo (7dias)
+- **Password**: Placeholder, deve usar bcrypt em produção
+- **Headers**: Authorization obrigatório em rotas protegidas
+- **Middleware Recovery**: Captura panics
+
+## Performance
+
+- SQLC compila queries em build-time (zero runtime cost)
+- Middleware Recovery evita crashes
+- Short-lived access tokens reduzem exposição
+- Connection pooling via database/sql padrão
