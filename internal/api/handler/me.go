@@ -22,8 +22,7 @@ func (h *MeHandler) Get(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"email":      claims.Email,
-		"password":   claims.Password,
+		"tenant_id":  claims.TenantID,
 		"issued_at":  claims.IssuedAt,
 		"expires_at": claims.ExpiresAt,
 	})

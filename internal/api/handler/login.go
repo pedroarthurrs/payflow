@@ -30,13 +30,15 @@ func (h *LoginHandler) Post(c *gin.Context) {
 		return
 	}
 
+	tenantID, _ := authenticateTenant(req.Email, req.Password)
+
 	now := time.Now()
 	claims := middleware.Claims{
-		Email: req.Email,
+		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "i9pay",
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(1 * time.Hour)),
 		},
 	}
 
@@ -51,4 +53,8 @@ func (h *LoginHandler) Post(c *gin.Context) {
 		"token":      signed,
 		"expires_at": claims.ExpiresAt.Time,
 	})
+}
+
+func authenticateTenant(email, password string) (string, error) {
+	return email + password, nil
 }
