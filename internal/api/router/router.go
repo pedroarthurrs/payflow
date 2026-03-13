@@ -6,9 +6,11 @@ import (
 	"i9pay/internal/api/http/me"
 	"i9pay/internal/api/http/root"
 	"i9pay/internal/api/middleware"
+	"i9pay/internal/config"
 	"i9pay/internal/database"
 	"i9pay/internal/service"
 	"i9pay/internal/token"
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,14 +19,25 @@ import (
 const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
-func New(jwtSecret string, db *database.DB) *gin.Engine {
+func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recovery())
-	r.Use(gin.Logger())
+	r.Use(middleware.RequestID())
+	r.Use(middleware.StructuredLogger(logger))
 	r.Use(middleware.Errors())
 
+	// Rate limiter stores
+	ipStore := middleware.NewRateLimiterStore()
+	loginStore := middleware.NewRateLimiterStore()
+	tenantStore := middleware.NewRateLimiterStore()
+
+	// Rate limiter windows
+	ipWindow := time.Duration(cfg.RateLimitWindowSeconds) * time.Second
+	loginWindow := time.Duration(cfg.RateLimitLoginWindowSeconds) * time.Second
+	tenantWindow := time.Duration(cfg.RateLimitTenantWindowSeconds) * time.Second
+
 	// Services
-	tokenSvc := token.NewService(jwtSecret, accessTokenTTL, refreshTokenTTL)
+	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
 	authSvc := service.NewAuthService(tokenSvc)
 
 	// Handlers
@@ -36,19 +49,21 @@ func New(jwtSecret string, db *database.DB) *gin.Engine {
 	r.GET("/", rootHandler.Get)
 
 	v1 := r.Group("/v1")
+	v1.Use(middleware.RateLimitByIP(ipStore, cfg.RateLimitMaxRequests, ipWindow, "too many requests, try again later"))
 	{
 		v1.GET("/health", healthHandler.Get)
 
 		// Auth routes — public, no token required.
 		authGroup := v1.Group("/auth")
 		{
-			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/login", middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later"), authHandler.Login)
 			authGroup.POST("/refresh", authHandler.Refresh)
 		}
 
 		// Protected routes — require a valid access token.
 		protected := v1.Group("/")
 		protected.Use(middleware.Auth(tokenSvc))
+		protected.Use(middleware.RateLimitByTenant(tenantStore, cfg.RateLimitTenantMaxRequests, tenantWindow))
 		{
 			protected.GET("/me", meHandler.Get)
 		}

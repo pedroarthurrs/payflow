@@ -3,19 +3,34 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
+	GoEnv      string
+	JwtSecret  string
+	ServerPort string
+
+	// Database connection
 	DbUser     string
 	DbPassword string
 	DbHost     string
 	DbPort     string
 	DbName     string
-	ServerPort string
-	GoEnv      string
-	JwtSecret  string
+
+	// Rate limiting — IP (public routes)
+	RateLimitWindowSeconds int
+	RateLimitMaxRequests   int
+
+	// Rate limiting — Login
+	RateLimitLoginWindowSeconds int
+	RateLimitLoginMaxRequests   int
+
+	// Rate limiting — Tenant (protected routes)
+	RateLimitTenantWindowSeconds int
+	RateLimitTenantMaxRequests   int
 }
 
 func Load() *Config {
@@ -47,6 +62,15 @@ func Load() *Config {
 		return ""
 	}
 
+	envInt := func(key string, fallback int) int {
+		if v := os.Getenv(key); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				return n
+			}
+		}
+		return fallback
+	}
+
 	return &Config{
 		GoEnv:      goEnv,
 		DbUser:     mustEnv("DB_USER"),
@@ -56,5 +80,12 @@ func Load() *Config {
 		DbName:     mustEnv("DB_NAME"),
 		ServerPort: env("SERVER_PORT", "8080"),
 		JwtSecret:  mustEnv("JWT_SECRET"),
+
+		RateLimitWindowSeconds:       envInt("RATE_LIMIT_WINDOW_SECONDS", 60),
+		RateLimitMaxRequests:         envInt("RATE_LIMIT_MAX_REQUESTS", 100),
+		RateLimitLoginWindowSeconds:  envInt("RATE_LIMIT_LOGIN_WINDOW_SECONDS", 300),
+		RateLimitLoginMaxRequests:    envInt("RATE_LIMIT_LOGIN_MAX_REQUESTS", 5),
+		RateLimitTenantWindowSeconds: envInt("RATE_LIMIT_TENANT_WINDOW_SECONDS", 60),
+		RateLimitTenantMaxRequests:   envInt("RATE_LIMIT_TENANT_MAX_REQUESTS", 200),
 	}
 }

@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"errors"
 	apierr "i9pay/internal/api/err"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 // Errors reads errors attached via c.Error() after the handler chain runs and
@@ -19,6 +21,13 @@ func Errors() gin.HandlerFunc {
 		}
 
 		err := c.Errors.Last().Err
+
+		// Check for validation errors first
+		var ve validator.ValidationErrors
+		if errors.As(err, &ve) {
+			c.JSON(http.StatusBadRequest, gin.H{"errors": apierr.TranslateValidationErrors(err)})
+			return
+		}
 
 		if appErr, ok := apierr.As(err); ok {
 			c.JSON(appErr.Status, gin.H{"error": appErr.Message})
