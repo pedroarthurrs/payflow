@@ -225,6 +225,48 @@ protected.Use(middleware.Auth(tokenSvc))
 
 ## Padrões de Código
 
+### Middleware
+
+Ao adicionar novo middleware, siga a ordem de execução:
+
+```go
+// No router.go
+r := gin.New()
+r.Use(middleware.Recovery())           // 1. Captura panics
+r.Use(middleware.RequestID())          // 2. Gera UUID por requisição
+r.Use(middleware.StructuredLogger(logger))  // 3. Registra requisição
+r.Use(middleware.Errors())             // 4. Serializa erros
+// Rate limiters aplicados por grupo
+// Auth aplicado em rotas protegidas
+```
+
+Cada middleware deve:
+- Ser independente e testável
+- Não modificar o comportamento de outros
+- Registrar erros via `c.Error(err)` em vez de responder diretamente
+- Chamar `c.Next()` para passar para o próximo middleware
+
+### Validação
+
+Use `go-playground/validator` com tags estruturadas:
+
+```go
+type CreateRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8,max=64"`
+	Name     string `json:"name" validate:"required,max=100"`
+}
+
+// No handler
+validate := validator.New()
+if err := validate.Struct(req); err != nil {
+	_ = c.Error(err)  // Middleware Errors() traduz automaticamente
+	return
+}
+```
+
+Mensagens são traduzidas automaticamente em `internal/api/err/validation.go`.
+
 ### Naming
 
 - **Packages**: lowercase, sem underscore (`internal/api/http/products`)

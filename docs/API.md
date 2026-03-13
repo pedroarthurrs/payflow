@@ -319,8 +319,82 @@ curl "$API_BASE/v1/me" \
 
 ## Rate Limiting
 
-Atualmente não implementado. Roadmap para futuras versões.
+A API implementa rate limiting em 3 tiers para proteção contra abuso e força bruta.
 
-## Webhooks
+### Tiers
 
-Atualmente não implementado. Roadmap para futuras versões.
+**1. IP-Based (Rotas Públicas)**
+- Limite: 100 requisições por 60 segundos por IP
+- Aplica-se a todas as rotas públicas
+
+**2. Login-Specific**
+- Limite: 5 tentativas por 300 segundos (5 minutos) por IP
+- Aplica-se apenas a `POST /v1/auth/login`
+
+**3. Tenant-Based (Rotas Protegidas)**
+- Limite: 200 requisições por 60 segundos por tenant
+- Aplica-se a todas as rotas protegidas
+
+### Headers de Resposta
+
+Todas as respostas incluem headers de rate limit:
+
+```
+X-RateLimit-Limit: 100              # Limite máximo
+X-RateLimit-Remaining: 95           # Requisições restantes
+X-RateLimit-Reset: 1678800000       # Unix timestamp do reset
+Retry-After: 45                      # Segundos até reset (apenas em 429)
+```
+
+### Resposta ao Exceder Limite (429)
+
+```json
+{
+  "error": "too many requests, try again later"
+}
+```
+
+Ou para login:
+
+```json
+{
+  "error": "too many login attempts, try again later"
+}
+```
+
+### Configuração
+
+Veja [SECURITY_OBSERVABILITY.md](/docs/SECURITY_OBSERVABILITY.md#rate-limiting) para detalhes de configuração via variáveis de ambiente.
+
+## Validation Errors
+
+Quando a validação de entrada falha, a API retorna um array estruturado de erros:
+
+**Response (400 Bad Request):**
+```json
+{
+  "errors": [
+    {
+      "field": "email",
+      "rejected_value": "invalid-email",
+      "message": "email must be a valid email"
+    },
+    {
+      "field": "password",
+      "rejected_value": "short",
+      "message": "password must be at least 8"
+    }
+  ]
+}
+```
+
+### Mensagens Traduzidas
+
+| Validação | Mensagem |
+|-----------|----------|
+| `required` | `{field} is required` |
+| `email` | `{field} must be a valid email` |
+| `min` | `{field} must be at least {param}` |
+| `max` | `{field} must be at most {param}` |
+
+Veja [SECURITY_OBSERVABILITY.md](/docs/SECURITY_OBSERVABILITY.md#input-validation-translation) para mais detalhes.

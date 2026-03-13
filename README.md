@@ -32,6 +32,7 @@ Pronto! API rodando em `http://localhost:8080`.
 - **[SETUP.md](/docs/SETUP.md)** — Como instalar e configurar localmente com Docker
 - **[API.md](/docs/API.md)** — Documentação completa de endpoints e exemplos cURL
 - **[ARCHITECTURE.md](/docs/ARCHITECTURE.md)** — Padrões e decisões de arquitetura
+- **[SECURITY_OBSERVABILITY.md](/docs/SECURITY_OBSERVABILITY.md)** — Rate Limiting, Structured Logging e Validação
 - **[DEVELOPMENT.md](/docs/DEVELOPMENT.md)** — Como contribuir e adicionar features
 - **[COMMANDS.md](/docs/COMMANDS.md)** — Referência de comandos disponíveis
 
@@ -63,13 +64,16 @@ i9pay/
 
 ## Features
 
-✅ Autenticação JWT com access e refresh tokens
-✅ Multi-tenant com isolamento de data
-✅ Health check com status de dependências
-✅ Arquitetura modular e escalável
-✅ Migrations versionadas com Go Migrate
-✅ Type-safe queries com SQLC
-✅ Docker para dev e produção
+* Autenticação JWT com access e refresh tokens
+* Multi-tenant com isolamento de data
+* Health check com status de dependências
+* Rate Limiting com 3 tiers (IP, Login, Tenant)
+* Structured Logging com slog (JSON/Texto)
+* Validação de Input com mensagens traduzidas
+* Arquitetura modular e escalável
+* Migrations versionadas com Go Migrate
+* Type-safe queries com SQLC
+* Docker para dev e produção
 
 ---
 
@@ -84,14 +88,3 @@ i9pay/
 1. Veja [DEVELOPMENT.md](/docs/DEVELOPMENT.md) para adicionar features
 2. Consulte [COMMANDS.md](/docs/COMMANDS.md) para todos os comandos
 3. Execute `make help` para lista rápida
-
----
-
-## Support
-
-Dúvidas? Abra uma [issue](../../issues) no repositório.
-
-**Sociais:**  
-[GitHub](https://github.com) • [Docs](https://docs)
-
-Licença: MIT

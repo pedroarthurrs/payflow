@@ -55,9 +55,13 @@ Response JSON
 **Middleware** (`api/middleware/`)
 - `auth.go`: Valida JWT e extrai claims
 - `errors.go`: Transforma erros de domínio em respostas HTTP
+- `ratelimit.go`: Rate limiting por IP e tenant
+- `requestid.go`: Gera/propaga UUID v4 por requisição
+- `logger.go`: Structured logging com slog
 
 **Error Handling** (`api/err/`)
 - `apierr.go`: Tipos de erro customizados (BadRequest, Unauthorized, etc.)
+- `validation.go`: Tradução de erros de validação em mensagens legíveis
 - Mapeamento para status HTTP
 
 ### 2. Service Layer (`service/`)
@@ -113,7 +117,55 @@ Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
 
 ## Padrões e Decisões
 
-### Padrão de Handlers
+### Middleware Chain
+
+A ordem de middleware é crítica para segurança e observabilidade:
+
+```
+1. Recovery()              — Captura panics
+2. RequestID()             — Gera/propaga X-Request-ID (UUID v4)
+3. StructuredLogger()      — Registra requisição com slog
+4. Errors()                — Serializa erros para JSON
+5. RateLimitByIP()         — Limita por IP (v1 group)
+6. Auth()                  — Valida JWT (protected group)
+7. RateLimitByTenant()     — Limita por tenant (protected group)
+```
+
+Cada middleware é responsável por uma preocupação específica:
+- **Recovery**: Evita crashes
+- **RequestID**: Rastreabilidade
+- **StructuredLogger**: Observabilidade
+- **Errors**: Serialização consistente
+- **RateLimit**: Proteção contra abuso
+- **Auth**: Segurança
+
+### Rate Limiting
+
+Implementado com 3 tiers independentes:
+
+1. **IP-Based** — Proteção geral contra abuso (100 req/min por IP)
+2. **Login-Specific** — Mitigação de força bruta (5 tentativas/5min por IP)
+3. **Tenant-Based** — Isolamento de recursos (200 req/min por tenant)
+
+Cada tier usa uma `RateLimiterStore` separada com `sync.Mutex` e `map[string]*visitor`. Sem limpeza ativa (lazy cleanup).
+
+### Structured Logging
+
+Usa `log/slog` nativo do Go (1.21+):
+- **Produção**: JSON handler (machine-readable)
+- **Desenvolvimento**: Text handler (human-readable)
+
+Cada log contém: `request_id`, `method`, `path`, `status`, `latency_ms`, `client_ip`, `user_id`.
+
+### Validation Translation
+
+Converte erros brutos do `go-playground/validator` em mensagens legíveis:
+- `required` → `{field} is required`
+- `email` → `{field} must be a valid email`
+- `min` → `{field} must be at least {param}`
+- `max` → `{field} must be at most {param}`
+
+Resposta estruturada com `field`, `rejected_value`, `message`.
 
 Cada handler é um pacote separado com:
 - Uma struct `Handler` com dependências
