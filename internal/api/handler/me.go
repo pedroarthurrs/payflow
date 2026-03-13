@@ -1,6 +1,7 @@
 package handler
 
 import (
+	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
 	"net/http"
 
@@ -16,12 +17,12 @@ func NewMeHandler() *MeHandler {
 func (h *MeHandler) Get(c *gin.Context) {
 	claims, ok := c.MustGet(middleware.ClaimsKey).(*middleware.Claims)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not parse claims"})
+		_ = c.Error(apierr.Internal("could not parse claims"))
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"name":       claims.Name,
+		"email":      claims.Email,
 		"password":   claims.Password,
 		"issued_at":  claims.IssuedAt,
 		"expires_at": claims.ExpiresAt,

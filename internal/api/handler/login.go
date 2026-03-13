@@ -1,6 +1,7 @@
 package handler
 
 import (
+	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
 	"net/http"
 	"time"
@@ -18,21 +19,20 @@ func NewLoginHandler(jwtSecret string) *LoginHandler {
 }
 
 type loginRequest struct {
-	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required"`
 	Password string `json:"password"    binding:"required"`
 }
 
 func (h *LoginHandler) Post(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		_ = c.Error(apierr.BadRequest(err.Error()))
 		return
 	}
 
 	now := time.Now()
 	claims := middleware.Claims{
-		Name:     req.Name,
-		Password: req.Password,
+		Email: req.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "i9pay",
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -43,7 +43,7 @@ func (h *LoginHandler) Post(c *gin.Context) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(h.jwtSecret)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate token"})
+		_ = c.Error(apierr.Internal("could not generate token"))
 		return
 	}
 

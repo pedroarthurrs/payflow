@@ -7,8 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func New(jwtSecret string) *gin.Engine {
-	r := gin.Default()
+func New(jwtSecret string, db *database.DB) *gin.Engine {
+	r := gin.New()
+	r.Use(middleware.Recovery())
+	r.Use(gin.Logger())
+	r.Use(middleware.Errors())
 
 	rootHandler := handler.NewRootHandler()
 	loginHandler := handler.NewLoginHandler(jwtSecret)
