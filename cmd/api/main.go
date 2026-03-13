@@ -30,7 +30,7 @@ func main() {
 	}
 	defer db.Close()
 
-	r := router.New(cfg.JwtSecret)
+	r := router.New(cfg.JwtSecret, db)
 
 	r.Run(":8080")
 }
