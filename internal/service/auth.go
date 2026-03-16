@@ -5,13 +5,19 @@ import (
 	"i9pay/internal/token"
 )
 
+// TokenProvider defines the token operations required by AuthService.
+type TokenProvider interface {
+	NewPair(tenantID string) (*token.Pair, error)
+	Refresh(refreshToken string) (*token.Pair, error)
+}
+
 // AuthService handles authentication logic.
 type AuthService struct {
-	tokenSvc *token.Service
+	tokenSvc TokenProvider
 }
 
 // NewAuthService creates an AuthService.
-func NewAuthService(tokenSvc *token.Service) *AuthService {
+func NewAuthService(tokenSvc TokenProvider) *AuthService {
 	return &AuthService{tokenSvc: tokenSvc}
 }
 

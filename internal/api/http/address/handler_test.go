@@ -141,8 +141,6 @@ func basePath(customerID string) string {
 // Property-Based Tests
 // ============================================================
 
-// Feature: customer-addresses, Property 2: Rejeição de campos obrigatórios ausentes
-// **Validates: Requirements 1.2, 1.11, 2.3, 5.2, 5.5**
 func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New().String()
@@ -195,8 +193,6 @@ func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 	})
 }
 
-// Feature: customer-addresses, Property 3: Validação do enum address_type
-// **Validates: Requisito 1.5**
 func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 	validTypes := map[string]bool{"billing": true, "shipping": true, "home": true}
 	rapid.Check(t, func(t *rapid.T) {
@@ -238,8 +234,6 @@ func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 	})
 }
 
-// Feature: customer-addresses, Property 5: Customer não encontrado para customer_id inexistente
-// **Validates: Requisitos 1.10, 3.4, 4.4, 5.4, 6.3**
 func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New().String()
@@ -315,8 +309,6 @@ func assertErrorMessage(t *rapid.T, w *httptest.ResponseRecorder, expected strin
 	}
 }
 
-// Feature: customer-addresses, Property 12: Formato da resposta de erro de validação
-// **Validates: Requisito 8.1**
 func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New().String()
@@ -397,7 +389,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 }
 
 // ============================================================
-// Unit Tests (Sub-task 6.7)
+// Unit Tests
 // ============================================================
 
 func TestCreate_ValidPayload_Returns201(t *testing.T) {
@@ -798,11 +790,9 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 }
 
 // ============================================================
-// Property-Based Tests (Task 8.2–8.5)
+// Property-Based Tests
 // ============================================================
 
-// Feature: customer-addresses, Property 8: Listagem retorna todos os endereços ordenados por created_at DESC
-// **Validates: Requisitos 3.1, 3.2**
 func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New()
@@ -873,8 +863,6 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 	})
 }
 
-// Feature: customer-addresses, Property 9: Atualização reflete novos valores
-// **Validates: Requisito 5.1**
 func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New()
@@ -959,8 +947,6 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 	})
 }
 
-// Feature: customer-addresses, Property 10: Exclusão remove o endereço
-// **Validates: Requisito 6.1**
 func TestProperty_DeleteRemovesAddress(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New()
@@ -1026,8 +1012,6 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 	})
 }
 
-// Feature: customer-addresses, Property 11: Isolamento multi-tenant
-// **Validates: Requisitos 7.1, 7.2, 7.3**
 func TestProperty_MultiTenantIsolation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantA := uuid.New()

@@ -457,8 +457,6 @@ func TestHardDelete_DatabaseError(t *testing.T) {
 // ============================================================
 // Existing property-based tests
 // ============================================================
-
-// **Validates: Requirements 1.1, 1.7, 1.8, 1.10, 3.1, 6.2**
 func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 	f := func(seed uint64) bool {
 		r := seed
@@ -559,7 +557,6 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 	}
 }
 
-// **Validates: Requirements 2.1, 6.1, 6.3**
 func TestProperty_MultiTenantIsolation(t *testing.T) {
 	f := func(seed uint64) bool {
 		r := seed
@@ -648,10 +645,6 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		t.Fatalf("Property 5 failed: %v", err)
 	}
 }
-
-// ============================================================
-// Sub-task 4.5: Unit tests for atomic creation
-// ============================================================
 
 func TestCreate_WithAddress_BothCreated(t *testing.T) {
 	resetTxTestStore()
@@ -776,12 +769,6 @@ func TestUpdate_WithoutAddress_OnlyCustomerUpdated(t *testing.T) {
 	}
 }
 
-// ============================================================
-// Sub-task 4.3: Property 6 — Atomic customer+address creation
-// ============================================================
-
-// Feature: customer-addresses, Property 6: Criação atômica de cliente com endereço
-// **Validates: Requirements 2.1, 2.6**
 func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		resetTxTestStore()
@@ -845,13 +832,6 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 		}
 	})
 }
-
-// ============================================================
-// Sub-task 4.4: Property 7 — Creation without address
-// ============================================================
-
-// Feature: customer-addresses, Property 7: Criação de cliente sem endereço não cria endereço
-// **Validates: Requirements 2.2, 3.3**
 func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New()

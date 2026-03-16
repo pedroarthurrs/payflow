@@ -133,9 +133,9 @@ func setupRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 
 	r.POST("/v1/customers", h.Create)
 	r.GET("/v1/customers", h.List)
-	r.GET("/v1/customers/:id", h.GetByID)
-	r.PUT("/v1/customers/:id", h.Update)
-	r.DELETE("/v1/customers/:id", h.Delete)
+	r.GET("/v1/customers/:customer_id", h.GetByID)
+	r.PUT("/v1/customers/:customer_id", h.Update)
+	r.DELETE("/v1/customers/:customer_id", h.Delete)
 
 	return r
 }
@@ -392,7 +392,6 @@ func TestDelete_Success_Returns204(t *testing.T) {
 
 // --- Property-based test: Rejection of invalid input ---
 
-// **Validates: Requirements 1.2, 1.3, 1.4, 1.5, 1.6, 1.9, 4.3, 4.6**
 func TestProperty_InvalidInput_Returns400(t *testing.T) {
 	// Property 2: Rejection of invalid input.
 	// Any payload that violates validation rules (missing required fields,
@@ -515,7 +514,6 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 
 // --- Property-based test: Invalid UUID returns 400 ---
 
-// **Validates: Requirements 3.3, 4.5, 5.3**
 func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 	// Property 8: UUID inválido retorna 400.
 	// Any string that is not a valid UUID should return HTTP 400 with
@@ -665,7 +663,6 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 
 // --- Property-based test: Validation error response format ---
 
-// **Validates: Requirement 7.1**
 func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 	// Property 9: Formato da resposta de erro de validação.
 	// Validation error responses must contain an array of objects where each
@@ -815,7 +812,6 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 
 // --- Property-based test: Soft delete hides customer from all operations ---
 
-// **Validates: Requirements 2.2, 3.4, 4.7, 5.1, 5.4**
 func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 	// Property 4: Soft delete oculta o cliente de todas as operações.
 	// After soft delete, the customer should not appear in the listing,
@@ -1038,7 +1034,6 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 // --- Property-based test: Round-trip of update and read ---
 
-// **Validates: Requirements 4.1, 4.2**
 func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 	// Property 3: Round-trip de atualização e leitura.
 	// For any existing active customer, updating it and then reading it by ID
@@ -1242,7 +1237,6 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 
 // --- Property-based test: Listing order by created_at descending ---
 
-// **Validates: Requirement 2.3**
 func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 	// Property 6: Ordenação da listagem por created_at decrescente.
 	// For any tenant with multiple customers, the listing should return
@@ -1405,7 +1399,6 @@ func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 
 // --- Property-based test: Non-existent customer returns 404 ---
 
-// **Validates: Requirements 3.2, 4.4, 5.2**
 func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
 	// Property 7: Cliente inexistente retorna 404.
 	// Any valid UUID that doesn't correspond to a customer of the authenticated

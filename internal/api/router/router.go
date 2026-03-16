@@ -75,9 +75,9 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 
 			protected.POST("/customers", customerHandler.Create)
 			protected.GET("/customers", customerHandler.List)
-			protected.GET("/customers/:id", customerHandler.GetByID)
-			protected.PUT("/customers/:id", customerHandler.Update)
-			protected.DELETE("/customers/:id", customerHandler.Delete)
+			protected.GET("/customers/:customer_id", customerHandler.GetByID)
+			protected.PUT("/customers/:customer_id", customerHandler.Update)
+			protected.DELETE("/customers/:customer_id", customerHandler.Delete)
 
 			protected.POST("/customers/:customer_id/addresses", addressHandler.Create)
 			protected.GET("/customers/:customer_id/addresses", addressHandler.List)

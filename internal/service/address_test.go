@@ -128,8 +128,7 @@ func buildDBAddress(id, tenantID, customerID uuid.UUID, arg dbgen.CreateAddressP
 // Property-Based Tests
 // ============================================================
 
-// Feature: customer-addresses, Property 1: Round trip de criação de endereço
-// **Validates: Requirements 1.1, 4.1, 1.12**
+// Property 1: Round trip de criação de endereço
 func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New()
@@ -278,8 +277,7 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 	})
 }
 
-// Feature: customer-addresses, Property 4: Valores padrão aplicados quando campos omitidos
-// **Validates: Requirements 1.6, 1.7, 1.9**
+// Property 4: Valores padrão aplicados quando campos omitidos
 func TestProperty_AddressDefaultValues(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantID := uuid.New()

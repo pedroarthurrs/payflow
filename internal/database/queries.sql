@@ -6,6 +6,10 @@ WHERE id = $1 LIMIT 1;
 SELECT * FROM tenants
 ORDER BY name;
 
+-- =================================
+-- Customer
+-- =================================
+
 -- name: CreateCustomer :one
 INSERT INTO customers (tenant_id, name, email, phone, document, document_type, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -34,6 +38,10 @@ WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL;
 -- name: HardDeleteCustomer :exec
 DELETE FROM customers
 WHERE id = $1 AND tenant_id = $2;
+
+-- =================================
+-- Address
+-- =================================
 
 -- name: CreateAddress :one
 INSERT INTO addresses (tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main)

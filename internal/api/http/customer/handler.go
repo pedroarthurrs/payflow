@@ -144,9 +144,9 @@ func tenantID(c *gin.Context) (uuid.UUID, bool) {
 	return tid, true
 }
 
-// customerID parses the ":id" path parameter as a UUID.
+// customerID parses the ":customer_id" path parameter as a UUID.
 func customerID(c *gin.Context) (uuid.UUID, bool) {
-	id, err := uuid.Parse(c.Param("id"))
+	id, err := uuid.Parse(c.Param("customer_id"))
 	if err != nil {
 		_ = c.Error(apierr.BadRequest("invalid customer id"))
 		return uuid.UUID{}, false
