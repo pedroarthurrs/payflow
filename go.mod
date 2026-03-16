@@ -10,6 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.11.2
 	github.com/sqlc-dev/pqtype v0.3.0
+	pgregory.net/rapid v1.2.0
 )
 
 require (

@@ -30,6 +30,7 @@ type CreateCustomerInput struct {
 	Document     string
 	DocumentType string
 	Metadata     json.RawMessage
+	Address      *CreateAddressInput
 }
 
 // UpdateCustomerInput represents the input for updating an existing customer.
@@ -40,4 +41,5 @@ type UpdateCustomerInput struct {
 	Document     string
 	DocumentType string
 	Metadata     json.RawMessage
+	Address      *CreateAddressInput
 }

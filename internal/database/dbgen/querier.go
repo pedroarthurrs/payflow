@@ -11,13 +11,18 @@ import (
 )
 
 type Querier interface {
+	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
+	GetAddressByID(ctx context.Context, arg GetAddressByIDParams) (Address, error)
 	GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error)
 	GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
 	HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error
+	ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error)
 	ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]Customer, error)
 	ListTenants(ctx context.Context) ([]Tenant, error)
 	SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error
+	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
 }
 

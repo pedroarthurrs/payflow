@@ -34,3 +34,28 @@ WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL;
 -- name: HardDeleteCustomer :exec
 DELETE FROM customers
 WHERE id = $1 AND tenant_id = $2;
+
+-- name: CreateAddress :one
+INSERT INTO addresses (tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING *;
+
+-- name: ListAddressesByCustomer :many
+SELECT * FROM addresses
+WHERE customer_id = $1 AND tenant_id = $2
+ORDER BY created_at DESC;
+
+-- name: GetAddressByID :one
+SELECT * FROM addresses
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+LIMIT 1;
+
+-- name: UpdateAddress :one
+UPDATE addresses
+SET type = $4, postal_code = $5, street = $6, number = $7, complement = $8, neighborhood = $9, city = $10, state = $11, country = $12, is_main = $13
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+RETURNING *;
+
+-- name: DeleteAddress :exec
+DELETE FROM addresses
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3;

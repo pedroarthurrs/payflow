@@ -1,6 +1,7 @@
 package router
 
 import (
+	"i9pay/internal/api/http/address"
 	"i9pay/internal/api/http/auth"
 	"i9pay/internal/api/http/customer"
 	"i9pay/internal/api/http/health"
@@ -40,7 +41,8 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
 	authSvc := service.NewAuthService(tokenSvc)
-	customerSvc := service.NewCustomerService(db)
+	addressSvc := service.NewAddressService(db)
+	customerSvc := service.NewCustomerService(db, addressSvc)
 
 	// Handlers
 	rootHandler := root.NewHandler()
@@ -48,6 +50,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	healthHandler := health.NewHandler(db)
 	meHandler := me.NewHandler()
 	customerHandler := customer.NewHandler(customerSvc)
+	addressHandler := address.NewHandler(addressSvc)
 
 	r.GET("/", rootHandler.Get)
 
@@ -75,6 +78,12 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 			protected.GET("/customers/:id", customerHandler.GetByID)
 			protected.PUT("/customers/:id", customerHandler.Update)
 			protected.DELETE("/customers/:id", customerHandler.Delete)
+
+			protected.POST("/customers/:customer_id/addresses", addressHandler.Create)
+			protected.GET("/customers/:customer_id/addresses", addressHandler.List)
+			protected.GET("/customers/:customer_id/addresses/:id", addressHandler.GetByID)
+			protected.PUT("/customers/:customer_id/addresses/:id", addressHandler.Update)
+			protected.DELETE("/customers/:customer_id/addresses/:id", addressHandler.Delete)
 		}
 	}
 

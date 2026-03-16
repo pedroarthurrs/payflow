@@ -92,6 +92,26 @@ func (m *mockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.HardDele
 	return nil
 }
 
+func (m *mockQuerier) CreateAddress(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
+	return dbgen.Address{}, nil
+}
+
+func (m *mockQuerier) DeleteAddress(ctx context.Context, arg dbgen.DeleteAddressParams) error {
+	return nil
+}
+
+func (m *mockQuerier) GetAddressByID(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
+	return dbgen.Address{}, nil
+}
+
+func (m *mockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) UpdateAddress(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
+	return dbgen.Address{}, nil
+}
+
 // withClaims injects JWT claims into the Gin context for testing.
 func withClaims(tenantID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -104,7 +124,7 @@ func withClaims(tenantID string) gin.HandlerFunc {
 func setupRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	db := &database.DB{Queries: mock}
-	svc := service.NewCustomerService(db)
+	svc := service.NewCustomerService(db, nil)
 	h := NewHandler(svc)
 
 	r := gin.New()

@@ -37,6 +37,10 @@ func TranslateValidationErrors(err error) []ValidationFieldError {
 			message = fmt.Sprintf("%s must be at least %s", field, fe.Param())
 		case "max":
 			message = fmt.Sprintf("%s must be at most %s", field, fe.Param())
+		case "len":
+			message = fmt.Sprintf("%s must be exactly %s characters", field, fe.Param())
+		case "oneof":
+			message = fmt.Sprintf("%s must be one of [%s]", field, fe.Param())
 		default:
 			message = fmt.Sprintf("%s failed %s validation", field, fe.Tag())
 		}

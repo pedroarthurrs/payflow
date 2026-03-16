@@ -13,6 +13,62 @@ import (
 	"github.com/sqlc-dev/pqtype"
 )
 
+const createAddress = `-- name: CreateAddress :one
+INSERT INTO addresses (tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at
+`
+
+type CreateAddressParams struct {
+	TenantID     uuid.UUID       `json:"tenant_id"`
+	CustomerID   uuid.UUID       `json:"customer_id"`
+	Type         NullAddressType `json:"type"`
+	PostalCode   string          `json:"postal_code"`
+	Street       string          `json:"street"`
+	Number       sql.NullString  `json:"number"`
+	Complement   sql.NullString  `json:"complement"`
+	Neighborhood sql.NullString  `json:"neighborhood"`
+	City         string          `json:"city"`
+	State        string          `json:"state"`
+	Country      sql.NullString  `json:"country"`
+	IsMain       sql.NullBool    `json:"is_main"`
+}
+
+func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error) {
+	row := q.db.QueryRowContext(ctx, createAddress,
+		arg.TenantID,
+		arg.CustomerID,
+		arg.Type,
+		arg.PostalCode,
+		arg.Street,
+		arg.Number,
+		arg.Complement,
+		arg.Neighborhood,
+		arg.City,
+		arg.State,
+		arg.Country,
+		arg.IsMain,
+	)
+	var i Address
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CustomerID,
+		&i.Type,
+		&i.PostalCode,
+		&i.Street,
+		&i.Number,
+		&i.Complement,
+		&i.Neighborhood,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.IsMain,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createCustomer = `-- name: CreateCustomer :one
 INSERT INTO customers (tenant_id, name, email, phone, document, document_type, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -53,6 +109,56 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const deleteAddress = `-- name: DeleteAddress :exec
+DELETE FROM addresses
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+`
+
+type DeleteAddressParams struct {
+	ID         uuid.UUID `json:"id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+	TenantID   uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) DeleteAddress(ctx context.Context, arg DeleteAddressParams) error {
+	_, err := q.db.ExecContext(ctx, deleteAddress, arg.ID, arg.CustomerID, arg.TenantID)
+	return err
+}
+
+const getAddressByID = `-- name: GetAddressByID :one
+SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at FROM addresses
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+LIMIT 1
+`
+
+type GetAddressByIDParams struct {
+	ID         uuid.UUID `json:"id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+	TenantID   uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) GetAddressByID(ctx context.Context, arg GetAddressByIDParams) (Address, error) {
+	row := q.db.QueryRowContext(ctx, getAddressByID, arg.ID, arg.CustomerID, arg.TenantID)
+	var i Address
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CustomerID,
+		&i.Type,
+		&i.PostalCode,
+		&i.Street,
+		&i.Number,
+		&i.Complement,
+		&i.Neighborhood,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.IsMain,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -123,6 +229,55 @@ type HardDeleteCustomerParams struct {
 func (q *Queries) HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error {
 	_, err := q.db.ExecContext(ctx, hardDeleteCustomer, arg.ID, arg.TenantID)
 	return err
+}
+
+const listAddressesByCustomer = `-- name: ListAddressesByCustomer :many
+SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at FROM addresses
+WHERE customer_id = $1 AND tenant_id = $2
+ORDER BY created_at DESC
+`
+
+type ListAddressesByCustomerParams struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+	TenantID   uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error) {
+	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer, arg.CustomerID, arg.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Address
+	for rows.Next() {
+		var i Address
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CustomerID,
+			&i.Type,
+			&i.PostalCode,
+			&i.Street,
+			&i.Number,
+			&i.Complement,
+			&i.Neighborhood,
+			&i.City,
+			&i.State,
+			&i.Country,
+			&i.IsMain,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCustomersByTenant = `-- name: ListCustomersByTenant :many
@@ -218,6 +373,65 @@ type SoftDeleteCustomerParams struct {
 func (q *Queries) SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error {
 	_, err := q.db.ExecContext(ctx, softDeleteCustomer, arg.ID, arg.TenantID)
 	return err
+}
+
+const updateAddress = `-- name: UpdateAddress :one
+UPDATE addresses
+SET type = $4, postal_code = $5, street = $6, number = $7, complement = $8, neighborhood = $9, city = $10, state = $11, country = $12, is_main = $13
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at
+`
+
+type UpdateAddressParams struct {
+	ID           uuid.UUID       `json:"id"`
+	CustomerID   uuid.UUID       `json:"customer_id"`
+	TenantID     uuid.UUID       `json:"tenant_id"`
+	Type         NullAddressType `json:"type"`
+	PostalCode   string          `json:"postal_code"`
+	Street       string          `json:"street"`
+	Number       sql.NullString  `json:"number"`
+	Complement   sql.NullString  `json:"complement"`
+	Neighborhood sql.NullString  `json:"neighborhood"`
+	City         string          `json:"city"`
+	State        string          `json:"state"`
+	Country      sql.NullString  `json:"country"`
+	IsMain       sql.NullBool    `json:"is_main"`
+}
+
+func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error) {
+	row := q.db.QueryRowContext(ctx, updateAddress,
+		arg.ID,
+		arg.CustomerID,
+		arg.TenantID,
+		arg.Type,
+		arg.PostalCode,
+		arg.Street,
+		arg.Number,
+		arg.Complement,
+		arg.Neighborhood,
+		arg.City,
+		arg.State,
+		arg.Country,
+		arg.IsMain,
+	)
+	var i Address
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CustomerID,
+		&i.Type,
+		&i.PostalCode,
+		&i.Street,
+		&i.Number,
+		&i.Complement,
+		&i.Neighborhood,
+		&i.City,
+		&i.State,
+		&i.Country,
+		&i.IsMain,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const updateCustomer = `-- name: UpdateCustomer :one

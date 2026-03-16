@@ -19,17 +19,45 @@ import (
 
 // CustomerService handles customer business logic.
 type CustomerService struct {
-	db *database.DB
+	db         *database.DB
+	addressSvc *AddressService
 }
 
 // NewCustomerService creates a CustomerService.
-func NewCustomerService(db *database.DB) *CustomerService {
-	return &CustomerService{db: db}
+func NewCustomerService(db *database.DB, addressSvc *AddressService) *CustomerService {
+	return &CustomerService{db: db, addressSvc: addressSvc}
 }
 
 // Create creates a new customer for the given tenant.
-func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
-	row, dbErr := s.db.Queries.CreateCustomer(ctx, dbgen.CreateCustomerParams{
+// When input.Address is provided, the customer and address are created atomically within a transaction.
+func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, *domain.Address, error) {
+	if input.Address == nil {
+		row, dbErr := s.db.Queries.CreateCustomer(ctx, dbgen.CreateCustomerParams{
+			TenantID:     tenantID,
+			Name:         input.Name,
+			Email:        input.Email,
+			Phone:        toNullString(input.Phone),
+			Document:     input.Document,
+			DocumentType: input.DocumentType,
+			Metadata:     toNullRawMessage(input.Metadata),
+		})
+		if dbErr != nil {
+			return nil, nil, s.handleWriteError(dbErr)
+		}
+		c := toDomainCustomer(row)
+		return &c, nil, nil
+	}
+
+	tx, err := s.db.DB.BeginTx(ctx, nil)
+	if err != nil {
+		slog.Error("failed to begin transaction", "error", err)
+		return nil, nil, apierr.Internal("internal server error")
+	}
+	defer tx.Rollback()
+
+	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
+
+	row, dbErr := qtx.CreateCustomer(ctx, dbgen.CreateCustomerParams{
 		TenantID:     tenantID,
 		Name:         input.Name,
 		Email:        input.Email,
@@ -39,11 +67,22 @@ func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input 
 		Metadata:     toNullRawMessage(input.Metadata),
 	})
 	if dbErr != nil {
-		return nil, s.handleWriteError(dbErr)
+		return nil, nil, s.handleWriteError(dbErr)
 	}
 
 	c := toDomainCustomer(row)
-	return &c, nil
+
+	addr, addrErr := s.addressSvc.CreateWithTx(ctx, tx, tenantID, c.ID, *input.Address)
+	if addrErr != nil {
+		return nil, nil, addrErr
+	}
+
+	if err := tx.Commit(); err != nil {
+		slog.Error("failed to commit transaction", "error", err)
+		return nil, nil, apierr.Internal("internal server error")
+	}
+
+	return &c, addr, nil
 }
 
 // List returns all active customers for the given tenant.
@@ -80,8 +119,39 @@ func (s *CustomerService) GetByID(ctx context.Context, tenantID uuid.UUID, custo
 }
 
 // Update updates an existing customer for the given tenant.
-func (s *CustomerService) Update(ctx context.Context, tenantID uuid.UUID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, error) {
-	row, dbErr := s.db.Queries.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
+// When input.Address is provided, the customer update and address creation are performed atomically.
+func (s *CustomerService) Update(ctx context.Context, tenantID uuid.UUID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
+	if input.Address == nil {
+		row, dbErr := s.db.Queries.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
+			ID:           customerID,
+			TenantID:     tenantID,
+			Name:         input.Name,
+			Email:        input.Email,
+			Phone:        toNullString(input.Phone),
+			Document:     input.Document,
+			DocumentType: input.DocumentType,
+			Metadata:     toNullRawMessage(input.Metadata),
+		})
+		if dbErr != nil {
+			if errors.Is(dbErr, sql.ErrNoRows) {
+				return nil, nil, domain.ErrCustomerNotFound
+			}
+			return nil, nil, s.handleWriteError(dbErr)
+		}
+		c := toDomainCustomer(row)
+		return &c, nil, nil
+	}
+
+	tx, err := s.db.DB.BeginTx(ctx, nil)
+	if err != nil {
+		slog.Error("failed to begin transaction", "error", err)
+		return nil, nil, apierr.Internal("internal server error")
+	}
+	defer tx.Rollback()
+
+	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
+
+	row, dbErr := qtx.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
 		ID:           customerID,
 		TenantID:     tenantID,
 		Name:         input.Name,
@@ -93,13 +163,24 @@ func (s *CustomerService) Update(ctx context.Context, tenantID uuid.UUID, custom
 	})
 	if dbErr != nil {
 		if errors.Is(dbErr, sql.ErrNoRows) {
-			return nil, domain.ErrCustomerNotFound
+			return nil, nil, domain.ErrCustomerNotFound
 		}
-		return nil, s.handleWriteError(dbErr)
+		return nil, nil, s.handleWriteError(dbErr)
 	}
 
 	c := toDomainCustomer(row)
-	return &c, nil
+
+	addr, addrErr := s.addressSvc.CreateWithTx(ctx, tx, tenantID, customerID, *input.Address)
+	if addrErr != nil {
+		return nil, nil, addrErr
+	}
+
+	if err := tx.Commit(); err != nil {
+		slog.Error("failed to commit transaction", "error", err)
+		return nil, nil, apierr.Internal("internal server error")
+	}
+
+	return &c, addr, nil
 }
 
 // Delete performs a soft delete on a customer for the given tenant.
