@@ -11,8 +11,14 @@ import (
 )
 
 type Querier interface {
+	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error)
 	GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
+	HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error
+	ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]Customer, error)
 	ListTenants(ctx context.Context) ([]Tenant, error)
+	SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error
+	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
 }
 
 var _ Querier = (*Queries)(nil)

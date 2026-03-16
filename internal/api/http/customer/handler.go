@@ -1,0 +1,236 @@
+package customer
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"time"
+
+	apierr "i9pay/internal/api/err"
+	"i9pay/internal/api/middleware"
+	"i9pay/internal/domain"
+	"i9pay/internal/service"
+	"i9pay/internal/token"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+// Handler handles customer-related HTTP endpoints.
+type Handler struct {
+	customerSvc *service.CustomerService
+}
+
+// NewHandler creates a customer Handler.
+func NewHandler(customerSvc *service.CustomerService) *Handler {
+	return &Handler{customerSvc: customerSvc}
+}
+
+type createCustomerRequest struct {
+	Name         string          `json:"name"          binding:"required"`
+	Email        string          `json:"email"         binding:"required,email"`
+	Phone        *string         `json:"phone"         binding:"omitempty,max=20"`
+	Document     string          `json:"document"      binding:"required,min=1,max=20"`
+	DocumentType string          `json:"document_type" binding:"required,min=1,max=20"`
+	Metadata     json.RawMessage `json:"metadata"      binding:"omitempty"`
+}
+
+type updateCustomerRequest struct {
+	Name         string          `json:"name"          binding:"required"`
+	Email        string          `json:"email"         binding:"required,email"`
+	Phone        *string         `json:"phone"         binding:"omitempty,max=20"`
+	Document     string          `json:"document"      binding:"required,min=1,max=20"`
+	DocumentType string          `json:"document_type" binding:"required,min=1,max=20"`
+	Metadata     json.RawMessage `json:"metadata"      binding:"omitempty"`
+}
+
+type customerResponse struct {
+	ID           uuid.UUID       `json:"id"`
+	Name         string          `json:"name"`
+	Email        string          `json:"email"`
+	Phone        *string         `json:"phone,omitempty"`
+	Document     string          `json:"document"`
+	DocumentType string          `json:"document_type"`
+	Status       string          `json:"status"`
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+func toCustomerResponse(c *domain.Customer) customerResponse {
+	return customerResponse{
+		ID:           c.ID,
+		Name:         c.Name,
+		Email:        c.Email,
+		Phone:        c.Phone,
+		Document:     c.Document,
+		DocumentType: c.DocumentType,
+		Status:       c.Status,
+		Metadata:     c.Metadata,
+		CreatedAt:    c.CreatedAt,
+		UpdatedAt:    c.UpdatedAt,
+	}
+}
+
+// tenantID extracts the tenant UUID from the JWT claims stored in the context.
+func tenantID(c *gin.Context) (uuid.UUID, bool) {
+	claims, ok := c.MustGet(middleware.ClaimsKey).(*token.Claims)
+	if !ok {
+		_ = c.Error(apierr.Internal("could not parse claims"))
+		return uuid.UUID{}, false
+	}
+	tid, err := uuid.Parse(claims.TenantID)
+	if err != nil {
+		_ = c.Error(apierr.Internal("invalid tenant id in claims"))
+		return uuid.UUID{}, false
+	}
+	return tid, true
+}
+
+// customerID parses the ":id" path parameter as a UUID.
+func customerID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid customer id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}
+
+// Create handles POST /v1/customers.
+func (h *Handler) Create(c *gin.Context) {
+	tid, ok := tenantID(c)
+	if !ok {
+		return
+	}
+
+	var req createCustomerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	cust, err := h.customerSvc.Create(c.Request.Context(), tid, domain.CreateCustomerInput{
+		Name:         req.Name,
+		Email:        req.Email,
+		Phone:        req.Phone,
+		Document:     req.Document,
+		DocumentType: req.DocumentType,
+		Metadata:     req.Metadata,
+	})
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, toCustomerResponse(cust))
+}
+
+// List handles GET /v1/customers.
+func (h *Handler) List(c *gin.Context) {
+	tid, ok := tenantID(c)
+	if !ok {
+		return
+	}
+
+	customers, err := h.customerSvc.List(c.Request.Context(), tid)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	resp := make([]customerResponse, len(customers))
+	for i := range customers {
+		resp[i] = toCustomerResponse(&customers[i])
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetByID handles GET /v1/customers/:id.
+func (h *Handler) GetByID(c *gin.Context) {
+	tid, ok := tenantID(c)
+	if !ok {
+		return
+	}
+
+	cid, ok := customerID(c)
+	if !ok {
+		return
+	}
+
+	cust, err := h.customerSvc.GetByID(c.Request.Context(), tid, cid)
+	if err != nil {
+		if errors.Is(err, domain.ErrCustomerNotFound) {
+			_ = c.Error(apierr.NotFound("customer not found"))
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toCustomerResponse(cust))
+}
+
+// Update handles PUT /v1/customers/:id.
+func (h *Handler) Update(c *gin.Context) {
+	tid, ok := tenantID(c)
+	if !ok {
+		return
+	}
+
+	cid, ok := customerID(c)
+	if !ok {
+		return
+	}
+
+	var req updateCustomerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	cust, err := h.customerSvc.Update(c.Request.Context(), tid, cid, domain.UpdateCustomerInput{
+		Name:         req.Name,
+		Email:        req.Email,
+		Phone:        req.Phone,
+		Document:     req.Document,
+		DocumentType: req.DocumentType,
+		Metadata:     req.Metadata,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrCustomerNotFound) {
+			_ = c.Error(apierr.NotFound("customer not found"))
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toCustomerResponse(cust))
+}
+
+// Delete handles DELETE /v1/customers/:id.
+func (h *Handler) Delete(c *gin.Context) {
+	tid, ok := tenantID(c)
+	if !ok {
+		return
+	}
+
+	cid, ok := customerID(c)
+	if !ok {
+		return
+	}
+
+	err := h.customerSvc.Delete(c.Request.Context(), tid, cid)
+	if err != nil {
+		if errors.Is(err, domain.ErrCustomerNotFound) {
+			_ = c.Error(apierr.NotFound("customer not found"))
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}

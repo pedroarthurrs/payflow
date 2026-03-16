@@ -7,9 +7,86 @@ package dbgen
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
+
+const createCustomer = `-- name: CreateCustomer :one
+INSERT INTO customers (tenant_id, name, email, phone, document, document_type, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at
+`
+
+type CreateCustomerParams struct {
+	TenantID     uuid.UUID             `json:"tenant_id"`
+	Name         string                `json:"name"`
+	Email        string                `json:"email"`
+	Phone        sql.NullString        `json:"phone"`
+	Document     string                `json:"document"`
+	DocumentType string                `json:"document_type"`
+	Metadata     pqtype.NullRawMessage `json:"metadata"`
+}
+
+func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
+	row := q.db.QueryRowContext(ctx, createCustomer,
+		arg.TenantID,
+		arg.Name,
+		arg.Email,
+		arg.Phone,
+		arg.Document,
+		arg.DocumentType,
+		arg.Metadata,
+	)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Email,
+		&i.Phone,
+		&i.Document,
+		&i.DocumentType,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getCustomerByID = `-- name: GetCustomerByID :one
+SELECT id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at FROM customers
+WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+LIMIT 1
+`
+
+type GetCustomerByIDParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error) {
+	row := q.db.QueryRowContext(ctx, getCustomerByID, arg.ID, arg.TenantID)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Email,
+		&i.Phone,
+		&i.Document,
+		&i.DocumentType,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
 
 const getTenant = `-- name: GetTenant :one
 SELECT id, email, name, password, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
@@ -31,6 +108,63 @@ func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const hardDeleteCustomer = `-- name: HardDeleteCustomer :exec
+DELETE FROM customers
+WHERE id = $1 AND tenant_id = $2
+`
+
+type HardDeleteCustomerParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error {
+	_, err := q.db.ExecContext(ctx, hardDeleteCustomer, arg.ID, arg.TenantID)
+	return err
+}
+
+const listCustomersByTenant = `-- name: ListCustomersByTenant :many
+SELECT id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at FROM customers
+WHERE tenant_id = $1 AND deleted_at IS NULL
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]Customer, error) {
+	rows, err := q.db.QueryContext(ctx, listCustomersByTenant, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Customer
+	for rows.Next() {
+		var i Customer
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.Email,
+			&i.Phone,
+			&i.Document,
+			&i.DocumentType,
+			&i.Status,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTenants = `-- name: ListTenants :many
@@ -69,4 +203,66 @@ func (q *Queries) ListTenants(ctx context.Context) ([]Tenant, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const softDeleteCustomer = `-- name: SoftDeleteCustomer :exec
+UPDATE customers SET deleted_at = NOW()
+WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+`
+
+type SoftDeleteCustomerParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error {
+	_, err := q.db.ExecContext(ctx, softDeleteCustomer, arg.ID, arg.TenantID)
+	return err
+}
+
+const updateCustomer = `-- name: UpdateCustomer :one
+UPDATE customers
+SET name = $3, email = $4, phone = $5, document = $6, document_type = $7, metadata = $8
+WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+RETURNING id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at
+`
+
+type UpdateCustomerParams struct {
+	ID           uuid.UUID             `json:"id"`
+	TenantID     uuid.UUID             `json:"tenant_id"`
+	Name         string                `json:"name"`
+	Email        string                `json:"email"`
+	Phone        sql.NullString        `json:"phone"`
+	Document     string                `json:"document"`
+	DocumentType string                `json:"document_type"`
+	Metadata     pqtype.NullRawMessage `json:"metadata"`
+}
+
+func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error) {
+	row := q.db.QueryRowContext(ctx, updateCustomer,
+		arg.ID,
+		arg.TenantID,
+		arg.Name,
+		arg.Email,
+		arg.Phone,
+		arg.Document,
+		arg.DocumentType,
+		arg.Metadata,
+	)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Email,
+		&i.Phone,
+		&i.Document,
+		&i.DocumentType,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }

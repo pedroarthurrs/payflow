@@ -72,6 +72,13 @@ Response JSON
 - Coordena token service
 - Lógica de negócio isolada de HTTP
 
+**CustomerService** (`service/customer.go`)
+- Gerenciamento completo de clientes (CRUD)
+- Soft delete padrão (marca `deleted_at`)
+- Hard delete para conformidade legal (LGPD/GDPR)
+- Validação de unicidade (email, documento por tenant)
+- Isolamento multi-tenant
+
 Futura expansão:
 - `user_service.go` - Gerenciamento de usuários
 - `subscription_service.go` - Lógica de assinaturas
@@ -292,6 +299,40 @@ func TestLoginHandler(t *testing.T) {
 - **Password**: Placeholder, deve usar bcrypt em produção
 - **Headers**: Authorization obrigatório em rotas protegidas
 - **Middleware Recovery**: Captura panics
+
+## Conformidade Legal (LGPD/GDPR)
+
+### Hard Delete para Direito ao Esquecimento
+
+O `CustomerService` implementa o método `HardDelete()` para atender requisitos legais de remoção permanente de dados:
+
+**Casos de Uso:**
+- LGPD Art. 18 (Direito ao Esquecimento)
+- GDPR Art. 17 (Right to Erasure)
+- Ordens judiciais
+- Políticas de retenção de dados
+
+**Implementação:**
+```go
+// Uso interno apenas - não exposto via HTTP
+err := customerSvc.HardDelete(ctx, tenantID, customerID)
+```
+
+**Características:**
+- Operação irreversível (DELETE físico no banco)
+- Requer verificação de existência prévia
+- Log de auditoria automático (nível WARN)
+- Isolamento por tenant (segurança multi-tenant)
+
+**Diferença entre Delete e HardDelete:**
+- `Delete()`: Soft delete (marca `deleted_at`, dados preservados)
+- `HardDelete()`: Remoção física permanente (conformidade legal)
+
+**Recomendações:**
+- Use `Delete()` para operações normais
+- Use `HardDelete()` apenas para requisições legais documentadas
+- Implemente processo de aprovação antes de executar
+- Mantenha logs de auditoria das operações de hard delete
 
 ## Performance
 

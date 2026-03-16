@@ -2,6 +2,7 @@ package router
 
 import (
 	"i9pay/internal/api/http/auth"
+	"i9pay/internal/api/http/customer"
 	"i9pay/internal/api/http/health"
 	"i9pay/internal/api/http/me"
 	"i9pay/internal/api/http/root"
@@ -39,12 +40,14 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
 	authSvc := service.NewAuthService(tokenSvc)
+	customerSvc := service.NewCustomerService(db)
 
 	// Handlers
 	rootHandler := root.NewHandler()
 	authHandler := auth.NewHandler(authSvc)
 	healthHandler := health.NewHandler(db)
 	meHandler := me.NewHandler()
+	customerHandler := customer.NewHandler(customerSvc)
 
 	r.GET("/", rootHandler.Get)
 
@@ -66,6 +69,12 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 		protected.Use(middleware.RateLimitByTenant(tenantStore, cfg.RateLimitTenantMaxRequests, tenantWindow))
 		{
 			protected.GET("/me", meHandler.Get)
+
+			protected.POST("/customers", customerHandler.Create)
+			protected.GET("/customers", customerHandler.List)
+			protected.GET("/customers/:id", customerHandler.GetByID)
+			protected.PUT("/customers/:id", customerHandler.Update)
+			protected.DELETE("/customers/:id", customerHandler.Delete)
 		}
 	}
 

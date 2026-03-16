@@ -18,7 +18,7 @@ type DBConfig struct {
 
 type DB struct {
 	*sql.DB
-	Queries *dbgen.Queries
+	Queries dbgen.Querier
 }
 
 func NewConnection(cfg DBConfig) (*DB, error) {
