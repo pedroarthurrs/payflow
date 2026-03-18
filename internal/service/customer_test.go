@@ -805,9 +805,11 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 		}
 		if cust == nil {
 			t.Fatal("expected customer, got nil")
+			return
 		}
 		if addr == nil {
 			t.Fatal("expected address, got nil")
+			return
 		}
 
 		// Both customer and address were created in the transaction

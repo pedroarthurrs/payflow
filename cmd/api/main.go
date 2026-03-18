@@ -1,11 +1,12 @@
 package main
 
 import (
+	"log/slog"
+	"os"
+
 	"i9pay/internal/api/router"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
-	"log/slog"
-	"os"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +21,12 @@ func SetupLogger(env string) *slog.Logger {
 }
 
 func main() {
+	if err := run(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg := config.Load()
 	logger := SetupLogger(cfg.GoEnv)
 
@@ -38,11 +45,15 @@ func main() {
 	})
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err)
-		os.Exit(1)
+		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	r := router.New(cfg, logger, db)
 
-	r.Run(":" + cfg.ServerPort)
+	if err := r.Run(":" + cfg.ServerPort); err != nil {
+		logger.Error("server stopped", "error", err)
+		return err
+	}
+	return nil
 }

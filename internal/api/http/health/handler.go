@@ -2,10 +2,11 @@ package health
 
 import (
 	"context"
-	"i9pay/internal/api/err"
-	"i9pay/internal/database"
 	"net/http"
 	"time"
+
+	"i9pay/internal/api/err"
+	"i9pay/internal/database"
 
 	"github.com/gin-gonic/gin"
 )

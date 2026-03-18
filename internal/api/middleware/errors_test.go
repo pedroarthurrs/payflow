@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	apierr "i9pay/internal/api/err"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	apierr "i9pay/internal/api/err"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -24,10 +26,10 @@ func TestErrors_ValidationErrors_Returns400WithFieldErrors(t *testing.T) {
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
 	r.GET("/test", Errors(), func(c *gin.Context) {
-		c.Error(valErr)
+		_ = c.Error(valErr)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -62,10 +64,10 @@ func TestErrors_AppError_Returns400WithErrorMessage(t *testing.T) {
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
 	r.GET("/test", Errors(), func(c *gin.Context) {
-		c.Error(apierr.BadRequest("bad request"))
+		_ = c.Error(apierr.BadRequest("bad request"))
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -84,10 +86,10 @@ func TestErrors_UnknownError_Returns500(t *testing.T) {
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
 	r.GET("/test", Errors(), func(c *gin.Context) {
-		c.Error(errors.New("something went wrong"))
+		_ = c.Error(errors.New("something went wrong"))
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
@@ -109,7 +111,7 @@ func TestErrors_NoErrors_PassesThrough(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {

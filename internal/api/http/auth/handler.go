@@ -1,10 +1,11 @@
 package auth
 
 import (
+	"net/http"
+
 	"i9pay/internal/api/err"
 	"i9pay/internal/domain"
 	"i9pay/internal/service"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,12 +1,14 @@
 package middleware
 
 import (
-	"i9pay/internal/token"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
+
+	"i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 )
@@ -132,7 +134,7 @@ func TestRateLimitByIP_AllowedRequestReturnsHeaders(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -160,7 +162,7 @@ func TestRateLimitByIP_RejectedRequestReturns429WithBodyAndHeaders(t *testing.T)
 	r.GET("/test", handler, func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
-	r.ServeHTTP(w1, httptest.NewRequest("GET", "/test", nil))
+	r.ServeHTTP(w1, httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody))
 
 	if w1.Code != http.StatusOK {
 		t.Fatalf("first request: expected 200, got %d", w1.Code)
@@ -168,7 +170,7 @@ func TestRateLimitByIP_RejectedRequestReturns429WithBodyAndHeaders(t *testing.T)
 
 	// Second request — should be rejected
 	w2 := httptest.NewRecorder()
-	r.ServeHTTP(w2, httptest.NewRequest("GET", "/test", nil))
+	r.ServeHTTP(w2, httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody))
 
 	if w2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected status 429, got %d", w2.Code)
@@ -207,7 +209,7 @@ func TestRateLimitByIP_RemainingDecreasesWithEachRequest(t *testing.T) {
 
 	for i := range maxReqs {
 		w := httptest.NewRecorder()
-		r.ServeHTTP(w, httptest.NewRequest("GET", "/test", nil))
+		r.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody))
 
 		if w.Code != http.StatusOK {
 			t.Fatalf("request %d: expected 200, got %d", i+1, w.Code)
@@ -235,7 +237,7 @@ func TestRateLimitByTenant_AllowedRequestReturnsHeaders(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -267,7 +269,7 @@ func TestRateLimitByTenant_RejectedRequestReturns429WithBodyAndHeaders(t *testin
 	r.GET("/test", setClaims, handler, func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
-	r.ServeHTTP(w1, httptest.NewRequest("GET", "/test", nil))
+	r.ServeHTTP(w1, httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody))
 
 	if w1.Code != http.StatusOK {
 		t.Fatalf("first request: expected 200, got %d", w1.Code)
@@ -275,7 +277,7 @@ func TestRateLimitByTenant_RejectedRequestReturns429WithBodyAndHeaders(t *testin
 
 	// Second request — should be rejected
 	w2 := httptest.NewRecorder()
-	r.ServeHTTP(w2, httptest.NewRequest("GET", "/test", nil))
+	r.ServeHTTP(w2, httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody))
 
 	if w2.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected status 429, got %d", w2.Code)
@@ -310,7 +312,7 @@ func TestRateLimitByTenant_NoClaims_Returns401(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusUnauthorized {

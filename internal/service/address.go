@@ -101,8 +101,8 @@ func (s *AddressService) List(ctx context.Context, tenantID, customerID uuid.UUI
 	}
 
 	addresses := make([]domain.Address, len(rows))
-	for i, row := range rows {
-		addresses[i] = toDomainAddress(row)
+	for i := range rows {
+		addresses[i] = toDomainAddress(rows[i])
 	}
 	return addresses, nil
 }

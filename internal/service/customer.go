@@ -48,12 +48,12 @@ func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input 
 		return &c, nil, nil
 	}
 
-	tx, err := s.db.DB.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		slog.Error("failed to begin transaction", "error", err)
 		return nil, nil, apierr.Internal("internal server error")
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
 
@@ -94,14 +94,14 @@ func (s *CustomerService) List(ctx context.Context, tenantID uuid.UUID) ([]domai
 	}
 
 	customers := make([]domain.Customer, len(rows))
-	for i, row := range rows {
-		customers[i] = toDomainCustomer(row)
+	for i := range rows {
+		customers[i] = toDomainCustomer(rows[i])
 	}
 	return customers, nil
 }
 
 // GetByID returns a single customer by ID for the given tenant.
-func (s *CustomerService) GetByID(ctx context.Context, tenantID uuid.UUID, customerID uuid.UUID) (*domain.Customer, error) {
+func (s *CustomerService) GetByID(ctx context.Context, tenantID, customerID uuid.UUID) (*domain.Customer, error) {
 	row, dbErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
 		ID:       customerID,
 		TenantID: tenantID,
@@ -120,7 +120,7 @@ func (s *CustomerService) GetByID(ctx context.Context, tenantID uuid.UUID, custo
 
 // Update updates an existing customer for the given tenant.
 // When input.Address is provided, the customer update and address creation are performed atomically.
-func (s *CustomerService) Update(ctx context.Context, tenantID uuid.UUID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
+func (s *CustomerService) Update(ctx context.Context, tenantID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
 	if input.Address == nil {
 		row, dbErr := s.db.Queries.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
 			ID:           customerID,
@@ -142,12 +142,12 @@ func (s *CustomerService) Update(ctx context.Context, tenantID uuid.UUID, custom
 		return &c, nil, nil
 	}
 
-	tx, err := s.db.DB.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		slog.Error("failed to begin transaction", "error", err)
 		return nil, nil, apierr.Internal("internal server error")
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
 
@@ -184,7 +184,7 @@ func (s *CustomerService) Update(ctx context.Context, tenantID uuid.UUID, custom
 }
 
 // Delete performs a soft delete on a customer for the given tenant.
-func (s *CustomerService) Delete(ctx context.Context, tenantID uuid.UUID, customerID uuid.UUID) error {
+func (s *CustomerService) Delete(ctx context.Context, tenantID, customerID uuid.UUID) error {
 	// First verify the customer exists (SoftDeleteCustomer is :exec and won't return sql.ErrNoRows)
 	_, getErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
 		ID:       customerID,
@@ -290,7 +290,7 @@ func toNullRawMessage(data json.RawMessage) pqtype.NullRawMessage {
 //	if err != nil {
 //	    // Log the failure and notify compliance team
 //	}
-func (s *CustomerService) HardDelete(ctx context.Context, tenantID uuid.UUID, customerID uuid.UUID) error {
+func (s *CustomerService) HardDelete(ctx context.Context, tenantID, customerID uuid.UUID) error {
 	if dbErr := s.db.Queries.HardDeleteCustomer(ctx, dbgen.HardDeleteCustomerParams{
 		ID:       customerID,
 		TenantID: tenantID,

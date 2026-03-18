@@ -1,6 +1,9 @@
 package router
 
 import (
+	"log/slog"
+	"time"
+
 	"i9pay/internal/api/http/address"
 	"i9pay/internal/api/http/auth"
 	"i9pay/internal/api/http/customer"
@@ -12,8 +15,6 @@ import (
 	"i9pay/internal/database"
 	"i9pay/internal/service"
 	"i9pay/internal/token"
-	"log/slog"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +22,7 @@ import (
 const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
+// New constructs and returns a configured Gin engine with all routes and middleware registered.
 func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recovery())
@@ -56,36 +58,32 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 
 	v1 := r.Group("/v1")
 	v1.Use(middleware.RateLimitByIP(ipStore, cfg.RateLimitMaxRequests, ipWindow, "too many requests, try again later"))
-	{
-		v1.GET("/health", healthHandler.Get)
 
-		// Auth routes — public, no token required.
-		authGroup := v1.Group("/auth")
-		{
-			authGroup.POST("/login", middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later"), authHandler.Login)
-			authGroup.POST("/refresh", authHandler.Refresh)
-		}
+	v1.GET("/health", healthHandler.Get)
 
-		// Protected routes — require a valid access token.
-		protected := v1.Group("/")
-		protected.Use(middleware.Auth(tokenSvc))
-		protected.Use(middleware.RateLimitByTenant(tenantStore, cfg.RateLimitTenantMaxRequests, tenantWindow))
-		{
-			protected.GET("/me", meHandler.Get)
+	// Auth routes — public, no token required.
+	authGroup := v1.Group("/auth")
+	authGroup.POST("/login", middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later"), authHandler.Login)
+	authGroup.POST("/refresh", authHandler.Refresh)
 
-			protected.POST("/customers", customerHandler.Create)
-			protected.GET("/customers", customerHandler.List)
-			protected.GET("/customers/:customer_id", customerHandler.GetByID)
-			protected.PUT("/customers/:customer_id", customerHandler.Update)
-			protected.DELETE("/customers/:customer_id", customerHandler.Delete)
+	// Protected routes — require a valid access token.
+	protected := v1.Group("/")
+	protected.Use(middleware.Auth(tokenSvc))
+	protected.Use(middleware.RateLimitByTenant(tenantStore, cfg.RateLimitTenantMaxRequests, tenantWindow))
 
-			protected.POST("/customers/:customer_id/addresses", addressHandler.Create)
-			protected.GET("/customers/:customer_id/addresses", addressHandler.List)
-			protected.GET("/customers/:customer_id/addresses/:id", addressHandler.GetByID)
-			protected.PUT("/customers/:customer_id/addresses/:id", addressHandler.Update)
-			protected.DELETE("/customers/:customer_id/addresses/:id", addressHandler.Delete)
-		}
-	}
+	protected.GET("/me", meHandler.Get)
+
+	protected.POST("/customers", customerHandler.Create)
+	protected.GET("/customers", customerHandler.List)
+	protected.GET("/customers/:customer_id", customerHandler.GetByID)
+	protected.PUT("/customers/:customer_id", customerHandler.Update)
+	protected.DELETE("/customers/:customer_id", customerHandler.Delete)
+
+	protected.POST("/customers/:customer_id/addresses", addressHandler.Create)
+	protected.GET("/customers/:customer_id/addresses", addressHandler.List)
+	protected.GET("/customers/:customer_id/addresses/:id", addressHandler.GetByID)
+	protected.PUT("/customers/:customer_id/addresses/:id", addressHandler.Update)
+	protected.DELETE("/customers/:customer_id/addresses/:id", addressHandler.Delete)
 
 	return r
 }

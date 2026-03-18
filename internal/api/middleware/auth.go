@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	i9token "i9pay/internal/token"
 	"net/http"
 	"strings"
+
+	i9token "i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 )

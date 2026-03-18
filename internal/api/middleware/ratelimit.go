@@ -1,11 +1,12 @@
 package middleware
 
 import (
-	"i9pay/internal/token"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,7 +33,7 @@ func NewRateLimiterStore() *RateLimiterStore {
 
 // Allow checks if the key is within the rate limit.
 // Returns (allowed bool, remaining int, resetAt time.Time).
-func (s *RateLimiterStore) Allow(key string, maxRequests int, window time.Duration) (bool, int, time.Time) {
+func (s *RateLimiterStore) Allow(key string, maxRequests int, window time.Duration) (allowed bool, remaining int, resetAt time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

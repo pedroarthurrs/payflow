@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,7 +22,7 @@ func TestRequestID_GeneratesUUIDWhenNoHeader(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -57,7 +58,7 @@ func TestRequestID_ReusesExistingHeader(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	req.Header.Set("X-Request-ID", "existing-id-123")
 	r.ServeHTTP(w, req)
 
@@ -88,7 +89,7 @@ func TestRequestID_ResponseHeaderAlwaysSet(t *testing.T) {
 	// Send multiple requests and verify each has the header
 	for i := 0; i < 3; i++ {
 		w := httptest.NewRecorder()
-		r.ServeHTTP(w, httptest.NewRequest("GET", "/test", nil))
+		r.ServeHTTP(w, httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody))
 
 		if got := w.Header().Get("X-Request-ID"); got == "" {
 			t.Fatalf("request %d: expected X-Request-ID header to be set", i+1)
@@ -108,7 +109,7 @@ func TestRequestID_StoredInGinContext(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if ctxValue == "" {

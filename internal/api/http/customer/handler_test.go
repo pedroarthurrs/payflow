@@ -149,7 +149,7 @@ func TestCreate_MissingRequiredFields_Returns400(t *testing.T) {
 	// Empty body — all required fields missing.
 	body := `{}`
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -188,7 +188,7 @@ func TestCreate_MissingName_Returns400(t *testing.T) {
 
 	body := `{"email":"test@example.com","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -221,7 +221,7 @@ func TestCreate_InvalidEmail_Returns400(t *testing.T) {
 
 	body := `{"name":"Alice","email":"not-an-email","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -253,7 +253,7 @@ func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
 	router := setupRouter(&mockQuerier{}, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/customers/not-a-uuid", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/not-a-uuid", http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -276,7 +276,7 @@ func TestUpdate_InvalidUUID_Returns400(t *testing.T) {
 
 	body := `{"name":"Alice","email":"a@b.com","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/v1/customers/bad-id", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/customers/bad-id", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -299,7 +299,7 @@ func TestDelete_InvalidUUID_Returns400(t *testing.T) {
 	router := setupRouter(&mockQuerier{}, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/v1/customers/xyz", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/xyz", http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
@@ -329,7 +329,7 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 
 	customerID := uuid.New().String()
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/customers/"+customerID, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/"+customerID, http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
@@ -378,7 +378,7 @@ func TestDelete_Success_Returns204(t *testing.T) {
 	router := setupRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/v1/customers/"+customerID.String(), nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/"+customerID.String(), http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNoContent {
@@ -467,7 +467,7 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 
 		// --- Test POST /v1/customers ---
 		wPost := httptest.NewRecorder()
-		reqPost := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(body))
+		reqPost := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(body))
 		reqPost.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wPost, reqPost)
 
@@ -480,7 +480,7 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 		// --- Test PUT /v1/customers/:id ---
 		customerID := uuid.New().String()
 		wPut := httptest.NewRecorder()
-		reqPut := httptest.NewRequest(http.MethodPut, "/v1/customers/"+customerID, strings.NewReader(body))
+		reqPut := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/customers/"+customerID, strings.NewReader(body))
 		reqPut.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wPut, reqPut)
 
@@ -581,7 +581,7 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 
 		// --- GET /v1/customers/:id ---
 		wGet := httptest.NewRecorder()
-		reqGet := httptest.NewRequest(http.MethodGet, "/v1/customers/"+invalidID, nil)
+		reqGet := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/"+invalidID, http.NoBody)
 		router.ServeHTTP(wGet, reqGet)
 
 		if wGet.Code != http.StatusBadRequest {
@@ -602,7 +602,7 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 		// --- PUT /v1/customers/:id ---
 		putBody := `{"name":"Alice","email":"a@b.com","document":"12345","document_type":"cpf"}`
 		wPut := httptest.NewRecorder()
-		reqPut := httptest.NewRequest(http.MethodPut, "/v1/customers/"+invalidID, strings.NewReader(putBody))
+		reqPut := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/customers/"+invalidID, strings.NewReader(putBody))
 		reqPut.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wPut, reqPut)
 
@@ -623,7 +623,7 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 
 		// --- DELETE /v1/customers/:id ---
 		wDel := httptest.NewRecorder()
-		reqDel := httptest.NewRequest(http.MethodDelete, "/v1/customers/"+invalidID, nil)
+		reqDel := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/"+invalidID, http.NoBody)
 		router.ServeHTTP(wDel, reqDel)
 
 		if wDel.Code != http.StatusBadRequest {
@@ -721,7 +721,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 		router := setupRouter(&mockQuerier{}, tenantID)
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(string(bodyBytes)))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(string(bodyBytes)))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
@@ -916,7 +916,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			name, email, document, documentType,
 		)
 		wCreate := httptest.NewRecorder()
-		reqCreate := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(createBody))
+		reqCreate := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(createBody))
 		reqCreate.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wCreate, reqCreate)
 
@@ -938,7 +938,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 		// Step 2: Delete the customer via DELETE — expect 204.
 		wDelete := httptest.NewRecorder()
-		reqDelete := httptest.NewRequest(http.MethodDelete, "/v1/customers/"+customerID, nil)
+		reqDelete := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/"+customerID, http.NoBody)
 		router.ServeHTTP(wDelete, reqDelete)
 
 		if wDelete.Code != http.StatusNoContent {
@@ -948,7 +948,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 		// Step 3: List via GET /customers — should return empty array.
 		wList := httptest.NewRecorder()
-		reqList := httptest.NewRequest(http.MethodGet, "/v1/customers", nil)
+		reqList := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers", http.NoBody)
 		router.ServeHTTP(wList, reqList)
 
 		if wList.Code != http.StatusOK {
@@ -968,7 +968,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 		// Step 4: Get by ID via GET /customers/:id — should return 404.
 		wGet := httptest.NewRecorder()
-		reqGet := httptest.NewRequest(http.MethodGet, "/v1/customers/"+customerID, nil)
+		reqGet := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/"+customerID, http.NoBody)
 		router.ServeHTTP(wGet, reqGet)
 
 		if wGet.Code != http.StatusNotFound {
@@ -991,7 +991,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			"Updated-"+name, email, document, documentType,
 		)
 		wUpdate := httptest.NewRecorder()
-		reqUpdate := httptest.NewRequest(http.MethodPut, "/v1/customers/"+customerID, strings.NewReader(updateBody))
+		reqUpdate := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/customers/"+customerID, strings.NewReader(updateBody))
 		reqUpdate.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wUpdate, reqUpdate)
 
@@ -1127,7 +1127,7 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 			createName, createEmail, createDocument, createDocType,
 		)
 		wCreate := httptest.NewRecorder()
-		reqCreate := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(createBody))
+		reqCreate := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(createBody))
 		reqCreate.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wCreate, reqCreate)
 
@@ -1165,7 +1165,7 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 			updateName, updateEmail, updateDocument, updateDocType,
 		)
 		wUpdate := httptest.NewRecorder()
-		reqUpdate := httptest.NewRequest(http.MethodPut, "/v1/customers/"+customerID, strings.NewReader(updateBody))
+		reqUpdate := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/customers/"+customerID, strings.NewReader(updateBody))
 		reqUpdate.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wUpdate, reqUpdate)
 
@@ -1176,7 +1176,7 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 
 		// Step 3: Read the customer via GET — expect 200.
 		wGet := httptest.NewRecorder()
-		reqGet := httptest.NewRequest(http.MethodGet, "/v1/customers/"+customerID, nil)
+		reqGet := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/"+customerID, http.NoBody)
 		router.ServeHTTP(wGet, reqGet)
 
 		if wGet.Code != http.StatusOK {
@@ -1330,7 +1330,7 @@ func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 				name, email, document, docType,
 			)
 			wCreate := httptest.NewRecorder()
-			reqCreate := httptest.NewRequest(http.MethodPost, "/v1/customers", strings.NewReader(createBody))
+			reqCreate := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(createBody))
 			reqCreate.Header.Set("Content-Type", "application/json")
 			router.ServeHTTP(wCreate, reqCreate)
 
@@ -1342,7 +1342,7 @@ func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 
 		// Step 2: List via GET /v1/customers — expect 200.
 		wList := httptest.NewRecorder()
-		reqList := httptest.NewRequest(http.MethodGet, "/v1/customers", nil)
+		reqList := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers", http.NoBody)
 		router.ServeHTTP(wList, reqList)
 
 		if wList.Code != http.StatusOK {
@@ -1445,7 +1445,7 @@ func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
 
 		// --- GET /v1/customers/:id — expect 404 ---
 		wGet := httptest.NewRecorder()
-		reqGet := httptest.NewRequest(http.MethodGet, "/v1/customers/"+nonExistentID.String(), nil)
+		reqGet := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/"+nonExistentID.String(), http.NoBody)
 		router.ServeHTTP(wGet, reqGet)
 
 		if wGet.Code != http.StatusNotFound {
@@ -1466,7 +1466,7 @@ func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
 		// --- PUT /v1/customers/:id with valid body — expect 404 ---
 		putBody := `{"name":"Test","email":"test@example.com","document":"12345","document_type":"cpf"}`
 		wPut := httptest.NewRecorder()
-		reqPut := httptest.NewRequest(http.MethodPut, "/v1/customers/"+nonExistentID.String(), strings.NewReader(putBody))
+		reqPut := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/v1/customers/"+nonExistentID.String(), strings.NewReader(putBody))
 		reqPut.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(wPut, reqPut)
 
@@ -1487,7 +1487,7 @@ func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
 
 		// --- DELETE /v1/customers/:id — expect 404 ---
 		wDel := httptest.NewRecorder()
-		reqDel := httptest.NewRequest(http.MethodDelete, "/v1/customers/"+nonExistentID.String(), nil)
+		reqDel := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/"+nonExistentID.String(), http.NoBody)
 		router.ServeHTTP(wDel, reqDel)
 
 		if wDel.Code != http.StatusNotFound {

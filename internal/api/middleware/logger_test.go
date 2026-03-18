@@ -2,12 +2,14 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"i9pay/internal/token"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,7 +46,7 @@ func setupLoggerTest(statusCode int, setupCtx func(c *gin.Context)) (*httptest.R
 		c.Status(statusCode)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	return w, &buf

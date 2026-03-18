@@ -3,7 +3,7 @@
 // It defines a Service that issues short-lived access tokens and long-lived
 // refresh tokens, and validates each according to its expected type. Keeping
 // this logic in its own package avoids coupling transport (middleware/handlers)
-// to JWT internals and makes the behaviour easy to test in isolation.
+// to JWT internals and makes the behavior easy to test in isolation.
 package token
 
 import (

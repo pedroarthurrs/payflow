@@ -174,7 +174,7 @@ func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 
 		// Test POST
 		w1 := httptest.NewRecorder()
-		r1 := httptest.NewRequest(http.MethodPost, basePath(customerID), strings.NewReader(body))
+		r1 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(body))
 		r1.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w1, r1)
 		if w1.Code != http.StatusBadRequest {
@@ -184,7 +184,7 @@ func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 		// Test PUT
 		addrID := uuid.New().String()
 		w2 := httptest.NewRecorder()
-		r2 := httptest.NewRequest(http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(body))
+		r2 := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(body))
 		r2.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w2, r2)
 		if w2.Code != http.StatusBadRequest {
@@ -215,7 +215,7 @@ func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 
 		// Test POST
 		w1 := httptest.NewRecorder()
-		r1 := httptest.NewRequest(http.MethodPost, basePath(customerID), strings.NewReader(body))
+		r1 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(body))
 		r1.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w1, r1)
 		if w1.Code != http.StatusBadRequest {
@@ -225,7 +225,7 @@ func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 		// Test PUT
 		addrID := uuid.New().String()
 		w2 := httptest.NewRecorder()
-		r2 := httptest.NewRequest(http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(body))
+		r2 := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(body))
 		r2.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w2, r2)
 		if w2.Code != http.StatusBadRequest {
@@ -251,7 +251,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 
 		// POST
 		w1 := httptest.NewRecorder()
-		r1 := httptest.NewRequest(http.MethodPost, basePath(customerID), strings.NewReader(body))
+		r1 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(body))
 		r1.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w1, r1)
 		if w1.Code != http.StatusNotFound {
@@ -261,7 +261,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 
 		// LIST
 		w2 := httptest.NewRecorder()
-		r2 := httptest.NewRequest(http.MethodGet, basePath(customerID), nil)
+		r2 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID), http.NoBody)
 		router.ServeHTTP(w2, r2)
 		if w2.Code != http.StatusNotFound {
 			t.Fatalf("LIST: expected 404, got %d", w2.Code)
@@ -270,7 +270,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 
 		// GET
 		w3 := httptest.NewRecorder()
-		r3 := httptest.NewRequest(http.MethodGet, basePath(customerID)+"/"+addrID, nil)
+		r3 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/"+addrID, http.NoBody)
 		router.ServeHTTP(w3, r3)
 		if w3.Code != http.StatusNotFound {
 			t.Fatalf("GET: expected 404, got %d", w3.Code)
@@ -279,7 +279,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 
 		// PUT
 		w4 := httptest.NewRecorder()
-		r4 := httptest.NewRequest(http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(body))
+		r4 := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(body))
 		r4.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w4, r4)
 		if w4.Code != http.StatusNotFound {
@@ -289,7 +289,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 
 		// DELETE
 		w5 := httptest.NewRecorder()
-		r5 := httptest.NewRequest(http.MethodDelete, basePath(customerID)+"/"+addrID, nil)
+		r5 := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/"+addrID, http.NoBody)
 		router.ServeHTTP(w5, r5)
 		if w5.Code != http.StatusNotFound {
 			t.Fatalf("DELETE: expected 404, got %d", w5.Code)
@@ -342,7 +342,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 
 		bodyBytes, _ := json.Marshal(payload)
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, basePath(customerID), strings.NewReader(string(bodyBytes)))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(string(bodyBytes)))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
@@ -414,7 +414,7 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 	router := setupRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, basePath(customerID.String()), strings.NewReader(validAddressJSON()))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID.String()), strings.NewReader(validAddressJSON()))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -441,7 +441,7 @@ func TestCreate_InvalidPayload_Returns400(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, basePath(customerID), strings.NewReader(`{}`))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -469,7 +469,7 @@ func TestList_Empty_Returns200(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, basePath(customerID), nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID), http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -511,7 +511,7 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 	router := setupRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, basePath(customerID.String()), nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -548,7 +548,7 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 	router := setupRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -577,14 +577,16 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, basePath(customerID)+"/"+addrID, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/"+addrID, http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "address not found" {
 		t.Fatalf("expected 'address not found', got %q", resp["error"])
 	}
@@ -597,14 +599,16 @@ func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, basePath(customerID)+"/not-a-uuid", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/not-a-uuid", http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "invalid address id" {
 		t.Fatalf("expected 'invalid address id', got %q", resp["error"])
 	}
@@ -632,7 +636,7 @@ func TestUpdate_ValidPayload_Returns200(t *testing.T) {
 
 	body := `{"postal_code":"99999","street":"Updated St","city":"New City","state":"NC"}`
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, basePath(customerID.String())+"/"+addrID.String(), strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID.String())+"/"+addrID.String(), strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -649,7 +653,7 @@ func TestUpdate_InvalidPayload_Returns400(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(`{}`))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -672,7 +676,7 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(validAddressJSON()))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(validAddressJSON()))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -680,7 +684,9 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "address not found" {
 		t.Fatalf("expected 'address not found', got %q", resp["error"])
 	}
@@ -708,7 +714,7 @@ func TestDelete_Found_Returns204(t *testing.T) {
 	router := setupRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNoContent {
@@ -730,14 +736,16 @@ func TestDelete_NotFound_Returns404(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, basePath(customerID)+"/"+addrID, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/"+addrID, http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "address not found" {
 		t.Fatalf("expected 'address not found', got %q", resp["error"])
 	}
@@ -750,14 +758,16 @@ func TestDelete_InvalidUUID_Returns400(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, basePath(customerID)+"/not-a-uuid", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/not-a-uuid", http.NoBody)
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "invalid address id" {
 		t.Fatalf("expected 'invalid address id', got %q", resp["error"])
 	}
@@ -775,7 +785,7 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 	router := setupRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, basePath(customerID), strings.NewReader(validAddressJSON()))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(validAddressJSON()))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
@@ -783,7 +793,9 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp["error"] != "customer not found" {
 		t.Fatalf("expected 'customer not found', got %q", resp["error"])
 	}
@@ -838,7 +850,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 		router := setupRouter(mock, tenantID.String())
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, basePath(customerID.String()), nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
 		router.ServeHTTP(w, req)
 
 		if w.Code != http.StatusOK {
@@ -907,7 +919,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 
 		// PUT to update
 		w1 := httptest.NewRecorder()
-		r1 := httptest.NewRequest(http.MethodPut, basePath(customerID.String())+"/"+addrID.String(), strings.NewReader(string(bodyBytes)))
+		r1 := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID.String())+"/"+addrID.String(), strings.NewReader(string(bodyBytes)))
 		r1.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w1, r1)
 
@@ -917,7 +929,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 
 		// GET to verify
 		w2 := httptest.NewRecorder()
-		r2 := httptest.NewRequest(http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), nil)
+		r2 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		router.ServeHTTP(w2, r2)
 
 		if w2.Code != http.StatusOK {
@@ -980,7 +992,7 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 
 		// Verify address exists first
 		w1 := httptest.NewRecorder()
-		r1 := httptest.NewRequest(http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), nil)
+		r1 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		router.ServeHTTP(w1, r1)
 		if w1.Code != http.StatusOK {
 			t.Fatalf("GET before delete: expected 200, got %d", w1.Code)
@@ -988,7 +1000,7 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 
 		// DELETE
 		w2 := httptest.NewRecorder()
-		r2 := httptest.NewRequest(http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), nil)
+		r2 := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		router.ServeHTTP(w2, r2)
 		if w2.Code != http.StatusNoContent {
 			t.Fatalf("DELETE: expected 204, got %d", w2.Code)
@@ -996,7 +1008,7 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 
 		// GET after delete should return 404
 		w3 := httptest.NewRecorder()
-		r3 := httptest.NewRequest(http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), nil)
+		r3 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		router.ServeHTTP(w3, r3)
 		if w3.Code != http.StatusNotFound {
 			t.Fatalf("GET after delete: expected 404, got %d", w3.Code)
@@ -1084,7 +1096,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		// Tenant A can access the address
 		routerA := setupRouter(mock, tenantA.String())
 		wA := httptest.NewRecorder()
-		rA := httptest.NewRequest(http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), nil)
+		rA := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerA.ServeHTTP(wA, rA)
 		if wA.Code != http.StatusOK {
 			t.Fatalf("Tenant A GET: expected 200, got %d", wA.Code)
@@ -1095,7 +1107,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 
 		// GET by ID
 		wB1 := httptest.NewRecorder()
-		rB1 := httptest.NewRequest(http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), nil)
+		rB1 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerB.ServeHTTP(wB1, rB1)
 		if wB1.Code != http.StatusNotFound {
 			t.Fatalf("Tenant B GET: expected 404, got %d", wB1.Code)
@@ -1103,7 +1115,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 
 		// LIST
 		wB2 := httptest.NewRecorder()
-		rB2 := httptest.NewRequest(http.MethodGet, basePath(customerID.String()), nil)
+		rB2 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
 		routerB.ServeHTTP(wB2, rB2)
 		if wB2.Code != http.StatusNotFound {
 			t.Fatalf("Tenant B LIST: expected 404, got %d", wB2.Code)
@@ -1111,7 +1123,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 
 		// PUT
 		wB3 := httptest.NewRecorder()
-		rB3 := httptest.NewRequest(http.MethodPut, basePath(customerID.String())+"/"+addrID.String(), strings.NewReader(validAddressJSON()))
+		rB3 := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID.String())+"/"+addrID.String(), strings.NewReader(validAddressJSON()))
 		rB3.Header.Set("Content-Type", "application/json")
 		routerB.ServeHTTP(wB3, rB3)
 		if wB3.Code != http.StatusNotFound {
@@ -1120,7 +1132,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 
 		// DELETE
 		wB4 := httptest.NewRecorder()
-		rB4 := httptest.NewRequest(http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), nil)
+		rB4 := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerB.ServeHTTP(wB4, rB4)
 		if wB4.Code != http.StatusNotFound {
 			t.Fatalf("Tenant B DELETE: expected 404, got %d", wB4.Code)

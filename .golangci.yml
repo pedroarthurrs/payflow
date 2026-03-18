@@ -26,6 +26,8 @@ linters:
         - diagnostic
         - style
         - performance
+      disabled-checks:
+        - hugeParam
     revive:
       rules:
         - name: exported

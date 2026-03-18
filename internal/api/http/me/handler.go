@@ -1,10 +1,11 @@
 package me
 
 import (
+	"net/http"
+
 	"i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
 	"i9pay/internal/token"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )

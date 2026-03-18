@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config holds all runtime configuration loaded from environment variables.
 type Config struct {
 	GoEnv      string
 	JwtSecret  string
@@ -33,6 +34,8 @@ type Config struct {
 	RateLimitTenantMaxRequests   int
 }
 
+// Load reads environment variables and returns a populated Config.
+// For development and staging it requires a .env file; production reads from the environment directly.
 func Load() *Config {
 	err := godotenv.Load()
 	goEnv := os.Getenv("GO_ENV")
