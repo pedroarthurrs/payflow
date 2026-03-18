@@ -41,6 +41,10 @@ tidy:
 test:
 	go test -v ./...
 
+## lint: Roda o golangci-lint
+lint:
+	golangci-lint run ./...
+
 ## vet: Roda o vet do projeto
 vet:
 	go vet -v ./...
