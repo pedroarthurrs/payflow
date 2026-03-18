@@ -174,9 +174,11 @@ Converte erros brutos do `go-playground/validator` em mensagens legíveis:
 
 Resposta estruturada com `field`, `rejected_value`, `message`.
 
+### Handler Pattern
+
 Cada handler é um pacote separado com:
 - Uma struct `Handler` com dependências
-- Um função `New{Feature}Handler()` para construção
+- Uma função `New{Feature}Handler()` para construção
 - Métodos para cada ação HTTP
 
 ```go

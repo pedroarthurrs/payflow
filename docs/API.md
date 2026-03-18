@@ -179,6 +179,265 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
+### POST /v1/customers
+
+Cria um novo cliente para o tenant autenticado. Opcionalmente cria um endereço junto.
+
+**Request:**
+```json
+{
+  "name": "João Silva",
+  "email": "joao@example.com",
+  "phone": "+5511999999999",
+  "document": "12345678900",
+  "document_type": "CPF",
+  "metadata": { "source": "web" },
+  "address": {
+    "type": "billing",
+    "postal_code": "01310-100",
+    "street": "Avenida Paulista",
+    "number": "1000",
+    "complement": "Apto 42",
+    "neighborhood": "Bela Vista",
+    "city": "São Paulo",
+    "state": "SP",
+    "country": "BR",
+    "is_main": true
+  }
+}
+```
+
+> Os campos `phone`, `metadata` e `address` são opcionais.
+
+**Response (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "name": "João Silva",
+  "email": "joao@example.com",
+  "phone": "+5511999999999",
+  "document": "12345678900",
+  "document_type": "CPF",
+  "status": "active",
+  "metadata": { "source": "web" },
+  "created_at": "2026-03-17T10:00:00Z",
+  "updated_at": "2026-03-17T10:00:00Z",
+  "address": {
+    "id": "550e8400-e29b-41d4-a716-446655440002",
+    "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+    "type": "billing",
+    "postal_code": "01310-100",
+    "street": "Avenida Paulista",
+    "number": "1000",
+    "complement": "Apto 42",
+    "neighborhood": "Bela Vista",
+    "city": "São Paulo",
+    "state": "SP",
+    "country": "BR",
+    "is_main": true,
+    "created_at": "2026-03-17T10:00:00Z"
+  }
+}
+```
+
+> O campo `address` só aparece na resposta se foi enviado na requisição.
+
+**Response (409 Conflict):**
+```json
+{ "error": "email already exists for this tenant" }
+```
+
+---
+
+### GET /v1/customers
+
+Lista todos os clientes do tenant autenticado.
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "name": "João Silva",
+    "email": "joao@example.com",
+    "document": "12345678900",
+    "document_type": "CPF",
+    "status": "active",
+    "created_at": "2026-03-17T10:00:00Z",
+    "updated_at": "2026-03-17T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/customers/:customer_id
+
+Retorna um cliente pelo ID.
+
+**Response (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "name": "João Silva",
+  "email": "joao@example.com",
+  "phone": "+5511999999999",
+  "document": "12345678900",
+  "document_type": "CPF",
+  "status": "active",
+  "created_at": "2026-03-17T10:00:00Z",
+  "updated_at": "2026-03-17T10:00:00Z"
+}
+```
+
+**Response (404 Not Found):**
+```json
+{ "error": "customer not found" }
+```
+
+---
+
+### PUT /v1/customers/:customer_id
+
+Atualiza um cliente. Todos os campos obrigatórios devem ser enviados.
+
+**Request:**
+```json
+{
+  "name": "João Silva Atualizado",
+  "email": "joao.novo@example.com",
+  "document": "12345678900",
+  "document_type": "CPF"
+}
+```
+
+**Response (200 OK):** mesmo formato do `GET /v1/customers/:customer_id`.
+
+**Response (404 Not Found):**
+```json
+{ "error": "customer not found" }
+```
+
+---
+
+### DELETE /v1/customers/:customer_id
+
+Remove um cliente (soft delete por padrão). Para hard delete (conformidade LGPD/GDPR), use o query param `?hard=true`.
+
+**Query Parameters:**
+
+| Param | Tipo | Descrição |
+|-------|------|-----------|
+| `hard` | bool | Se `true`, remove permanentemente os dados |
+
+**Response (204 No Content):** sem body.
+
+**Response (404 Not Found):**
+```json
+{ "error": "customer not found" }
+```
+
+---
+
+### POST /v1/customers/:customer_id/addresses
+
+Adiciona um endereço a um cliente.
+
+**Request:**
+```json
+{
+  "type": "shipping",
+  "postal_code": "04538-133",
+  "street": "Rua Funchal",
+  "number": "418",
+  "city": "São Paulo",
+  "state": "SP",
+  "country": "BR",
+  "is_main": false
+}
+```
+
+> `type` deve ser um de: `billing`, `shipping`, `home`. Os campos `number`, `complement`, `neighborhood` e `country` são opcionais.
+
+**Response (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440003",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "type": "shipping",
+  "postal_code": "04538-133",
+  "street": "Rua Funchal",
+  "number": "418",
+  "city": "São Paulo",
+  "state": "SP",
+  "country": "BR",
+  "is_main": false,
+  "created_at": "2026-03-17T10:05:00Z"
+}
+```
+
+---
+
+### GET /v1/customers/:customer_id/addresses
+
+Lista todos os endereços de um cliente.
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+    "type": "billing",
+    "postal_code": "01310-100",
+    "street": "Avenida Paulista",
+    "city": "São Paulo",
+    "state": "SP",
+    "country": "BR",
+    "is_main": true,
+    "created_at": "2026-03-17T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/customers/:customer_id/addresses/:id
+
+Retorna um endereço específico.
+
+**Response (200 OK):** mesmo formato de um item da listagem acima.
+
+**Response (404 Not Found):**
+```json
+{ "error": "address not found" }
+```
+
+---
+
+### PUT /v1/customers/:customer_id/addresses/:id
+
+Atualiza um endereço.
+
+**Request:** mesmo formato do `POST /v1/customers/:customer_id/addresses`.
+
+**Response (200 OK):** mesmo formato do `GET /v1/customers/:customer_id/addresses/:id`.
+
+---
+
+### DELETE /v1/customers/:customer_id/addresses/:id
+
+Remove um endereço.
+
+**Response (204 No Content):** sem body.
+
+**Response (404 Not Found):**
+```json
+{ "error": "address not found" }
+```
+
+---
+
 ## HTTP Status Codes
 
 | Code | Meaning | Exemplo |

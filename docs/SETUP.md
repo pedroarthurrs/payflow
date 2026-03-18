@@ -144,25 +144,61 @@ make build-dev
 
 **air** - Hot reload:
 ```bash
-go install github.com/cosmtrek/air@latest
+go install github.com/air-verse/air@latest
 air
 ```
 
-**golangci-lint** - Linter:
+**golangci-lint** - Linter (multichecker estático):
 ```bash
 curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 golangci-lint run
 ```
 
+> O projeto inclui `.golangci.yml` com regras configuradas. Execute `make lint` para rodar.
+
+**sqlc** - Geração de código a partir de SQL:
+```bash
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+```
+
+**golang-migrate** - Migrations de banco:
+```bash
+go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+```
+
+**mockery** - Geração de mocks para testes:
+```bash
+go install github.com/vektra/mockery/v2@latest
+mockery --all --output internal/mocks
+```
+
+**delve** - Debugger:
+```bash
+go install github.com/go-delve/delve/cmd/dlv@latest
+```
+
 **gopls** - Language Server (configure em seu editor):
 ```bash
-go install github.com/golang/tools/gopls@latest
+go install golang.org/x/tools/gopls@latest
 ```
 
 ### VSCode Integration
 
-Instale extensões:
-- Go (golang.go)
+Instale as extensões recomendadas (ou aceite quando o VSCode sugerir via `.vscode/extensions.json`):
+
+| Extensão | ID | Propósito |
+|----------|----|-----------|
+| Go | `golang.go` | Suporte completo à linguagem |
+| REST Client | `humao.rest-client` | Testar requisições HTTP no editor |
+| Docker | `ms-azuretools.vscode-docker` | Gerenciar containers |
+| GitLens | `eamodio.gitlens` | Histórico e blame no editor |
+| Error Lens | `usernamehw.errorlens` | Erros inline no código |
+| Database Client | `cweijan.vscode-database-client2` | Explorar o PostgreSQL local |
+| DotENV | `mikestead.dotenv` | Syntax highlight em arquivos `.env` |
+
+Configurações recomendadas em `.vscode/settings.json` (já incluídas no repo):
+- `go.lintTool: "golangci-lint"` — integra o linter ao editor
+- `go.formatTool: "goimports"` — formata e organiza imports ao salvar
 
 
 ---
@@ -173,7 +209,7 @@ Instale extensões:
 
 Arquivo `bitbucket-pipelines.yml`:
 ```yaml
-image: golang:1.26
+image: golang:1.26.1
 
 pipelines:
   default:

@@ -178,10 +178,10 @@ go install github.com/go-delve/delve/cmd/dlv@latest
 dlv debug ./cmd/api/main.go
 ```
 
-### Logs estruturados (future)
-```go
-// TODO: Adicionar slog ou zap
-```
+### Logs estruturados
+
+A aplicação usa `log/slog` nativo do Go 1.21+. Em desenvolvimento os logs saem em texto;
+em produção saem em JSON. O logger é inicializado em `cmd/api/main.go` via `SetupLogger(env)`.
 
 ---
 
