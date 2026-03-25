@@ -1,9 +1,10 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 
-	"i9pay/internal/api/err"
+	apierr "i9pay/internal/api/err"
 	"i9pay/internal/domain"
 	"i9pay/internal/service"
 
@@ -21,24 +22,30 @@ func NewHandler(authSvc *service.AuthService) *Handler {
 }
 
 type loginRequest struct {
-	Email    string `json:"email"    binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	APIKey   string `json:"api_key"`
 }
 
-// Login authenticates a tenant and returns a fresh access/refresh token pair.
+// Login authenticates via dynamic mode detection and returns a token pair.
 func (h *Handler) Login(c *gin.Context) {
 	var req loginRequest
 	if e := c.ShouldBindJSON(&req); e != nil {
-		_ = c.Error(err.BadRequest(e.Error()))
+		_ = c.Error(apierr.BadRequest(e.Error()))
 		return
 	}
 
-	pair, e := h.authSvc.Login(domain.Credentials{
+	pair, e := h.authSvc.Login(c.Request.Context(), domain.LoginRequest{
 		Email:    req.Email,
 		Password: req.Password,
+		APIKey:   req.APIKey,
 	})
 	if e != nil {
-		_ = c.Error(err.Unauthorized("invalid credentials"))
+		if errors.Is(e, domain.ErrBadRequest) {
+			_ = c.Error(apierr.BadRequest(e.Error()))
+			return
+		}
+		_ = c.Error(apierr.Unauthorized("invalid credentials"))
 		return
 	}
 
@@ -53,13 +60,13 @@ type refreshRequest struct {
 func (h *Handler) Refresh(c *gin.Context) {
 	var req refreshRequest
 	if e := c.ShouldBindJSON(&req); e != nil {
-		_ = c.Error(err.BadRequest(e.Error()))
+		_ = c.Error(apierr.BadRequest(e.Error()))
 		return
 	}
 
 	pair, e := h.authSvc.RefreshToken(req.RefreshToken)
 	if e != nil {
-		_ = c.Error(err.Unauthorized("invalid or expired refresh token"))
+		_ = c.Error(apierr.Unauthorized("invalid or expired refresh token"))
 		return
 	}
 

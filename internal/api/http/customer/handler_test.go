@@ -111,6 +111,33 @@ func (m *mockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.Lis
 func (m *mockQuerier) UpdateAddress(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
 	return dbgen.Address{}, nil
 }
+func (m *mockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *mockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *mockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *mockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
+	return nil, nil
+}
+func (m *mockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
+	return nil
+}
+func (m *mockQuerier) UpdateUser(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *mockQuerier) GetAPIKeyByHash(ctx context.Context, keyHash string) (dbgen.ApiKey, error) {
+	return dbgen.ApiKey{}, nil
+}
+func (m *mockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
 
 // withClaims injects JWT claims into the Gin context for testing.
 func withClaims(tenantID string) gin.HandlerFunc {

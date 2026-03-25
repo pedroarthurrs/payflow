@@ -9,6 +9,7 @@ package token
 import (
 	"errors"
 	"fmt"
+	"i9pay/internal/domain"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -37,7 +38,24 @@ type Claims struct {
 	// TokenType indicates whether this is an access or refresh token.
 	TokenType TokenType `json:"token_type"`
 
+	// UserID is the authenticated user's UUID. Empty for system tokens.
+	UserID string `json:"user_id,omitempty"`
+
+	// Role is the user's role within the tenant. Empty for system tokens.
+	Role domain.Role `json:"role,omitempty"`
+
+	// AuthType indicates the authentication mode (user or system). Always present.
+	AuthType domain.AuthType `json:"auth_type"`
+
 	jwt.RegisteredClaims
+}
+
+// ClaimsInput holds the data needed to issue a token pair with extended claims.
+type ClaimsInput struct {
+	TenantID string
+	UserID   string          // empty for system tokens
+	Role     domain.Role     // empty for system tokens
+	AuthType domain.AuthType
 }
 
 // Pair is returned on a successful login or token refresh.
@@ -68,13 +86,19 @@ func NewService(secret string, accessTTL, refreshTTL time.Duration) *Service {
 }
 
 // NewPair issues a new access/refresh token pair for the given tenantID.
+// NewPair is kept for backward compatibility; it emits tokens without user/role claims.
 func (s *Service) NewPair(tenantID string) (*Pair, error) {
-	accessToken, accessExpiry, err := s.sign(tenantID, TypeAccess, s.accessTokenTTL)
+	return s.NewPairWithClaims(ClaimsInput{TenantID: tenantID})
+}
+
+// NewPairWithClaims issues a new access/refresh token pair with extended claims.
+func (s *Service) NewPairWithClaims(input ClaimsInput) (*Pair, error) {
+	accessToken, accessExpiry, err := s.sign(input, TypeAccess, s.accessTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("sign access token: %w", err)
 	}
 
-	refreshToken, refreshExpiry, err := s.sign(tenantID, TypeRefresh, s.refreshTokenTTL)
+	refreshToken, refreshExpiry, err := s.sign(input, TypeRefresh, s.refreshTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("sign refresh token: %w", err)
 	}
@@ -96,6 +120,22 @@ func (s *Service) Refresh(refreshToken string) (*Pair, error) {
 	}
 
 	return s.NewPair(claims.TenantID)
+}
+
+// RefreshWithClaims validates a refresh token and issues a fresh token pair,
+// preserving the UserID, Role, and AuthType from the original token.
+func (s *Service) RefreshWithClaims(refreshToken string) (*Pair, error) {
+	claims, err := s.Verify(refreshToken, TypeRefresh)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.NewPairWithClaims(ClaimsInput{
+		TenantID: claims.TenantID,
+		UserID:   claims.UserID,
+		Role:     claims.Role,
+		AuthType: claims.AuthType,
+	})
 }
 
 // Verify parses and validates a JWT string, ensuring it matches the expected
@@ -130,14 +170,17 @@ func (s *Service) Verify(tokenString string, expectedType TokenType) (*Claims, e
 	return claims, nil
 }
 
-// sign creates and signs a JWT for the given tenantID and TokenType.
-func (s *Service) sign(tenantID string, tokenType TokenType, ttl time.Duration) (string, time.Time, error) {
+// sign creates and signs a JWT for the given ClaimsInput and TokenType.
+func (s *Service) sign(input ClaimsInput, tokenType TokenType, ttl time.Duration) (string, time.Time, error) {
 	now := time.Now()
 	expiry := now.Add(ttl)
 
 	claims := Claims{
-		TenantID:  tenantID,
+		TenantID:  input.TenantID,
 		TokenType: tokenType,
+		UserID:    input.UserID,
+		Role:      input.Role,
+		AuthType:  input.AuthType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			IssuedAt:  jwt.NewNumericDate(now),
