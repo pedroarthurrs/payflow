@@ -24,9 +24,9 @@ import (
 // ============================================================
 
 type mockTokenProvider struct {
-	newPairFn          func(tenantID string) (*token.Pair, error)
+	newPairFn           func(tenantID string) (*token.Pair, error)
 	newPairWithClaimsFn func(input token.ClaimsInput) (*token.Pair, error)
-	refreshFn          func(refreshToken string) (*token.Pair, error)
+	refreshFn           func(refreshToken string) (*token.Pair, error)
 	refreshWithClaimsFn func(refreshToken string) (*token.Pair, error)
 }
 
@@ -347,7 +347,6 @@ func TestRefreshToken_Error(t *testing.T) {
 // Property-based tests (pgregory.net/rapid)
 // ============================================================
 
-// Feature: rbac-dynamic-auth, Property 1: SHA-256 hash round-trip
 // For any API key string, hex(SHA-256(key)) computed twice must be identical.
 func TestProperty_APIKeyHashRoundTrip(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
@@ -365,7 +364,6 @@ func TestProperty_APIKeyHashRoundTrip(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 2: Token de usuário contém user_id e role
 // For any valid user login, the emitted access token must have non-empty user_id,
 // non-empty role, and auth_type == "user".
 func TestProperty_UserTokenClaimsComplete(t *testing.T) {
@@ -419,7 +417,6 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 3: Token de sistema não contém user_id nem role
 // For any valid API key login, the emitted access token must have empty user_id,
 // empty role, and auth_type == "system".
 func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
@@ -464,7 +461,6 @@ func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 6: Detecção de modo de login pelo payload
 // For any payload with api_key present, mode must be system.
 // For any payload with tenant_id+email+password and no api_key, mode must be user.
 func TestProperty_LoginModeDetection(t *testing.T) {
@@ -530,7 +526,6 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 7: last_used_at atualizado após autenticação por API Key
 // After a successful API key login, UpdateAPIKeyLastUsed must have been called.
 func TestProperty_APIKeyLastUsedAtUpdated(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
@@ -560,7 +555,6 @@ func TestProperty_APIKeyLastUsedAtUpdated(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 8: Refresh preserva user_id e role do usuário
 // For any user token (auth_type=user), after refresh, the new token must have
 // the same user_id and role as the original.
 func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
@@ -607,7 +601,7 @@ func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
 	})
 }
 
-// Property 3 (existing): RefreshToken propaga erros do TokenProvider
+// TestProperty_RefreshTokenErrorPropagation verifies that RefreshToken propagates errors from the TokenProvider.
 func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		refreshInput := rapid.String().Draw(t, "refreshToken")
@@ -653,8 +647,6 @@ func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 //
 // Root cause: `req.TenantID != ""` guard in AuthService.Login (auth.go) is false
 // when TenantID is empty, so the function falls through to `return nil, ErrBadRequest`.
-//
-// **Validates: Requirements 1.1, 1.2**
 func TestLogin_BugCondition_EmailPasswordWithoutTenantID(t *testing.T) {
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
@@ -703,8 +695,6 @@ func TestLogin_BugCondition_EmailPasswordWithoutTenantID(t *testing.T) {
 
 // TestProperty_Preservation_NonBuggyInputs verifies that non-bug-condition inputs
 // (where isBugCondition returns FALSE) produce the same results before and after the fix.
-//
-// **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6**
 func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	// Sub-property A: API key preservation
 	// For any valid API key, auth_type=system token is returned.

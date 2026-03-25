@@ -3,6 +3,7 @@ package domain
 // Role represents a user's role within a tenant.
 type Role string
 
+// Roles available within a tenant.
 const (
 	RoleOwner  Role = "owner"
 	RoleAdmin  Role = "admin"
@@ -26,6 +27,7 @@ func RoleLevel(r Role) int {
 // AuthType represents the authentication mode used to obtain a token.
 type AuthType string
 
+// Authentication modes for token issuance.
 const (
 	AuthTypeUser   AuthType = "user"
 	AuthTypeSystem AuthType = "system"

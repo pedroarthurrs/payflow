@@ -1,7 +1,5 @@
 package token_test
 
-// Feature: rbac-dynamic-auth, Property 4: tenant_id e auth_type sempre presentes nos claims
-
 import (
 	"testing"
 	"time"
@@ -15,8 +13,6 @@ import (
 // TestProperty_ClaimsTenantIDAndAuthType verifies that for any authentication mode
 // (user or system), the emitted token always contains a non-empty tenant_id and
 // a valid auth_type ("user" or "system").
-//
-// Validates: Requirements 4.3
 func TestProperty_ClaimsTenantIDAndAuthType(t *testing.T) {
 	svc := token.NewService("test-secret-key", 15*time.Minute, 7*24*time.Hour)
 

@@ -126,9 +126,8 @@ var _ dbgen.Querier = (*userMockQuerier)(nil)
 // Property-based tests
 // ============================================================
 
-// Feature: rbac-dynamic-auth, Property 9: Isolamento multi-tenant em operações de usuário
-// For any List call with tenantID_A, no user belonging to tenantID_B appears in results.
-// Validates: Requirements 8.2, 8.3
+// TestProperty_UserMultiTenantIsolation verifies that for any List call with tenantID_A,
+// no user belonging to tenantID_B appears in results.
 func TestProperty_UserMultiTenantIsolation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		tenantA := uuid.New()
@@ -191,9 +190,8 @@ func TestProperty_UserMultiTenantIsolation(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 10: Lista de usuários nunca expõe o campo password
-// For any List call, no domain.User in the result has a non-empty Password field.
-// Validates: Requirements 7.2
+// TestProperty_UserListNoPassword verifies that for any List call,
+// no domain.User in the result has a non-empty Password field.
 func TestProperty_UserListNoPassword(t *testing.T) {
 	// Pre-compute hash once outside the loop — bcrypt cost is not what this property tests.
 	const fixedPassword = "testpassword1"
@@ -248,11 +246,9 @@ func TestProperty_UserListNoPassword(t *testing.T) {
 	})
 }
 
-// Feature: rbac-dynamic-auth, Property 11: Criação de usuário round-trip
-// For any valid CreateUserRequest (role != owner), after Create succeeds,
-// the returned domain.User must have the same email and role as the request,
-// and be linked to the correct tenantID.
-// Validates: Requirements 7.1
+// TestProperty_UserCreationRoundTrip verifies that for any valid CreateUserRequest
+// (role != owner), after Create succeeds, the returned domain.User must have the
+// same email and role as the request, and be linked to the correct tenantID.
 func TestProperty_UserCreationRoundTrip(t *testing.T) {
 	// Use a fixed password — bcrypt cost is not what this property tests.
 	const fixedPassword = "testpassword1"

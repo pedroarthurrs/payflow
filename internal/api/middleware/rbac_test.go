@@ -1,7 +1,7 @@
-// Feature: rbac-dynamic-auth, Property 5: Hierarquia RBAC
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -34,16 +34,14 @@ func newTestEngine(minRole domain.Role, claims *i9token.Claims) *gin.Engine {
 // doRequest fires a GET /protected against the engine and returns the status code.
 func doRequest(engine *gin.Engine) int {
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/protected", http.NoBody)
 	engine.ServeHTTP(w, req)
 	return w.Code
 }
 
-// TestProperty_RBACHierarchy verifies Property 5:
+// TestProperty_RBACHierarchy verifies the RBAC hierarchy:
 // For any pair (R1, R2) where RoleLevel(R1) >= RoleLevel(R2), RequireRole(R2) accepts R1 (200).
 // For any pair where RoleLevel(R1) < RoleLevel(R2), RequireRole(R2) rejects R1 (403).
-//
-// Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1
 func TestProperty_RBACHierarchy(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		// Draw two roles from the valid set.
@@ -81,7 +79,7 @@ func TestRequireRole_MissingClaims(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/protected", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusUnauthorized {

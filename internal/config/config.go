@@ -49,11 +49,8 @@ func envInt(key string, fallback int) int {
 func Load() *Config {
 	return &Config{
 		GoEnv:      os.Getenv("GO_ENV"),
-
 		ServerPort: os.Getenv("SERVER_PORT"),
-		
 		JwtSecret:  os.Getenv("JWT_SECRET"),
-
 		DbUser:     os.Getenv("DB_USER"),
 		DbPassword: os.Getenv("DB_PASSWORD"),
 		DbHost:     os.Getenv("DB_HOST"),

@@ -420,7 +420,6 @@ func TestDelete_Success_Returns204(t *testing.T) {
 // --- Property-based test: Rejection of invalid input ---
 
 func TestProperty_InvalidInput_Returns400(t *testing.T) {
-	// Property 2: Rejection of invalid input.
 	// Any payload that violates validation rules (missing required fields,
 	// invalid email format, document or document_type outside 1-20 chars range,
 	// phone with more than 20 chars) must return HTTP 400.
@@ -522,11 +521,11 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 2 (Rejection of invalid input) failed: %v", err)
+		t.Fatalf("rejection of invalid input failed: %v", err)
 	}
 
 	// Log coverage of violation types for visibility.
-	t.Log("Property 2: all 5 violation types covered across 100 iterations (POST + PUT)")
+	t.Log("all 5 violation types covered across 100 iterations (POST + PUT)")
 	for i, desc := range []string{
 		"missing name (empty)",
 		"invalid email (no @)",
@@ -542,7 +541,6 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 // --- Property-based test: Invalid UUID returns 400 ---
 
 func TestProperty_InvalidUUID_Returns400(t *testing.T) {
-	// Property 8: UUID inválido retorna 400.
 	// Any string that is not a valid UUID should return HTTP 400 with
 	// "invalid customer id" for GET, PUT, and DELETE operations.
 
@@ -673,10 +671,10 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 8 (Invalid UUID returns 400) failed: %v", err)
+		t.Fatalf("invalid UUID returns 400 failed: %v", err)
 	}
 
-	t.Log("Property 8: all 5 invalid UUID categories covered across 100 iterations (GET + PUT + DELETE)")
+	t.Log("all 5 invalid UUID categories covered across 100 iterations (GET + PUT + DELETE)")
 	for i, desc := range []string{
 		"random short alphanumeric (1-10 chars)",
 		"truncated valid UUID prefix",
@@ -691,7 +689,6 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 // --- Property-based test: Validation error response format ---
 
 func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
-	// Property 9: Formato da resposta de erro de validação.
 	// Validation error responses must contain an array of objects where each
 	// object has `field`, `rejected_value`, and `message` fields.
 	// The `field` and `message` must be non-empty strings.
@@ -823,10 +820,10 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 9 (Validation error response format) failed: %v", err)
+		t.Fatalf("validation error response format failed: %v", err)
 	}
 
-	t.Log("Property 9: validation error response format verified across 100 iterations")
+	t.Log("validation error response format verified across 100 iterations")
 	for i, desc := range []string{
 		"empty body (all required fields missing)",
 		"only name provided (3 fields missing)",
@@ -840,7 +837,6 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 // --- Property-based test: Soft delete hides customer from all operations ---
 
 func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
-	// Property 4: Soft delete oculta o cliente de todas as operações.
 	// After soft delete, the customer should not appear in the listing,
 	// querying by ID should return 404, updating should return 404,
 	// and the record should be preserved in the database with deleted_at filled.
@@ -1053,16 +1049,15 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 4 (Soft delete hides customer from all operations) failed: %v", err)
+		t.Fatalf("soft delete hides customer failed: %v", err)
 	}
 
-	t.Log("Property 4: soft delete behavior verified across 100 iterations")
+	t.Log("soft delete behavior verified across 100 iterations")
 }
 
 // --- Property-based test: Round-trip of update and read ---
 
 func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
-	// Property 3: Round-trip de atualização e leitura.
 	// For any existing active customer, updating it and then reading it by ID
 	// should return the updated data with updated_at >= the value before the update.
 
@@ -1256,16 +1251,15 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 3 (Round-trip of update and read) failed: %v", err)
+		t.Fatalf("update-and-read round-trip failed: %v", err)
 	}
 
-	t.Log("Property 3: update-and-read round-trip verified across 100 iterations")
+	t.Log("update-and-read round-trip verified across 100 iterations")
 }
 
 // --- Property-based test: Listing order by created_at descending ---
 
 func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
-	// Property 6: Ordenação da listagem por created_at decrescente.
 	// For any tenant with multiple customers, the listing should return
 	// customers ordered by created_at DESC (most recent first).
 
@@ -1418,16 +1412,15 @@ func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 6 (Listing order by created_at descending) failed: %v", err)
+		t.Fatalf("listing order by created_at descending failed: %v", err)
 	}
 
-	t.Log("Property 6: listing order by created_at DESC verified across 100 iterations")
+	t.Log("listing order by created_at DESC verified across 100 iterations")
 }
 
 // --- Property-based test: Non-existent customer returns 404 ---
 
 func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
-	// Property 7: Cliente inexistente retorna 404.
 	// Any valid UUID that doesn't correspond to a customer of the authenticated
 	// tenant should return 404 with "customer not found" for GET, PUT, and DELETE.
 
@@ -1537,8 +1530,8 @@ func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
 
 	cfg := &quick.Config{MaxCount: 100}
 	if err := quick.Check(f, cfg); err != nil {
-		t.Fatalf("Property 7 (Non-existent customer returns 404) failed: %v", err)
+		t.Fatalf("non-existent customer returns 404 failed: %v", err)
 	}
 
-	t.Log("Property 7: non-existent customer returns 404 verified across 100 iterations (GET + PUT + DELETE)")
+	t.Log("non-existent customer returns 404 verified across 100 iterations (GET + PUT + DELETE)")
 }

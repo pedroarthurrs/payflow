@@ -29,8 +29,8 @@ type UpdateUserRequest struct {
 
 // UserService handles user management logic.
 type UserService struct {
-	db           *database.DB
-	bcryptCost   int
+	db         *database.DB
+	bcryptCost int
 }
 
 // NewUserService creates a UserService with database access.
@@ -69,8 +69,8 @@ func (s *UserService) Create(ctx context.Context, tenantID string, req CreateUse
 		if listErr != nil {
 			return nil, listErr
 		}
-		for _, u := range existing {
-			if u.Role == string(domain.RoleOwner) {
+		for i := range existing {
+			if existing[i].Role == string(domain.RoleOwner) {
 				return nil, domain.ErrForbidden
 			}
 		}
@@ -109,8 +109,8 @@ func (s *UserService) List(ctx context.Context, tenantID string) ([]domain.User,
 	}
 
 	users := make([]domain.User, 0, len(rows))
-	for _, row := range rows {
-		users = append(users, *mapUser(row))
+	for i := range rows {
+		users = append(users, *mapUser(rows[i]))
 	}
 	return users, nil
 }

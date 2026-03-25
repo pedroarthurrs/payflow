@@ -9,8 +9,9 @@ package token
 import (
 	"errors"
 	"fmt"
-	"i9pay/internal/domain"
 	"time"
+
+	"i9pay/internal/domain"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -40,10 +41,8 @@ type Claims struct {
 
 	// UserID is the authenticated user's UUID. Empty for system tokens.
 	UserID string `json:"user_id,omitempty"`
-
 	// Role is the user's role within the tenant. Empty for system tokens.
 	Role domain.Role `json:"role,omitempty"`
-
 	// AuthType indicates the authentication mode (user or system). Always present.
 	AuthType domain.AuthType `json:"auth_type"`
 
@@ -52,10 +51,10 @@ type Claims struct {
 
 // ClaimsInput holds the data needed to issue a token pair with extended claims.
 type ClaimsInput struct {
-	TenantID string
+	TenantID string          // tenant UUID
 	UserID   string          // empty for system tokens
 	Role     domain.Role     // empty for system tokens
-	AuthType domain.AuthType
+	AuthType domain.AuthType // user or system
 }
 
 // Pair is returned on a successful login or token refresh.

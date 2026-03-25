@@ -582,7 +582,7 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 		return true
 	}
 	if err := quick.Check(f, &quick.Config{MaxCount: 100}); err != nil {
-		t.Fatalf("Property 1 failed: %v", err)
+		t.Fatalf("round-trip failed: %v", err)
 	}
 }
 
@@ -671,7 +671,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		return true
 	}
 	if err := quick.Check(f, &quick.Config{MaxCount: 100}); err != nil {
-		t.Fatalf("Property 5 failed: %v", err)
+		t.Fatalf("multi-tenant isolation failed: %v", err)
 	}
 }
 
