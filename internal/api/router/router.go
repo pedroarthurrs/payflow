@@ -10,9 +10,11 @@ import (
 	"i9pay/internal/api/http/health"
 	"i9pay/internal/api/http/me"
 	"i9pay/internal/api/http/root"
+	"i9pay/internal/api/http/user"
 	"i9pay/internal/api/middleware"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
+	"i9pay/internal/domain"
 	"i9pay/internal/service"
 	"i9pay/internal/token"
 
@@ -42,9 +44,10 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
-	authSvc := service.NewAuthService(tokenSvc)
+	authSvc := service.NewAuthService(tokenSvc, db)
 	addressSvc := service.NewAddressService(db)
 	customerSvc := service.NewCustomerService(db, addressSvc)
+	userSvc := service.NewUserService(db)
 
 	// Handlers
 	rootHandler := root.NewHandler()
@@ -53,6 +56,7 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	meHandler := me.NewHandler()
 	customerHandler := customer.NewHandler(customerSvc)
 	addressHandler := address.NewHandler(addressSvc)
+	userHandler := user.NewHandler(userSvc)
 
 	r.GET("/", rootHandler.Get)
 
@@ -84,6 +88,11 @@ func New(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
 	protected.GET("/customers/:customer_id/addresses/:id", addressHandler.GetByID)
 	protected.PUT("/customers/:customer_id/addresses/:id", addressHandler.Update)
 	protected.DELETE("/customers/:customer_id/addresses/:id", addressHandler.Delete)
+
+	protected.POST("/users", middleware.RequireRole(domain.RoleOwner), userHandler.Create)
+	protected.GET("/users", middleware.RequireRole(domain.RoleAdmin), userHandler.List)
+	protected.PUT("/users/:user_id", middleware.RequireRole(domain.RoleOwner), userHandler.Update)
+	protected.DELETE("/users/:user_id", middleware.RequireRole(domain.RoleOwner), userHandler.Delete)
 
 	return r
 }

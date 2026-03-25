@@ -11,19 +11,40 @@ import (
 )
 
 type Querier interface {
+	// =================================
+	// Address
+	// =================================
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
+	// =================================
+	// Customer
+	// =================================
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
+	// =================================
+	// API Key
+	// =================================
+	GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error)
 	GetAddressByID(ctx context.Context, arg GetAddressByIDParams) (Address, error)
 	GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error)
 	GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
+	// =================================
+	// User
+	// =================================
+	GetUserByEmailAndTenant(ctx context.Context, arg GetUserByEmailAndTenantParams) (User, error)
+	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
 	HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error
 	ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error)
 	ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]Customer, error)
 	ListTenants(ctx context.Context) ([]Tenant, error)
+	ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error)
 	SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error
+	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
+	UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 }
 
 var _ Querier = (*Queries)(nil)

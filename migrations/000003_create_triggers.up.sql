@@ -14,6 +14,11 @@ CREATE TRIGGER tr_tenants_updated_at
     BEFORE UPDATE ON tenants
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Aplicando na tabela de Users
+CREATE TRIGGER tr_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Aplicando na tabela de Customers
 CREATE TRIGGER tr_customers_updated_at
     BEFORE UPDATE ON customers
@@ -27,6 +32,41 @@ CREATE TRIGGER tr_invoices_updated_at
 -- Aplicando na tabela de Invoice Settings
 CREATE TRIGGER tr_invoice_settings_updated_at
     BEFORE UPDATE ON invoice_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Tenant Configs
+CREATE TRIGGER tr_tenant_configs_updated_at
+    BEFORE UPDATE ON tenant_configs
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Webhook Endpoints
+CREATE TRIGGER tr_webhook_endpoints_updated_at
+    BEFORE UPDATE ON webhook_endpoints
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Addresses
+CREATE TRIGGER tr_addresses_updated_at
+    BEFORE UPDATE ON addresses
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Products
+CREATE TRIGGER tr_products_updated_at
+    BEFORE UPDATE ON products
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Plans
+CREATE TRIGGER tr_plans_updated_at
+    BEFORE UPDATE ON plans
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Subscriptions
+CREATE TRIGGER tr_subscriptions_updated_at
+    BEFORE UPDATE ON subscriptions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Aplicando na tabela de Subscription Items
+CREATE TRIGGER tr_subscription_items_updated_at
+    BEFORE UPDATE ON subscription_items
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ------------------------------- FIM ---------------------------------------
 

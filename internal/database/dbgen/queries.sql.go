@@ -14,9 +14,10 @@ import (
 )
 
 const createAddress = `-- name: CreateAddress :one
+
 INSERT INTO addresses (tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at
+RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at
 `
 
 type CreateAddressParams struct {
@@ -34,6 +35,9 @@ type CreateAddressParams struct {
 	IsMain       sql.NullBool    `json:"is_main"`
 }
 
+// =================================
+// Address
+// =================================
 func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error) {
 	row := q.db.QueryRowContext(ctx, createAddress,
 		arg.TenantID,
@@ -65,26 +69,33 @@ func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (A
 		&i.Country,
 		&i.IsMain,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const createCustomer = `-- name: CreateCustomer :one
-INSERT INTO customers (tenant_id, name, email, phone, document, document_type, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at
+
+INSERT INTO customers (tenant_id, name, email, phone, document, document_type, external_reference, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at
 `
 
 type CreateCustomerParams struct {
-	TenantID     uuid.UUID             `json:"tenant_id"`
-	Name         string                `json:"name"`
-	Email        string                `json:"email"`
-	Phone        sql.NullString        `json:"phone"`
-	Document     string                `json:"document"`
-	DocumentType string                `json:"document_type"`
-	Metadata     pqtype.NullRawMessage `json:"metadata"`
+	TenantID          uuid.UUID             `json:"tenant_id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	Phone             sql.NullString        `json:"phone"`
+	Document          string                `json:"document"`
+	DocumentType      string                `json:"document_type"`
+	ExternalReference sql.NullString        `json:"external_reference"`
+	Metadata          pqtype.NullRawMessage `json:"metadata"`
 }
 
+// =================================
+// Customer
+// =================================
 func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
 	row := q.db.QueryRowContext(ctx, createCustomer,
 		arg.TenantID,
@@ -93,6 +104,7 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 		arg.Phone,
 		arg.Document,
 		arg.DocumentType,
+		arg.ExternalReference,
 		arg.Metadata,
 	)
 	var i Customer
@@ -104,6 +116,7 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 		&i.Phone,
 		&i.Document,
 		&i.DocumentType,
+		&i.ExternalReference,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -113,9 +126,46 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 	return i, err
 }
 
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (tenant_id, name, email, password, role)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at
+`
+
+type CreateUserParams struct {
+	TenantID uuid.UUID `json:"tenant_id"`
+	Name     string    `json:"name"`
+	Email    string    `json:"email"`
+	Password string    `json:"password"`
+	Role     string    `json:"role"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser,
+		arg.TenantID,
+		arg.Name,
+		arg.Email,
+		arg.Password,
+		arg.Role,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.Name,
+		&i.Password,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const deleteAddress = `-- name: DeleteAddress :exec
-DELETE FROM addresses
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+UPDATE addresses SET deleted_at = NOW()
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
 `
 
 type DeleteAddressParams struct {
@@ -129,9 +179,38 @@ func (q *Queries) DeleteAddress(ctx context.Context, arg DeleteAddressParams) er
 	return err
 }
 
+const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
+
+SELECT id, tenant_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, deleted_at FROM api_keys
+WHERE key_hash = $1
+  AND deleted_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW())
+`
+
+// =================================
+// API Key
+// =================================
+func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error) {
+	row := q.db.QueryRowContext(ctx, getAPIKeyByHash, keyHash)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.KeyHash,
+		&i.KeyPrefix,
+		&i.Environment,
+		&i.LastUsedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getAddressByID = `-- name: GetAddressByID :one
-SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at FROM addresses
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
 LIMIT 1
 `
 
@@ -159,12 +238,14 @@ func (q *Queries) GetAddressByID(ctx context.Context, arg GetAddressByIDParams) 
 		&i.Country,
 		&i.IsMain,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getCustomerByID = `-- name: GetCustomerByID :one
-SELECT id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at FROM customers
+SELECT id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
 WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
 LIMIT 1
 `
@@ -185,6 +266,7 @@ func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams
 		&i.Phone,
 		&i.Document,
 		&i.DocumentType,
+		&i.ExternalReference,
 		&i.Status,
 		&i.Metadata,
 		&i.CreatedAt,
@@ -195,7 +277,7 @@ func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams
 }
 
 const getTenant = `-- name: GetTenant :one
-SELECT id, email, name, password, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
+SELECT id, name, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
 WHERE id = $1 LIMIT 1
 `
 
@@ -204,11 +286,86 @@ func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
 	var i Tenant
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
+		&i.WebhookSecret,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
 		&i.Email,
 		&i.Name,
 		&i.Password,
-		&i.WebhookSecret,
-		&i.Status,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getUserByEmailAndTenant = `-- name: GetUserByEmailAndTenant :one
+
+SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND tenant_id = $2 AND deleted_at IS NULL
+`
+
+type GetUserByEmailAndTenantParams struct {
+	Email    string    `json:"email"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+// =================================
+// User
+// =================================
+func (q *Queries) GetUserByEmailAndTenant(ctx context.Context, arg GetUserByEmailAndTenantParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmailAndTenant, arg.Email, arg.TenantID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.Name,
+		&i.Password,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+`
+
+type GetUserByIDParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByID, arg.ID, arg.TenantID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.Name,
+		&i.Password,
+		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -232,8 +389,8 @@ func (q *Queries) HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomer
 }
 
 const listAddressesByCustomer = `-- name: ListAddressesByCustomer :many
-SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at FROM addresses
-WHERE customer_id = $1 AND tenant_id = $2
+SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
+WHERE customer_id = $1 AND tenant_id = $2 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
 
@@ -266,6 +423,8 @@ func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddresses
 			&i.Country,
 			&i.IsMain,
 			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -281,7 +440,7 @@ func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddresses
 }
 
 const listCustomersByTenant = `-- name: ListCustomersByTenant :many
-SELECT id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at FROM customers
+SELECT id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
 WHERE tenant_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
@@ -303,6 +462,7 @@ func (q *Queries) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID)
 			&i.Phone,
 			&i.Document,
 			&i.DocumentType,
+			&i.ExternalReference,
 			&i.Status,
 			&i.Metadata,
 			&i.CreatedAt,
@@ -323,7 +483,7 @@ func (q *Queries) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID)
 }
 
 const listTenants = `-- name: ListTenants :many
-SELECT id, email, name, password, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
+SELECT id, name, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
 ORDER BY name
 `
 
@@ -338,11 +498,46 @@ func (q *Queries) ListTenants(ctx context.Context) ([]Tenant, error) {
 		var i Tenant
 		if err := rows.Scan(
 			&i.ID,
+			&i.Name,
+			&i.WebhookSecret,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersByTenant = `-- name: ListUsersByTenant :many
+SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC
+`
+
+func (q *Queries) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, listUsersByTenant, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
 			&i.Email,
 			&i.Name,
 			&i.Password,
-			&i.WebhookSecret,
-			&i.Status,
+			&i.Role,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -375,11 +570,35 @@ func (q *Queries) SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomer
 	return err
 }
 
+const softDeleteUser = `-- name: SoftDeleteUser :exec
+UPDATE users SET deleted_at = NOW()
+WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+`
+
+type SoftDeleteUserParams struct {
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error {
+	_, err := q.db.ExecContext(ctx, softDeleteUser, arg.ID, arg.TenantID)
+	return err
+}
+
+const updateAPIKeyLastUsed = `-- name: UpdateAPIKeyLastUsed :exec
+UPDATE api_keys SET last_used_at = NOW() WHERE id = $1
+`
+
+func (q *Queries) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, updateAPIKeyLastUsed, id)
+	return err
+}
+
 const updateAddress = `-- name: UpdateAddress :one
 UPDATE addresses
 SET type = $4, postal_code = $5, street = $6, number = $7, complement = $8, neighborhood = $9, city = $10, state = $11, country = $12, is_main = $13
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
-RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
+RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at
 `
 
 type UpdateAddressParams struct {
@@ -430,26 +649,29 @@ func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (A
 		&i.Country,
 		&i.IsMain,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const updateCustomer = `-- name: UpdateCustomer :one
 UPDATE customers
-SET name = $3, email = $4, phone = $5, document = $6, document_type = $7, metadata = $8
+SET name = $3, email = $4, phone = $5, document = $6, document_type = $7, external_reference = $8, metadata = $9
 WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
-RETURNING id, tenant_id, name, email, phone, document, document_type, status, metadata, created_at, updated_at, deleted_at
+RETURNING id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at
 `
 
 type UpdateCustomerParams struct {
-	ID           uuid.UUID             `json:"id"`
-	TenantID     uuid.UUID             `json:"tenant_id"`
-	Name         string                `json:"name"`
-	Email        string                `json:"email"`
-	Phone        sql.NullString        `json:"phone"`
-	Document     string                `json:"document"`
-	DocumentType string                `json:"document_type"`
-	Metadata     pqtype.NullRawMessage `json:"metadata"`
+	ID                uuid.UUID             `json:"id"`
+	TenantID          uuid.UUID             `json:"tenant_id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	Phone             sql.NullString        `json:"phone"`
+	Document          string                `json:"document"`
+	DocumentType      string                `json:"document_type"`
+	ExternalReference sql.NullString        `json:"external_reference"`
+	Metadata          pqtype.NullRawMessage `json:"metadata"`
 }
 
 func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error) {
@@ -461,6 +683,7 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 		arg.Phone,
 		arg.Document,
 		arg.DocumentType,
+		arg.ExternalReference,
 		arg.Metadata,
 	)
 	var i Customer
@@ -472,8 +695,44 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 		&i.Phone,
 		&i.Document,
 		&i.DocumentType,
+		&i.ExternalReference,
 		&i.Status,
 		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateUser = `-- name: UpdateUser :one
+UPDATE users SET name = $1, role = $2, updated_at = NOW()
+WHERE id = $3 AND tenant_id = $4 AND deleted_at IS NULL
+RETURNING id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at
+`
+
+type UpdateUserParams struct {
+	Name     string    `json:"name"`
+	Role     string    `json:"role"`
+	ID       uuid.UUID `json:"id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUser,
+		arg.Name,
+		arg.Role,
+		arg.ID,
+		arg.TenantID,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.Name,
+		&i.Password,
+		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,

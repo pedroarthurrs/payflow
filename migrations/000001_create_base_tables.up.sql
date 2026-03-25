@@ -25,14 +25,27 @@ CREATE TYPE transaction_status_type AS ENUM (
 -- Entidade principal de gestão (Tenants/Empresas).
 CREATE TABLE IF NOT EXISTS tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL,
     webhook_secret VARCHAR(255) DEFAULT gen_random_uuid(),
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Usuários com acesso ao painel de cada Tenant.
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+
+    CONSTRAINT unique_user_email_per_tenant UNIQUE (tenant_id, email)
 );
 
 -- Configurações globais atreladas a um Tenant.
@@ -42,6 +55,8 @@ CREATE TABLE IF NOT EXISTS tenant_configs (
     support_email VARCHAR(255),
     logo_url TEXT,
     primary_color VARCHAR(7) DEFAULT '#000000',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT unique_tenant_config_tenant_id UNIQUE (tenant_id)
 );
@@ -57,6 +72,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     last_used_at TIMESTAMP WITH TIME ZONE,
     expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
 
     CONSTRAINT unique_api_key_tenant_id UNIQUE (tenant_id, id)
 );
@@ -91,6 +107,8 @@ CREATE TABLE IF NOT EXISTS webhook_endpoints (
     environment environment_type DEFAULT 'test',
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
 
     CONSTRAINT unique_webhook_endpoint_tenant_id UNIQUE (tenant_id, id)
 );
@@ -122,7 +140,8 @@ CREATE TABLE IF NOT EXISTS customers (
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     document VARCHAR(20) NOT NULL,
-    document_type VARCHAR(20) NOT NULL, -- Tipificação padronizada do documento.
+    document_type VARCHAR(20) NOT NULL,   -- Tipificação padronizada do documento.
+    external_reference VARCHAR(255),       -- Referência ao cliente em sistema externo (CRM, ERP, etc.).
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     metadata JSONB,                     -- Metadados customizados vinculados à entidade.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -148,6 +167,8 @@ CREATE TABLE IF NOT EXISTS addresses (
     country CHAR(2) DEFAULT 'BR',
     is_main BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
 
     CONSTRAINT fk_addresses_customer_tenant
         FOREIGN KEY (tenant_id, customer_id)
@@ -161,6 +182,7 @@ CREATE TABLE IF NOT EXISTS products (
     name VARCHAR(255) NOT NULL,
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
     CONSTRAINT unique_product_tenant_id UNIQUE (tenant_id, id)
@@ -180,6 +202,7 @@ CREATE TABLE IF NOT EXISTS plans (
     active BOOLEAN DEFAULT true,
     version INTEGER DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
     CONSTRAINT fk_plans_product_tenant
@@ -200,6 +223,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     cancel_at_period_end BOOLEAN DEFAULT false,
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_subscriptions_customer_tenant
         FOREIGN KEY (tenant_id, customer_id)
@@ -216,6 +240,7 @@ CREATE TABLE IF NOT EXISTS subscription_items (
     plan_id UUID NOT NULL,
     quantity INTEGER DEFAULT 1 CHECK (quantity > 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_sub_items_subscription_tenant
         FOREIGN KEY (tenant_id, subscription_id)

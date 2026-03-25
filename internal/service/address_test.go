@@ -90,6 +90,35 @@ func (m *addressMockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.H
 	return nil
 }
 
+// Stubs for user/api-key methods added by rbac-dynamic-auth feature.
+func (m *addressMockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *addressMockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *addressMockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *addressMockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *addressMockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
+	return nil, nil
+}
+func (m *addressMockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
+	return nil
+}
+func (m *addressMockQuerier) UpdateUser(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error) {
+	return dbgen.User{}, nil
+}
+func (m *addressMockQuerier) GetAPIKeyByHash(ctx context.Context, keyHash string) (dbgen.ApiKey, error) {
+	return dbgen.ApiKey{}, nil
+}
+func (m *addressMockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
 // newAddressTestService creates an AddressService backed by the given mock.
 func newAddressTestService(mock *addressMockQuerier) *AddressService {
 	return NewAddressService(&database.DB{Queries: mock})

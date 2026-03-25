@@ -11,8 +11,8 @@ ORDER BY name;
 -- =================================
 
 -- name: CreateCustomer :one
-INSERT INTO customers (tenant_id, name, email, phone, document, document_type, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO customers (tenant_id, name, email, phone, document, document_type, external_reference, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: ListCustomersByTenant :many
@@ -27,7 +27,7 @@ LIMIT 1;
 
 -- name: UpdateCustomer :one
 UPDATE customers
-SET name = $3, email = $4, phone = $5, document = $6, document_type = $7, metadata = $8
+SET name = $3, email = $4, phone = $5, document = $6, document_type = $7, external_reference = $8, metadata = $9
 WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
 RETURNING *;
 
@@ -50,20 +50,63 @@ RETURNING *;
 
 -- name: ListAddressesByCustomer :many
 SELECT * FROM addresses
-WHERE customer_id = $1 AND tenant_id = $2
+WHERE customer_id = $1 AND tenant_id = $2 AND deleted_at IS NULL
 ORDER BY created_at DESC;
 
 -- name: GetAddressByID :one
 SELECT * FROM addresses
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
 LIMIT 1;
 
 -- name: UpdateAddress :one
 UPDATE addresses
 SET type = $4, postal_code = $5, street = $6, number = $7, complement = $8, neighborhood = $9, city = $10, state = $11, country = $12, is_main = $13
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
 RETURNING *;
 
 -- name: DeleteAddress :exec
-DELETE FROM addresses
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3;
+UPDATE addresses SET deleted_at = NOW()
+WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL;
+
+-- =================================
+-- User
+-- =================================
+
+-- name: GetUserByEmailAndTenant :one
+SELECT * FROM users WHERE email = $1 AND tenant_id = $2 AND deleted_at IS NULL;
+
+-- name: GetUserByEmail :one
+SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1;
+
+-- name: GetUserByID :one
+SELECT * FROM users WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL;
+
+-- name: CreateUser :one
+INSERT INTO users (tenant_id, name, email, password, role)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: ListUsersByTenant :many
+SELECT * FROM users WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC;
+
+-- name: UpdateUser :one
+UPDATE users SET name = $1, role = $2, updated_at = NOW()
+WHERE id = $3 AND tenant_id = $4 AND deleted_at IS NULL
+RETURNING *;
+
+-- name: SoftDeleteUser :exec
+UPDATE users SET deleted_at = NOW()
+WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL;
+
+-- =================================
+-- API Key
+-- =================================
+
+-- name: GetAPIKeyByHash :one
+SELECT * FROM api_keys
+WHERE key_hash = $1
+  AND deleted_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW());
+
+-- name: UpdateAPIKeyLastUsed :exec
+UPDATE api_keys SET last_used_at = NOW() WHERE id = $1;

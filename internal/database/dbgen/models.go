@@ -210,6 +210,8 @@ type Address struct {
 	Country      sql.NullString  `json:"country"`
 	IsMain       sql.NullBool    `json:"is_main"`
 	CreatedAt    sql.NullTime    `json:"created_at"`
+	UpdatedAt    sql.NullTime    `json:"updated_at"`
+	DeletedAt    sql.NullTime    `json:"deleted_at"`
 }
 
 type ApiKey struct {
@@ -222,6 +224,7 @@ type ApiKey struct {
 	LastUsedAt  sql.NullTime    `json:"last_used_at"`
 	ExpiresAt   sql.NullTime    `json:"expires_at"`
 	CreatedAt   sql.NullTime    `json:"created_at"`
+	DeletedAt   sql.NullTime    `json:"deleted_at"`
 }
 
 type ApiLog struct {
@@ -240,18 +243,19 @@ type ApiLog struct {
 }
 
 type Customer struct {
-	ID           uuid.UUID             `json:"id"`
-	TenantID     uuid.UUID             `json:"tenant_id"`
-	Name         string                `json:"name"`
-	Email        string                `json:"email"`
-	Phone        sql.NullString        `json:"phone"`
-	Document     string                `json:"document"`
-	DocumentType string                `json:"document_type"`
-	Status       sql.NullString        `json:"status"`
-	Metadata     pqtype.NullRawMessage `json:"metadata"`
-	CreatedAt    sql.NullTime          `json:"created_at"`
-	UpdatedAt    sql.NullTime          `json:"updated_at"`
-	DeletedAt    sql.NullTime          `json:"deleted_at"`
+	ID                uuid.UUID             `json:"id"`
+	TenantID          uuid.UUID             `json:"tenant_id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	Phone             sql.NullString        `json:"phone"`
+	Document          string                `json:"document"`
+	DocumentType      string                `json:"document_type"`
+	ExternalReference sql.NullString        `json:"external_reference"`
+	Status            sql.NullString        `json:"status"`
+	Metadata          pqtype.NullRawMessage `json:"metadata"`
+	CreatedAt         sql.NullTime          `json:"created_at"`
+	UpdatedAt         sql.NullTime          `json:"updated_at"`
+	DeletedAt         sql.NullTime          `json:"deleted_at"`
 }
 
 type CustomerBalanceTransaction struct {
@@ -360,6 +364,7 @@ type Plan struct {
 	Active        sql.NullBool   `json:"active"`
 	Version       sql.NullInt32  `json:"version"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
+	UpdatedAt     sql.NullTime   `json:"updated_at"`
 	DeletedAt     sql.NullTime   `json:"deleted_at"`
 }
 
@@ -369,6 +374,7 @@ type Product struct {
 	Name      string       `json:"name"`
 	Active    sql.NullBool `json:"active"`
 	CreatedAt sql.NullTime `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
 	DeletedAt sql.NullTime `json:"deleted_at"`
 }
 
@@ -382,6 +388,7 @@ type Subscription struct {
 	CancelAtPeriodEnd  sql.NullBool           `json:"cancel_at_period_end"`
 	Metadata           pqtype.NullRawMessage  `json:"metadata"`
 	CreatedAt          sql.NullTime           `json:"created_at"`
+	UpdatedAt          sql.NullTime           `json:"updated_at"`
 }
 
 type SubscriptionItem struct {
@@ -391,6 +398,7 @@ type SubscriptionItem struct {
 	PlanID         uuid.UUID     `json:"plan_id"`
 	Quantity       sql.NullInt32 `json:"quantity"`
 	CreatedAt      sql.NullTime  `json:"created_at"`
+	UpdatedAt      sql.NullTime  `json:"updated_at"`
 }
 
 type SubscriptionSchedule struct {
@@ -418,9 +426,7 @@ type SubscriptionStatusHistory struct {
 
 type Tenant struct {
 	ID            uuid.UUID      `json:"id"`
-	Email         string         `json:"email"`
 	Name          string         `json:"name"`
-	Password      string         `json:"password"`
 	WebhookSecret sql.NullString `json:"webhook_secret"`
 	Status        sql.NullString `json:"status"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
@@ -434,6 +440,8 @@ type TenantConfig struct {
 	SupportEmail sql.NullString `json:"support_email"`
 	LogoUrl      sql.NullString `json:"logo_url"`
 	PrimaryColor sql.NullString `json:"primary_color"`
+	CreatedAt    sql.NullTime   `json:"created_at"`
+	UpdatedAt    sql.NullTime   `json:"updated_at"`
 }
 
 type Transaction struct {
@@ -450,6 +458,18 @@ type Transaction struct {
 	CreatedAt        sql.NullTime          `json:"created_at"`
 }
 
+type User struct {
+	ID        uuid.UUID    `json:"id"`
+	TenantID  uuid.UUID    `json:"tenant_id"`
+	Email     string       `json:"email"`
+	Name      string       `json:"name"`
+	Password  string       `json:"password"`
+	Role      string       `json:"role"`
+	CreatedAt sql.NullTime `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
+	DeletedAt sql.NullTime `json:"deleted_at"`
+}
+
 type WebhookEndpoint struct {
 	ID            uuid.UUID           `json:"id"`
 	TenantID      uuid.UUID           `json:"tenant_id"`
@@ -459,6 +479,8 @@ type WebhookEndpoint struct {
 	Environment   NullEnvironmentType `json:"environment"`
 	IsActive      sql.NullBool        `json:"is_active"`
 	CreatedAt     sql.NullTime        `json:"created_at"`
+	UpdatedAt     sql.NullTime        `json:"updated_at"`
+	DeletedAt     sql.NullTime        `json:"deleted_at"`
 }
 
 type WebhookLog struct {
