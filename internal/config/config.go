@@ -1,11 +1,8 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
-
-	"github.com/joho/godotenv"
 )
 
 // Config holds all runtime configuration loaded from environment variables.
@@ -34,55 +31,34 @@ type Config struct {
 	RateLimitTenantMaxRequests   int
 }
 
+// envInt reads an environment variable and converts it to int.
+// Returns the fallback value if the variable is empty or not a valid integer.
+func envInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
+}
+
 // Load reads environment variables and returns a populated Config.
-// For development and staging it requires a .env file; production reads from the environment directly.
 func Load() *Config {
-	err := godotenv.Load()
-	goEnv := os.Getenv("GO_ENV")
-
-	if err != nil && goEnv != "production" {
-		log.Fatalf("FATAL: .env required for development mode")
-	}
-
-	suffix := map[string]string{
-		"development": "_DEV",
-		"staging":     "_STAGING",
-	}[goEnv]
-
-	env := func(key, fallback string) string {
-		if v := os.Getenv(key + suffix); v != "" {
-			return v
-		}
-		return fallback
-	}
-
-	mustEnv := func(key string) string {
-		k := key + suffix
-		if v := os.Getenv(k); v != "" {
-			return v
-		}
-		log.Fatalf("FATAL: required environment variable %s is missing", k)
-		return ""
-	}
-
-	envInt := func(key string, fallback int) int {
-		if v := os.Getenv(key); v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				return n
-			}
-		}
-		return fallback
-	}
-
 	return &Config{
-		GoEnv:      goEnv,
-		DbUser:     mustEnv("DB_USER"),
-		DbPassword: mustEnv("DB_PASSWORD"),
-		DbHost:     mustEnv("DB_HOST"),
-		DbPort:     env("DB_PORT", "5432"),
-		DbName:     mustEnv("DB_NAME"),
-		ServerPort: env("SERVER_PORT", "8080"),
-		JwtSecret:  mustEnv("JWT_SECRET"),
+		GoEnv:      os.Getenv("GO_ENV"),
+
+		ServerPort: os.Getenv("SERVER_PORT"),
+		
+		JwtSecret:  os.Getenv("JWT_SECRET"),
+
+		DbUser:     os.Getenv("DB_USER"),
+		DbPassword: os.Getenv("DB_PASSWORD"),
+		DbHost:     os.Getenv("DB_HOST"),
+		DbPort:     os.Getenv("DB_PORT"),
+		DbName:     os.Getenv("DB_NAME"),
 
 		RateLimitWindowSeconds:       envInt("RATE_LIMIT_WINDOW_SECONDS", 60),
 		RateLimitMaxRequests:         envInt("RATE_LIMIT_MAX_REQUESTS", 100),
