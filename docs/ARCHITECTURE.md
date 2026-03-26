@@ -8,7 +8,7 @@ A arquitetura segue o padrão **Modular com Camadas Lógicas**, sem usar Clean A
 ┌─────────────────────────────────────────────┐
 │   HTTP Layer (router + middleware)          │
 ├─────────────────────────────────────────────┤
-│   HTTP Handlers (por feature em http/)      │
+│   HTTP Handlers (handler/ — consolidado)    │
 ├─────────────────────────────────────────────┤
 │   Business Logic (services/)                │
 ├─────────────────────────────────────────────┤
@@ -45,12 +45,26 @@ Response JSON
 - Injeção de dependências (services, handlers)
 - Configuração de middleware
 
-**Handlers** (`api/http/{feature}/`)
+**Handlers** (`api/handler/`)
+- Consolidados em um único pacote (um arquivo por recurso)
+- Tipos qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, etc.
+- Consolidados em um único pacote (um arquivo por recurso)
+- Tipos qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, etc.
 - Recebem requisições HTTP
 - Validam payload
-- Chamam services
+
+**DTOs** (`api/dto/`)
+- Data Transfer Objects compartilhados entre handlers
+- `context.go`: Extração de IDs do contexto Gin (TenantID, CustomerID)
+- `request.go`: Structs de request compartilhadas
+- `response.go`: Structs de response compartilhadas
 - Retornam respostas JSON
-- Organizados por feature (auth, health, me, etc.)
+
+**DTOs** (`api/dto/`)
+- Data Transfer Objects compartilhados entre handlers
+- `context.go`: Extração de IDs do contexto Gin (TenantID, CustomerID)
+- `request.go`: Structs de request compartilhadas
+- `response.go`: Structs de response compartilhadas
 
 **Middleware** (`api/middleware/`)
 - `auth.go`: Valida JWT e extrai claims
@@ -101,12 +115,13 @@ Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
 **SQLC Generated** (`database/dbgen/`)
 - `db.go`: Configuração do DB
 - `models.go`: Structs geradas do schema
-- `querier.go`: Interface de queries
+### 5. Auth Service (`auth/token/`)
 - `queries.sql.go`: Implementação type-safe das queries
-
+**JWT Service** (`auth/token/token.go`)
 **SQL** (`database/queries.sql`)
 - Queries acima dessa arquivo geram código Go automaticamente
 - Versionadas com migrations
+- Suporta claims estendidos (user_id, role, auth_type)
 
 ### 5. Token Service (`token/`)
 
@@ -169,40 +184,40 @@ Cada log contém: `request_id`, `method`, `path`, `status`, `latency_ms`, `clien
 Converte erros brutos do `go-playground/validator` em mensagens legíveis:
 - `required` → `{field} is required`
 - `email` → `{field} must be a valid email`
-- `min` → `{field} must be at least {param}`
-- `max` → `{field} must be at most {param}`
-
+Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos:
+- Uma struct `{Recurso}Handler` com dependências
+- Uma função `New{Recurso}Handler()` para construção
 Resposta estruturada com `field`, `rejected_value`, `message`.
 
 ### Handler Pattern
-
-Cada handler é um pacote separado com:
-- Uma struct `Handler` com dependências
-- Uma função `New{Feature}Handler()` para construção
+package handler
+Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos:
+type AuthHandler struct {
+- Uma função `New{Recurso}Handler()` para construção
 - Métodos para cada ação HTTP
 
-```go
-package auth
+func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
+    return &AuthHandler{authSvc: authSvc}
 
-type Handler struct {
-    authSvc *service.AuthService
+type AuthHandler struct {
+func (h *AuthHandler) Login(c *gin.Context) { /* ... */ }
 }
 
-func NewHandler(authSvc *service.AuthService) *Handler {
-    return &Handler{authSvc: authSvc}
+func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
+    return &AuthHandler{authSvc: authSvc}
 }
 
-func (h *Handler) Login(c *gin.Context) { /* ... */ }
+func (h *AuthHandler) Login(c *gin.Context) { /* ... */ }
 ```
 
-### Injeção de Dependências
+authHandler := handler.NewAuthHandler(authSvc)
 
 Sem usar framework DI. Dependências são passadas explicitamente no `router.go`:
 
 ```go
 tokenSvc := token.NewService(secret, ttl1, ttl2)
 authSvc := service.NewAuthService(tokenSvc)
-authHandler := auth.NewHandler(authSvc)
+authHandler := handler.NewAuthHandler(authSvc)
 ```
 
 ### Tratamento de Erros
@@ -221,17 +236,15 @@ if err != nil {
 // Middleware converte para JSON
 {
   "error": "invalid credentials"
-}
+1. Crie arquivo em `internal/api/handler/{feature}.go`:
 ```
-
-## Extensibilidade
+   touch internal/api/handler/product.go
 
 ### Adicionar Nova Feature
 
-1. Crie pacote em `internal/api/http/{feature}/`:
+1. Crie arquivo em `internal/api/handler/{feature}.go`:
    ```bash
-   mkdir internal/api/http/products
-   touch internal/api/http/products/handler.go
+   touch internal/api/handler/product.go
    ```
 
 2. Implemente handlers com dependências
@@ -240,13 +253,13 @@ if err != nil {
 
 4. Use domain models em `internal/domain/`
 
-5. Registre no router
+├── api/handler/product.go          # HTTP API
 
 Exemplo: Feature de Produtos
 
 ```
 internal/
-├── api/http/products/handler.go    # HTTP API
+├── api/handler/product.go          # HTTP API
 ├── service/product.go              # Business logic
 └── domain/product.go               # Models
 ```
@@ -277,13 +290,13 @@ product, err := s.db.Queries.GetProduct(ctx, productID)
 - API endpoints com test database
 - Database transactions com rollback
 
-Exemplo test de handler:
+    h := handler.NewAuthHandler(mockAuthSvc)
 
 ```go
 func TestLoginHandler(t *testing.T) {
     // Mock service
     mockAuthSvc := &mockAuthService{}
-    h := auth.NewHandler(mockAuthSvc)
+    h := handler.NewAuthHandler(mockAuthSvc)
     
     // Test
     c := &gin.Context{...}

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"i9pay/internal/token"
+	"i9pay/internal/auth/token"
 
 	"github.com/gin-gonic/gin"
 )

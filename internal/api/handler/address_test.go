@@ -1,4 +1,4 @@
-package address
+package handler
 
 import (
 	"context"
@@ -10,19 +10,20 @@ import (
 	"testing"
 	"time"
 
+	"i9pay/internal/api/dto"
 	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
+	"i9pay/internal/auth/token"
 	"i9pay/internal/database"
 	"i9pay/internal/database/dbgen"
 	"i9pay/internal/service"
-	"i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"pgregory.net/rapid"
 )
 
-// mockQuerier implements dbgen.Querier for address handler tests.
+// mockQuerier implements dbgen.Querier for handler tests.
 type mockQuerier struct {
 	createAddressFn           func(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error)
 	deleteAddressFn           func(ctx context.Context, arg dbgen.DeleteAddressParams) error
@@ -30,6 +31,12 @@ type mockQuerier struct {
 	listAddressesByCustomerFn func(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error)
 	updateAddressFn           func(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error)
 	getCustomerByIDFn         func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
+	createCustomerFn          func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
+	getTenantFn               func(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error)
+	listCustomersByTenantFn   func(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error)
+	softDeleteCustomerFn      func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
+	updateCustomerFn          func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
+	hardDeleteCustomerFn      func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
 }
 
 func (m *mockQuerier) CreateAddress(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
@@ -69,26 +76,44 @@ func (m *mockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomer
 	return dbgen.Customer{}, nil
 }
 
-// Stub methods to satisfy dbgen.Querier interface.
+// Stub/delegating methods to satisfy dbgen.Querier interface.
 func (m *mockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
+	if m.createCustomerFn != nil {
+		return m.createCustomerFn(ctx, arg)
+	}
 	return dbgen.Customer{}, nil
 }
 func (m *mockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
+	if m.getTenantFn != nil {
+		return m.getTenantFn(ctx, id)
+	}
 	return dbgen.Tenant{}, nil
 }
 func (m *mockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
+	if m.listCustomersByTenantFn != nil {
+		return m.listCustomersByTenantFn(ctx, tenantID)
+	}
 	return nil, nil
 }
 func (m *mockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
 	return nil, nil
 }
 func (m *mockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
+	if m.softDeleteCustomerFn != nil {
+		return m.softDeleteCustomerFn(ctx, arg)
+	}
 	return nil
 }
 func (m *mockQuerier) UpdateCustomer(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
+	if m.updateCustomerFn != nil {
+		return m.updateCustomerFn(ctx, arg)
+	}
 	return dbgen.Customer{}, nil
 }
 func (m *mockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error {
+	if m.hardDeleteCustomerFn != nil {
+		return m.hardDeleteCustomerFn(ctx, arg)
+	}
 	return nil
 }
 func (m *mockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
@@ -127,12 +152,12 @@ func withClaims(tenantID string) gin.HandlerFunc {
 	}
 }
 
-// setupRouter creates a Gin test router with the error middleware, claims, and address handler routes.
-func setupRouter(mock *mockQuerier, tenantID string) *gin.Engine {
+// setupAddressRouter creates a Gin test router with the error middleware, claims, and address handler routes.
+func setupAddressRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	db := &database.DB{Queries: mock}
 	svc := service.NewAddressService(db)
-	h := NewHandler(svc)
+	h := NewAddressHandler(svc)
 
 	r := gin.New()
 	r.Use(middleware.Errors())
@@ -173,7 +198,7 @@ func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 		tenantID := uuid.New().String()
 		customerID := uuid.New().String()
 		mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-		router := setupRouter(mock, tenantID)
+		router := setupAddressRouter(mock, tenantID)
 
 		requiredFields := []string{"postal_code", "street", "city", "state"}
 		removeCount := rapid.IntRange(1, 4).Draw(t, "remove_count")
@@ -226,7 +251,7 @@ func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 		tenantID := uuid.New().String()
 		customerID := uuid.New().String()
 		mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-		router := setupRouter(mock, tenantID)
+		router := setupAddressRouter(mock, tenantID)
 
 		invalidType := rapid.StringMatching(`[a-z]{1,20}`).Draw(t, "bad_type")
 		if validTypes[invalidType] {
@@ -271,7 +296,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 				return dbgen.Customer{}, sql.ErrNoRows
 			},
 		}
-		router := setupRouter(mock, tenantID)
+		router := setupAddressRouter(mock, tenantID)
 
 		body := validAddressJSON()
 		addrID := uuid.New().String()
@@ -341,7 +366,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 		tenantID := uuid.New().String()
 		customerID := uuid.New().String()
 		mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-		router := setupRouter(mock, tenantID)
+		router := setupAddressRouter(mock, tenantID)
 
 		category := rapid.IntRange(0, 3).Draw(t, "category")
 		payload := map[string]any{}
@@ -438,7 +463,7 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID.String()), strings.NewReader(validAddressJSON()))
@@ -449,7 +474,7 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 		t.Fatalf("expected 201, got %d (body=%s)", w.Code, w.Body.String())
 	}
 
-	var resp addressResponse
+	var resp dto.AddressResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -465,7 +490,7 @@ func TestCreate_InvalidPayload_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(`{}`))
@@ -493,7 +518,7 @@ func TestList_Empty_Returns200(t *testing.T) {
 			return []dbgen.Address{}, nil
 		},
 	}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID), http.NoBody)
@@ -502,7 +527,7 @@ func TestList_Empty_Returns200(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp []addressResponse
+	var resp []*dto.AddressResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -535,7 +560,7 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
@@ -544,7 +569,7 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp []addressResponse
+	var resp []*dto.AddressResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -572,7 +597,7 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
@@ -581,7 +606,7 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
 	}
-	var resp addressResponse
+	var resp dto.AddressResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -601,7 +626,7 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 			return dbgen.Address{}, sql.ErrNoRows
 		},
 	}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/"+addrID, http.NoBody)
@@ -623,7 +648,7 @@ func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/not-a-uuid", http.NoBody)
@@ -659,7 +684,7 @@ func TestUpdate_ValidPayload_Returns200(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, tenantID.String())
 
 	body := `{"postal_code":"99999","street":"Updated St","city":"New City","state":"NC"}`
 	w := httptest.NewRecorder()
@@ -677,7 +702,7 @@ func TestUpdate_InvalidPayload_Returns400(t *testing.T) {
 	customerID := uuid.New().String()
 	addrID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(`{}`))
@@ -700,7 +725,7 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 			return dbgen.Address{}, sql.ErrNoRows
 		},
 	}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(validAddressJSON()))
@@ -738,7 +763,7 @@ func TestDelete_Found_Returns204(t *testing.T) {
 			return nil
 		},
 	}
-	router := setupRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
@@ -760,7 +785,7 @@ func TestDelete_NotFound_Returns404(t *testing.T) {
 			return dbgen.Address{}, sql.ErrNoRows
 		},
 	}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/"+addrID, http.NoBody)
@@ -782,7 +807,7 @@ func TestDelete_InvalidUUID_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/not-a-uuid", http.NoBody)
@@ -809,7 +834,7 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 			return dbgen.Customer{}, sql.ErrNoRows
 		},
 	}
-	router := setupRouter(mock, tenantID)
+	router := setupAddressRouter(mock, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(validAddressJSON()))
@@ -874,7 +899,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 				return sorted, nil
 			},
 		}
-		router := setupRouter(mock, tenantID.String())
+		router := setupAddressRouter(mock, tenantID.String())
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
@@ -884,7 +909,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 
-		var resp []addressResponse
+		var resp []*dto.AddressResponse
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response: %v", err)
 		}
@@ -936,7 +961,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 				return updatedRow, nil
 			},
 		}
-		router := setupRouter(mock, tenantID.String())
+		router := setupAddressRouter(mock, tenantID.String())
 
 		payload := map[string]any{
 			"type": newType, "postal_code": newPC,
@@ -963,7 +988,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 			t.Fatalf("GET: expected 200, got %d", w2.Code)
 		}
 
-		var resp addressResponse
+		var resp dto.AddressResponse
 		if err := json.Unmarshal(w2.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse GET response: %v", err)
 		}
@@ -1015,7 +1040,7 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 				return nil
 			},
 		}
-		router := setupRouter(mock, tenantID.String())
+		router := setupAddressRouter(mock, tenantID.String())
 
 		// Verify address exists first
 		w1 := httptest.NewRecorder()
@@ -1121,7 +1146,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		}
 
 		// Tenant A can access the address
-		routerA := setupRouter(mock, tenantA.String())
+		routerA := setupAddressRouter(mock, tenantA.String())
 		wA := httptest.NewRecorder()
 		rA := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerA.ServeHTTP(wA, rA)
@@ -1130,7 +1155,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		}
 
 		// Tenant B gets 404 for customer (customer doesn't exist for tenant B)
-		routerB := setupRouter(mock, tenantB.String())
+		routerB := setupAddressRouter(mock, tenantB.String())
 
 		// GET by ID
 		wB1 := httptest.NewRecorder()

@@ -1,4 +1,4 @@
-package auth
+package handler
 
 import (
 	"errors"
@@ -11,14 +11,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler handles authentication-related HTTP endpoints.
-type Handler struct {
+// AuthHandler handles authentication-related HTTP endpoints.
+type AuthHandler struct {
 	authSvc *service.AuthService
+	loginRL gin.HandlerFunc
 }
 
-// NewHandler creates an auth Handler.
-func NewHandler(authSvc *service.AuthService) *Handler {
-	return &Handler{authSvc: authSvc}
+// NewAuthHandler creates an AuthHandler.
+func NewAuthHandler(authSvc *service.AuthService, loginRL gin.HandlerFunc) *AuthHandler {
+	return &AuthHandler{authSvc: authSvc, loginRL: loginRL}
+}
+
+// RegisterRoutes registers the auth handler routes.
+func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup) {
+	auth := rg.Group("/auth")
+	auth.POST("/login", h.loginRL, h.Login)
+	auth.POST("/refresh", h.Refresh)
 }
 
 type loginRequest struct {
@@ -28,7 +36,7 @@ type loginRequest struct {
 }
 
 // Login authenticates via dynamic mode detection and returns a token pair.
-func (h *Handler) Login(c *gin.Context) {
+func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if e := c.ShouldBindJSON(&req); e != nil {
 		_ = c.Error(apierr.BadRequest(e.Error()))
@@ -57,7 +65,7 @@ type refreshRequest struct {
 }
 
 // Refresh validates the supplied refresh token and returns a new token pair.
-func (h *Handler) Refresh(c *gin.Context) {
+func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshRequest
 	if e := c.ShouldBindJSON(&req); e != nil {
 		_ = c.Error(apierr.BadRequest(e.Error()))

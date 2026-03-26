@@ -1,26 +1,35 @@
-package user
+package handler
 
 import (
 	"errors"
 	"net/http"
 
+	"i9pay/internal/api/dto"
 	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
 	"i9pay/internal/domain"
 	"i9pay/internal/service"
-	"i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Handler handles user management HTTP endpoints.
-type Handler struct {
+// UserHandler handles user management HTTP endpoints.
+type UserHandler struct {
 	userSvc *service.UserService
 }
 
-// NewHandler creates a user Handler.
-func NewHandler(userSvc *service.UserService) *Handler {
-	return &Handler{userSvc: userSvc}
+// NewUserHandler creates a UserHandler.
+func NewUserHandler(userSvc *service.UserService) *UserHandler {
+	return &UserHandler{userSvc: userSvc}
+}
+
+// RegisterRoutes registers the user handler routes.
+func (h *UserHandler) RegisterRoutes(rg *gin.RouterGroup) {
+	users := rg.Group("/users")
+	users.POST("/", middleware.RequireRole(domain.RoleOwner), h.Create)
+	users.GET("/", middleware.RequireRole(domain.RoleAdmin), h.List)
+	users.PUT("/:user_id", middleware.RequireRole(domain.RoleOwner), h.Update)
+	users.DELETE("/:user_id", middleware.RequireRole(domain.RoleOwner), h.Delete)
 }
 
 type createUserRequest struct {
@@ -35,19 +44,9 @@ type updateUserRequest struct {
 	Role domain.Role `json:"role" binding:"required"`
 }
 
-// tenantIDFromClaims extracts the tenant ID string from JWT claims in context.
-func tenantIDFromClaims(c *gin.Context) (string, bool) {
-	claims, ok := c.MustGet(middleware.ClaimsKey).(*token.Claims)
-	if !ok {
-		_ = c.Error(apierr.Internal("could not parse claims"))
-		return "", false
-	}
-	return claims.TenantID, true
-}
-
 // Create handles POST /v1/users.
-func (h *Handler) Create(c *gin.Context) {
-	tid, ok := tenantIDFromClaims(c)
+func (h *UserHandler) Create(c *gin.Context) {
+	tid, ok := dto.TenantID(c)
 	if !ok {
 		return
 	}
@@ -58,7 +57,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userSvc.Create(c.Request.Context(), tid, service.CreateUserRequest{
+	user, err := h.userSvc.Create(c.Request.Context(), tid.String(), service.CreateUserRequest{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
@@ -81,13 +80,13 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 // List handles GET /v1/users.
-func (h *Handler) List(c *gin.Context) {
-	tid, ok := tenantIDFromClaims(c)
+func (h *UserHandler) List(c *gin.Context) {
+	tid, ok := dto.TenantID(c)
 	if !ok {
 		return
 	}
 
-	users, err := h.userSvc.List(c.Request.Context(), tid)
+	users, err := h.userSvc.List(c.Request.Context(), tid.String())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -97,8 +96,8 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 // Update handles PUT /v1/users/:user_id.
-func (h *Handler) Update(c *gin.Context) {
-	tid, ok := tenantIDFromClaims(c)
+func (h *UserHandler) Update(c *gin.Context) {
+	tid, ok := dto.TenantID(c)
 	if !ok {
 		return
 	}
@@ -111,7 +110,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userSvc.Update(c.Request.Context(), tid, userID, service.UpdateUserRequest{
+	user, err := h.userSvc.Update(c.Request.Context(), tid.String(), userID, service.UpdateUserRequest{
 		Name: req.Name,
 		Role: req.Role,
 	})
@@ -128,15 +127,15 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 // Delete handles DELETE /v1/users/:user_id.
-func (h *Handler) Delete(c *gin.Context) {
-	tid, ok := tenantIDFromClaims(c)
+func (h *UserHandler) Delete(c *gin.Context) {
+	tid, ok := dto.TenantID(c)
 	if !ok {
 		return
 	}
 
 	userID := c.Param("user_id")
 
-	err := h.userSvc.Delete(c.Request.Context(), tid, userID)
+	err := h.userSvc.Delete(c.Request.Context(), tid.String(), userID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			_ = c.Error(apierr.NotFound(err.Error()))

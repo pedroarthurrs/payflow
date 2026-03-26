@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"i9pay/internal/auth/token"
 	"i9pay/internal/database"
 	"i9pay/internal/database/dbgen"
 	"i9pay/internal/domain"
-	"i9pay/internal/token"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

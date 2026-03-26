@@ -49,7 +49,7 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 
-	r := router.New(cfg, logger, db)
+	r := router.NewRouter(cfg, logger, db)
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		logger.Error("server stopped", "error", err)

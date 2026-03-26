@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	i9token "i9pay/internal/token"
+	i9token "i9pay/internal/auth/token"
 
 	"github.com/gin-gonic/gin"
 )

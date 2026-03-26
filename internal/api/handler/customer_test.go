@@ -1,4 +1,4 @@
-package customer
+package handler
 
 import (
 	"context"
@@ -17,142 +17,18 @@ import (
 	"i9pay/internal/database"
 	"i9pay/internal/database/dbgen"
 	"i9pay/internal/service"
-	"i9pay/internal/token"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
 )
 
-// mockQuerier implements dbgen.Querier for handler tests.
-type mockQuerier struct {
-	createCustomerFn        func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
-	getCustomerByIDFn       func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
-	getTenantFn             func(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error)
-	listCustomersByTenantFn func(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error)
-	listTenantsFn           func(ctx context.Context) ([]dbgen.Tenant, error)
-	softDeleteCustomerFn    func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
-	updateCustomerFn        func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
-	hardDeleteCustomerFn    func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
-}
-
-func (m *mockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
-	if m.createCustomerFn != nil {
-		return m.createCustomerFn(ctx, arg)
-	}
-	return dbgen.Customer{}, nil
-}
-
-func (m *mockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-	if m.getCustomerByIDFn != nil {
-		return m.getCustomerByIDFn(ctx, arg)
-	}
-	return dbgen.Customer{}, nil
-}
-
-func (m *mockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
-	if m.getTenantFn != nil {
-		return m.getTenantFn(ctx, id)
-	}
-	return dbgen.Tenant{}, nil
-}
-
-func (m *mockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
-	if m.listCustomersByTenantFn != nil {
-		return m.listCustomersByTenantFn(ctx, tenantID)
-	}
-	return nil, nil
-}
-
-func (m *mockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
-	if m.listTenantsFn != nil {
-		return m.listTenantsFn(ctx)
-	}
-	return nil, nil
-}
-
-func (m *mockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
-	if m.softDeleteCustomerFn != nil {
-		return m.softDeleteCustomerFn(ctx, arg)
-	}
-	return nil
-}
-
-func (m *mockQuerier) UpdateCustomer(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
-	if m.updateCustomerFn != nil {
-		return m.updateCustomerFn(ctx, arg)
-	}
-	return dbgen.Customer{}, nil
-}
-
-func (m *mockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error {
-	if m.hardDeleteCustomerFn != nil {
-		return m.hardDeleteCustomerFn(ctx, arg)
-	}
-	return nil
-}
-
-func (m *mockQuerier) CreateAddress(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-	return dbgen.Address{}, nil
-}
-
-func (m *mockQuerier) DeleteAddress(ctx context.Context, arg dbgen.DeleteAddressParams) error {
-	return nil
-}
-
-func (m *mockQuerier) GetAddressByID(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-	return dbgen.Address{}, nil
-}
-
-func (m *mockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
-	return nil, nil
-}
-
-func (m *mockQuerier) UpdateAddress(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
-	return dbgen.Address{}, nil
-}
-func (m *mockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
-	return nil
-}
-func (m *mockQuerier) UpdateUser(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetAPIKeyByHash(ctx context.Context, keyHash string) (dbgen.ApiKey, error) {
-	return dbgen.ApiKey{}, nil
-}
-func (m *mockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
-// withClaims injects JWT claims into the Gin context for testing.
-func withClaims(tenantID string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Set(middleware.ClaimsKey, &token.Claims{TenantID: tenantID})
-		c.Next()
-	}
-}
-
-// setupRouter creates a Gin test router with the error middleware, claims, and customer handler routes.
-func setupRouter(mock *mockQuerier, tenantID string) *gin.Engine {
+// setupCustomerRouter creates a Gin test router with the error middleware, claims, and customer handler routes.
+func setupCustomerRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	db := &database.DB{Queries: mock}
 	svc := service.NewCustomerService(db, nil)
-	h := NewHandler(svc)
+	h := NewCustomerHandler(svc)
 
 	r := gin.New()
 	r.Use(middleware.Errors())
@@ -169,9 +45,9 @@ func setupRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 
 // --- Test 1: Validation of required fields ---
 
-func TestCreate_MissingRequiredFields_Returns400(t *testing.T) {
+func TestCustomerCreate_MissingRequiredFields_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
-	router := setupRouter(&mockQuerier{}, tenantID)
+	router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 	// Empty body — all required fields missing.
 	body := `{}`
@@ -195,7 +71,6 @@ func TestCreate_MissingRequiredFields_Returns400(t *testing.T) {
 	}
 
 	// All four required fields should appear in validation errors.
-	// Note: validator uses Go struct field names lowercased, not JSON tags.
 	requiredFields := map[string]bool{"name": false, "email": false, "document": false, "documenttype": false}
 	for _, fe := range errs {
 		if _, exists := requiredFields[fe.Field]; exists {
@@ -209,9 +84,9 @@ func TestCreate_MissingRequiredFields_Returns400(t *testing.T) {
 	}
 }
 
-func TestCreate_MissingName_Returns400(t *testing.T) {
+func TestCustomerCreate_MissingName_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
-	router := setupRouter(&mockQuerier{}, tenantID)
+	router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 	body := `{"email":"test@example.com","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
@@ -242,9 +117,9 @@ func TestCreate_MissingName_Returns400(t *testing.T) {
 
 // --- Test 2: Invalid email format ---
 
-func TestCreate_InvalidEmail_Returns400(t *testing.T) {
+func TestCustomerCreate_InvalidEmail_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
-	router := setupRouter(&mockQuerier{}, tenantID)
+	router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 	body := `{"name":"Alice","email":"not-an-email","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
@@ -275,9 +150,9 @@ func TestCreate_InvalidEmail_Returns400(t *testing.T) {
 
 // --- Test 3: Invalid UUID in path param ---
 
-func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
+func TestCustomerGetByID_InvalidUUID_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
-	router := setupRouter(&mockQuerier{}, tenantID)
+	router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/not-a-uuid", http.NoBody)
@@ -297,9 +172,9 @@ func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
 	}
 }
 
-func TestUpdate_InvalidUUID_Returns400(t *testing.T) {
+func TestCustomerUpdate_InvalidUUID_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
-	router := setupRouter(&mockQuerier{}, tenantID)
+	router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 	body := `{"name":"Alice","email":"a@b.com","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
@@ -321,9 +196,9 @@ func TestUpdate_InvalidUUID_Returns400(t *testing.T) {
 	}
 }
 
-func TestDelete_InvalidUUID_Returns400(t *testing.T) {
+func TestCustomerDelete_InvalidUUID_Returns400(t *testing.T) {
 	tenantID := uuid.New().String()
-	router := setupRouter(&mockQuerier{}, tenantID)
+	router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/xyz", http.NoBody)
@@ -345,14 +220,14 @@ func TestDelete_InvalidUUID_Returns400(t *testing.T) {
 
 // --- Test 4: 404 for customer not found ---
 
-func TestGetByID_NotFound_Returns404(t *testing.T) {
+func TestCustomerGetByID_NotFound_Returns404(t *testing.T) {
 	tenantID := uuid.New().String()
 	mock := &mockQuerier{
 		getCustomerByIDFn: func(_ context.Context, _ dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 			return dbgen.Customer{}, sql.ErrNoRows
 		},
 	}
-	router := setupRouter(mock, tenantID)
+	router := setupCustomerRouter(mock, tenantID)
 
 	customerID := uuid.New().String()
 	w := httptest.NewRecorder()
@@ -375,7 +250,7 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 
 // --- Test 5: 204 for soft delete ---
 
-func TestDelete_Success_Returns204(t *testing.T) {
+func TestCustomerDelete_Success_Returns204(t *testing.T) {
 	tenantID := uuid.New()
 	customerID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -402,7 +277,7 @@ func TestDelete_Success_Returns204(t *testing.T) {
 			return nil
 		},
 	}
-	router := setupRouter(mock, tenantID.String())
+	router := setupCustomerRouter(mock, tenantID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/"+customerID.String(), http.NoBody)
@@ -419,7 +294,7 @@ func TestDelete_Success_Returns204(t *testing.T) {
 
 // --- Property-based test: Rejection of invalid input ---
 
-func TestProperty_InvalidInput_Returns400(t *testing.T) {
+func TestCustomerProperty_InvalidInput_Returns400(t *testing.T) {
 	// Any payload that violates validation rules (missing required fields,
 	// invalid email format, document or document_type outside 1-20 chars range,
 	// phone with more than 20 chars) must return HTTP 400.
@@ -489,7 +364,7 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 		body := string(bodyBytes)
 
 		tenantID := uuid.New().String()
-		router := setupRouter(&mockQuerier{}, tenantID)
+		router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 		// --- Test POST /v1/customers ---
 		wPost := httptest.NewRecorder()
@@ -540,7 +415,7 @@ func TestProperty_InvalidInput_Returns400(t *testing.T) {
 
 // --- Property-based test: Invalid UUID returns 400 ---
 
-func TestProperty_InvalidUUID_Returns400(t *testing.T) {
+func TestCustomerProperty_InvalidUUID_Returns400(t *testing.T) {
 	// Any string that is not a valid UUID should return HTTP 400 with
 	// "invalid customer id" for GET, PUT, and DELETE operations.
 
@@ -563,7 +438,6 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 		}
 
 		// Generate a string that is guaranteed NOT to be a valid UUID.
-		// Pick among several categories of invalid strings.
 		category := nextR() % 5
 		var invalidID string
 		switch category {
@@ -602,7 +476,7 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 		}
 
 		tenantID := uuid.New().String()
-		router := setupRouter(&mockQuerier{}, tenantID)
+		router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 		// --- GET /v1/customers/:id ---
 		wGet := httptest.NewRecorder()
@@ -688,7 +562,7 @@ func TestProperty_InvalidUUID_Returns400(t *testing.T) {
 
 // --- Property-based test: Validation error response format ---
 
-func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
+func TestCustomerProperty_ValidationErrorResponseFormat(t *testing.T) {
 	// Validation error responses must contain an array of objects where each
 	// object has `field`, `rejected_value`, and `message` fields.
 	// The `field` and `message` must be non-empty strings.
@@ -711,7 +585,6 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 		}
 
 		// Generate a payload that triggers validation errors.
-		// Pick a violation category to ensure diverse error shapes.
 		category := nextR() % 4
 
 		payload := map[string]any{}
@@ -742,7 +615,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 		}
 
 		tenantID := uuid.New().String()
-		router := setupRouter(&mockQuerier{}, tenantID)
+		router := setupCustomerRouter(&mockQuerier{}, tenantID)
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(string(bodyBytes)))
@@ -836,7 +709,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 
 // --- Property-based test: Soft delete hides customer from all operations ---
 
-func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
+func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 	// After soft delete, the customer should not appear in the listing,
 	// querying by ID should return 404, updating should return 404,
 	// and the record should be preserved in the database with deleted_at filled.
@@ -931,7 +804,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			},
 		}
 
-		router := setupRouter(mock, tenantID.String())
+		router := setupCustomerRouter(mock, tenantID.String())
 
 		// Step 1: Create a customer via POST — expect 201.
 		createBody := fmt.Sprintf(
@@ -1057,7 +930,7 @@ func TestProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 // --- Property-based test: Round-trip of update and read ---
 
-func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
+func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 	// For any existing active customer, updating it and then reading it by ID
 	// should return the updated data with updated_at >= the value before the update.
 
@@ -1141,7 +1014,7 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 			},
 		}
 
-		router := setupRouter(mock, tenantID.String())
+		router := setupCustomerRouter(mock, tenantID.String())
 
 		// Step 1: Create a customer via POST — expect 201.
 		createBody := fmt.Sprintf(
@@ -1259,7 +1132,7 @@ func TestProperty_UpdateAndReadRoundTrip(t *testing.T) {
 
 // --- Property-based test: Listing order by created_at descending ---
 
-func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
+func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 	// For any tenant with multiple customers, the listing should return
 	// customers ordered by created_at DESC (most recent first).
 
@@ -1337,7 +1210,7 @@ func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 			},
 		}
 
-		router := setupRouter(mock, tenantID.String())
+		router := setupCustomerRouter(mock, tenantID.String())
 
 		// Step 1: Create 2-5 customers via POST with different timestamps.
 		for i := 0; i < numCustomers; i++ {
@@ -1420,7 +1293,7 @@ func TestProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 
 // --- Property-based test: Non-existent customer returns 404 ---
 
-func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
+func TestCustomerProperty_NonExistentCustomerReturns404(t *testing.T) {
 	// Any valid UUID that doesn't correspond to a customer of the authenticated
 	// tenant should return 404 with "customer not found" for GET, PUT, and DELETE.
 
@@ -1461,7 +1334,7 @@ func TestProperty_NonExistentCustomerReturns404(t *testing.T) {
 			},
 		}
 
-		router := setupRouter(mock, tenantID)
+		router := setupCustomerRouter(mock, tenantID)
 
 		// --- GET /v1/customers/:id — expect 404 ---
 		wGet := httptest.NewRecorder()

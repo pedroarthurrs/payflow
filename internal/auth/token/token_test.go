@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"i9pay/internal/auth/token"
 	"i9pay/internal/domain"
-	"i9pay/internal/token"
 
 	"pgregory.net/rapid"
 )

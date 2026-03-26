@@ -5,12 +5,13 @@
 ```
 i9pay/
 ├── cmd/                      # Aplicações executáveis
-│   └── api/                  # API principal
+│   └── server/               # Servidor HTTP principal
 ├── internal/                 # Código privado (não importável)
 │   ├── api/                  # Camada HTTP
 │   │   ├── router/           # Roteador e inicialização
 │   │   ├── middleware/       # Middlewares (auth, errors, etc)
-│   │   ├── http/             # Handlers por feature
+│   │   ├── handler/          # Handlers consolidados (um arquivo por recurso)
+│   │   ├── dto/              # Data Transfer Objects (requests/responses compartilhados)
 │   │   └── err/              # Tipos de erro customizados
 │   ├── service/              # Lógica de negócio
 │   ├── domain/               # Modelos e validações
@@ -27,7 +28,7 @@ i9pay/
 └── Makefile                  # Comandos úteis
 ```
 
-**Nota**: Cada _feature_ cria subpacotes específicas, não há código genérico no `internal/`.
+**Nota**: Handlers ficam consolidados em `internal/api/handler/` (um arquivo por recurso). DTOs compartilhados ficam em `internal/api/dto/`.
 
 ## Adicionando Nova Feature
 
@@ -36,14 +37,14 @@ Exemplo: Implementar CRUD de Produtos.
 ### 1. Estrutura
 
 ```bash
-mkdir -p internal/api/http/products
+touch internal/api/handler/product.go
 mkdir -p internal/service
 ```
 
-### 2. Handler (`internal/api/http/products/handler.go`)
+### 2. Handler (`internal/api/handler/product.go`)
 
 ```go
-package products
+package handler
 
 import (
 	"i9pay/internal/api/err"
@@ -54,12 +55,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type Handler struct {
+type ProductHandler struct {
 	productSvc *service.ProductService
 }
 
-func NewHandler(productSvc *service.ProductService) *Handler {
-	return &Handler{productSvc: productSvc}
+func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
+	return &ProductHandler{productSvc: productSvc}
 }
 
 type CreateRequest struct {
@@ -67,7 +68,7 @@ type CreateRequest struct {
 	Price int64  `json:"price" binding:"required,min=0"`
 }
 
-func (h *Handler) Create(c *gin.Context) {
+func (h *ProductHandler) Create(c *gin.Context) {
 	var req CreateRequest
 	if e := c.ShouldBindJSON(&req); e != nil {
 		_ = c.Error(err.BadRequest(e.Error()))
@@ -83,7 +84,7 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, product)
 }
 
-func (h *Handler) Get(c *gin.Context) {
+func (h *ProductHandler) Get(c *gin.Context) {
 	id, e := uuid.Parse(c.Param("id"))
 	if e != nil {
 		_ = c.Error(err.BadRequest("invalid product id"))
@@ -204,7 +205,7 @@ make sqlc
 ```go
 // No setup de handlers
 productSvc := service.NewProductService(db)
-productHandler := products.NewHandler(productSvc)
+productHandler := handler.NewProductHandler(productSvc)
 
 // Adicione rotas
 protected := v1.Group("/")
@@ -269,7 +270,7 @@ Mensagens são traduzidas automaticamente em `internal/api/err/validation.go`.
 
 ### Naming
 
-- **Packages**: lowercase, sem underscore (`internal/api/http/products`)
+- **Packages**: lowercase, sem underscore (`internal/api/handler`)
 - **Funcs/Methods**: camelCase (`createProduct`, `fecthTenantById`)
 - **Consts**: UPPER_SNAKE_CASE (`DEFAULT_TTL`, `MAX_RETRY`)
 - **Vars**: camelCase (`productID`, `isValid`)
@@ -316,9 +317,9 @@ internal/
 ├── service/
 │   ├── product.go
 │   └── product_test.go      # Tests aqui
-├── api/http/products/
-│   ├── handler.go
-│   └── handler_test.go      # Tests aqui
+├── api/handler/
+│   ├── product.go
+│   └── product_test.go      # Tests aqui
 ```
 
 Exemplo test:

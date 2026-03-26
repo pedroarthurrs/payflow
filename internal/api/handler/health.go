@@ -1,4 +1,4 @@
-package health
+package handler
 
 import (
 	"context"
@@ -11,18 +11,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler handles health check endpoints.
-type Handler struct {
+// HealthHandler handles health check endpoints.
+type HealthHandler struct {
 	db *database.DB
 }
 
-// NewHandler creates a health Handler.
-func NewHandler(db *database.DB) *Handler {
-	return &Handler{db: db}
+// NewHealthHandler creates a HealthHandler.
+func NewHealthHandler(db *database.DB) *HealthHandler {
+	return &HealthHandler{db: db}
+}
+
+// RegisterRoutes registers the health handler routes.
+func (h *HealthHandler) RegisterRoutes(rg *gin.RouterGroup) {
+	rg.GET("/health", h.Get)
 }
 
 // Get returns the health status of the service and its dependencies.
-func (h *Handler) Get(c *gin.Context) {
+func (h *HealthHandler) Get(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 	defer cancel()
 

@@ -42,16 +42,22 @@ Pronto! API rodando em `http://localhost:8080`.
 
 ```
 i9pay/
-├── cmd/api/                  # Ponto de entrada
+├── cmd/server/               # Ponto de entrada (main.go)
 ├── docker/                   # Dockerfiles (dev/prod)
 ├── docs/                     # Documentação
 ├── internal/
-│   ├── api/                  # Camada HTTP (router, handlers, middleware)
+│   ├── api/                  # Camada HTTP
+│   │   ├── handler/          # Handlers consolidados (um arquivo por recurso)
+│   │   ├── middleware/       # Auth, logging, rate limiting, errors
+│   │   ├── dto/              # Data Transfer Objects compartilhados
+│   │   ├── err/              # Error handling e tradução
+│   │   └── router/           # Router e testes de rotas
+│   ├── auth/                 # Autenticação
+│   │   └── token/            # JWT service
 │   ├── service/              # Lógica de negócio
 │   ├── domain/               # Modelos e validações
 │   ├── config/               # Configurações
-│   ├── database/             # Conexão e queries (SQLC)
-│   └── token/                # JWT service
+│   └── database/             # Conexão e queries (SQLC)
 ├── migrations/               # SQL migrations versionadas
 ├── Makefile                  # Comandos úteis
 ├── go.mod / go.sum           # Dependências
