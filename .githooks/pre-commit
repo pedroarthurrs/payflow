@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"
+
 echo "Running pre-commit checks..."
 
 echo "→ make fmt"
