@@ -9,9 +9,9 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Aplicando na tabela de Tenants
-CREATE TRIGGER tr_tenants_updated_at
-    BEFORE UPDATE ON tenants
+-- Aplicando na tabela de Organizations
+CREATE TRIGGER tr_organizations_updated_at
+    BEFORE UPDATE ON organizations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Aplicando na tabela de Users
@@ -34,9 +34,9 @@ CREATE TRIGGER tr_invoice_settings_updated_at
     BEFORE UPDATE ON invoice_settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Aplicando na tabela de Tenant Configs
-CREATE TRIGGER tr_tenant_configs_updated_at
-    BEFORE UPDATE ON tenant_configs
+-- Aplicando na tabela de Organization Configs
+CREATE TRIGGER tr_organization_configs_updated_at
+    BEFORE UPDATE ON organization_configs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Aplicando na tabela de Webhook Endpoints
@@ -89,14 +89,14 @@ BEGIN
     -- Verifica se o status foi alterado
     IF (OLD.status IS DISTINCT FROM NEW.status) THEN
         INSERT INTO subscription_status_history (
-            tenant_id,
+            organization_id,
             subscription_id,
             old_status,
             new_status,
             reason,
             metadata
         ) VALUES (
-            NEW.tenant_id,
+            NEW.organization_id,
             NEW.id,
             OLD.status,
             NEW.status,

@@ -22,8 +22,8 @@ CREATE TYPE transaction_status_type AS ENUM (
     'partially_refunded' -- Estorno parcial
 );
 
--- Entidade principal de gestão (Tenants/Empresas).
-CREATE TABLE IF NOT EXISTS tenants (
+-- Entidade principal de gestão (Organizations/Empresas).
+CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     webhook_secret VARCHAR(255) DEFAULT gen_random_uuid(),
@@ -33,10 +33,10 @@ CREATE TABLE IF NOT EXISTS tenants (
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
--- Usuários com acesso ao painel de cada Tenant.
+-- Usuários com acesso ao painel de cada Organization.
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
@@ -45,26 +45,26 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT unique_user_email_per_tenant UNIQUE (tenant_id, email)
+    CONSTRAINT unique_user_email_per_organization UNIQUE (organization_id, email)
 );
 
--- Configurações globais atreladas a um Tenant.
-CREATE TABLE IF NOT EXISTS tenant_configs (
+-- Configurações globais atreladas a um Organization.
+CREATE TABLE IF NOT EXISTS organization_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     support_email VARCHAR(255),
     logo_url TEXT,
     primary_color VARCHAR(7) DEFAULT '#000000',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT unique_tenant_config_tenant_id UNIQUE (tenant_id)
+    CONSTRAINT unique_organization_config_organization_id UNIQUE (organization_id)
 );
 
 -- Gerenciamento de acesso por ambiente.
 CREATE TABLE IF NOT EXISTS api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL,
     key_hash TEXT NOT NULL UNIQUE,   -- Hash SHA-256 da chave para validação.
     key_prefix VARCHAR(10) NOT NULL, -- Prefixo indicativo de ambiente da chave.
@@ -74,13 +74,13 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT unique_api_key_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_api_key_organization_id UNIQUE (organization_id, id)
 );
 
 -- Monitoramento e debug do sistema.
 CREATE TABLE IF NOT EXISTS api_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     api_key_id UUID,       -- Chave de API utilizada na requisição.
     method VARCHAR(10),    -- Método HTTP da requisição.
     path TEXT,             -- Path da rota acessada.
@@ -92,15 +92,15 @@ CREATE TABLE IF NOT EXISTS api_logs (
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_api_logs_api_key_tenant
-        FOREIGN KEY (tenant_id, api_key_id)
-        REFERENCES api_keys (tenant_id, id) ON DELETE SET NULL
+    CONSTRAINT fk_api_logs_api_key_organization
+        FOREIGN KEY (organization_id, api_key_id)
+        REFERENCES api_keys (organization_id, id) ON DELETE SET NULL
 );
 
 -- Configuração dos webhooks.
 CREATE TABLE IF NOT EXISTS webhook_endpoints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
     description TEXT,
     enabled_events TEXT[], -- Identificadores dos eventos habilitados no endpoint.
@@ -110,13 +110,13 @@ CREATE TABLE IF NOT EXISTS webhook_endpoints (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT unique_webhook_endpoint_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_webhook_endpoint_organization_id UNIQUE (organization_id, id)
 );
 
 -- Monitoramento e debug dos webhooks.
 CREATE TABLE IF NOT EXISTS webhook_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     endpoint_id UUID NOT NULL,
     event_type VARCHAR(100) NOT NULL, -- Identificador do evento disparado.
     payload JSONB NOT NULL,
@@ -127,15 +127,15 @@ CREATE TABLE IF NOT EXISTS webhook_logs (
     success BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_webhook_logs_endpoint_tenant
-        FOREIGN KEY (tenant_id, endpoint_id)
-        REFERENCES webhook_endpoints (tenant_id, id) ON DELETE CASCADE
+    CONSTRAINT fk_webhook_logs_endpoint_organization
+        FOREIGN KEY (organization_id, endpoint_id)
+        REFERENCES webhook_endpoints (organization_id, id) ON DELETE CASCADE
 );
 
 -- Clientes finais de cada SaaS.
 CREATE TABLE IF NOT EXISTS customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
@@ -148,13 +148,13 @@ CREATE TABLE IF NOT EXISTS customers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT unique_customer_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_customer_organization_id UNIQUE (organization_id, id)
 );
 
 -- Endereços vinculados a clientes.
 CREATE TABLE IF NOT EXISTS addresses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     customer_id UUID NOT NULL,
     type address_type DEFAULT 'billing',
     postal_code VARCHAR(10) NOT NULL,
@@ -170,28 +170,28 @@ CREATE TABLE IF NOT EXISTS addresses (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT fk_addresses_customer_tenant
-        FOREIGN KEY (tenant_id, customer_id)
-        REFERENCES customers (tenant_id, id) ON DELETE CASCADE
+    CONSTRAINT fk_addresses_customer_organization
+        FOREIGN KEY (organization_id, customer_id)
+        REFERENCES customers (organization_id, id) ON DELETE CASCADE
 );
 
--- Produtos comercializados pelos Tenants.
+-- Produtos comercializados pelos Organizations.
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     name VARCHAR(255) NOT NULL,
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT unique_product_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_product_organization_id UNIQUE (organization_id, id)
 );
 
 -- Regras de preço e recorrência dos produtos.
 CREATE TABLE IF NOT EXISTS plans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     product_id UUID NOT NULL,
     name VARCHAR(255),                -- Nome de exibição público do plano.
     slug TEXT,
@@ -205,17 +205,17 @@ CREATE TABLE IF NOT EXISTS plans (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT fk_plans_product_tenant
-        FOREIGN KEY (tenant_id, product_id)
-        REFERENCES products (tenant_id, id) ON DELETE CASCADE,
+    CONSTRAINT fk_plans_product_organization
+        FOREIGN KEY (organization_id, product_id)
+        REFERENCES products (organization_id, id) ON DELETE CASCADE,
 
-    CONSTRAINT unique_plan_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_plan_organization_id UNIQUE (organization_id, id)
 );
 
 -- Contratos ativos de assinatura.
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     customer_id UUID NOT NULL,
     status subscription_status_type NOT NULL, -- Situação cíclica atual da assinatura.
     current_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -225,36 +225,36 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_subscriptions_customer_tenant
-        FOREIGN KEY (tenant_id, customer_id)
-        REFERENCES customers (tenant_id, id),
+    CONSTRAINT fk_subscriptions_customer_organization
+        FOREIGN KEY (organization_id, customer_id)
+        REFERENCES customers (organization_id, id),
 
-    CONSTRAINT unique_subscription_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_subscription_organization_id UNIQUE (organization_id, id)
 );
 
 -- Itens vinculados às assinaturas, detalhando os planos contratados.
 CREATE TABLE IF NOT EXISTS subscription_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     subscription_id UUID NOT NULL,
     plan_id UUID NOT NULL,
     quantity INTEGER DEFAULT 1 CHECK (quantity > 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_sub_items_subscription_tenant
-        FOREIGN KEY (tenant_id, subscription_id)
-        REFERENCES subscriptions (tenant_id, id) ON DELETE CASCADE,
+    CONSTRAINT fk_sub_items_subscription_organization
+        FOREIGN KEY (organization_id, subscription_id)
+        REFERENCES subscriptions (organization_id, id) ON DELETE CASCADE,
 
-    CONSTRAINT fk_sub_items_plan_tenant
-        FOREIGN KEY (tenant_id, plan_id)
-        REFERENCES plans (tenant_id, id)
+    CONSTRAINT fk_sub_items_plan_organization
+        FOREIGN KEY (organization_id, plan_id)
+        REFERENCES plans (organization_id, id)
 );
 
 -- Notas fiscais emitidas por assinatura ou cobrança avulsa.
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     customer_id UUID NOT NULL,
     subscription_id UUID, -- Assinatura originadora, quando aplicável.
 
@@ -276,21 +276,21 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_invoices_customer_tenant
-        FOREIGN KEY (tenant_id, customer_id)
-        REFERENCES customers (tenant_id, id),
+    CONSTRAINT fk_invoices_customer_organization
+        FOREIGN KEY (organization_id, customer_id)
+        REFERENCES customers (organization_id, id),
 
-    CONSTRAINT fk_invoices_subscription_tenant
-        FOREIGN KEY (tenant_id, subscription_id)
-        REFERENCES subscriptions (tenant_id, id),
+    CONSTRAINT fk_invoices_subscription_organization
+        FOREIGN KEY (organization_id, subscription_id)
+        REFERENCES subscriptions (organization_id, id),
 
-    CONSTRAINT unique_invoice_tenant_id UNIQUE (tenant_id, id)
+    CONSTRAINT unique_invoice_organization_id UNIQUE (organization_id, id)
 );
 
 -- Itens de linha da nota fiscal.
 CREATE TABLE IF NOT EXISTS invoice_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     invoice_id UUID NOT NULL,
     description TEXT NOT NULL,
     quantity DECIMAL(12, 4) NOT NULL DEFAULT 1.0 CHECK (quantity > 0),
@@ -299,15 +299,15 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_invoice_items_invoice_tenant
-        FOREIGN KEY (tenant_id, invoice_id)
-        REFERENCES invoices (tenant_id, id) ON DELETE CASCADE
+    CONSTRAINT fk_invoice_items_invoice_organization
+        FOREIGN KEY (organization_id, invoice_id)
+        REFERENCES invoices (organization_id, id) ON DELETE CASCADE
 );
 
 -- Auditoria técnica das operações com o ERP.
 CREATE TABLE IF NOT EXISTS invoice_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     invoice_id UUID NOT NULL,
 
     -- Identificação da operação realizada.
@@ -328,15 +328,15 @@ CREATE TABLE IF NOT EXISTS invoice_logs (
     message TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_invoice_logs_invoice_tenant
-        FOREIGN KEY (tenant_id, invoice_id)
-        REFERENCES invoices (tenant_id, id) ON DELETE CASCADE
+    CONSTRAINT fk_invoice_logs_invoice_organization
+        FOREIGN KEY (organization_id, invoice_id)
+        REFERENCES invoices (organization_id, id) ON DELETE CASCADE
 );
 
--- Configurações de emissão fiscal por Tenant.
+-- Configurações de emissão fiscal por Organization.
 CREATE TABLE IF NOT EXISTS invoice_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
     -- Modalidade de mercado (nacional ou internacional).
     type VARCHAR(20) NOT NULL CHECK (type IN ('national', 'international')),
@@ -363,13 +363,13 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT unique_tenant_invoice_type UNIQUE (tenant_id, type)
+    CONSTRAINT unique_organization_invoice_type UNIQUE (organization_id, type)
 );
 
 -- Registros financeiros brutos vinculados a faturas.
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     invoice_id UUID,
 
     gateway_name VARCHAR(50),       -- Gateway que processou o pagamento.
@@ -382,15 +382,15 @@ CREATE TABLE IF NOT EXISTS transactions (
     error_log JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_transactions_invoice_tenant
-        FOREIGN KEY (tenant_id, invoice_id)
-        REFERENCES invoices (tenant_id, id) ON DELETE SET NULL
+    CONSTRAINT fk_transactions_invoice_organization
+        FOREIGN KEY (organization_id, invoice_id)
+        REFERENCES invoices (organization_id, id) ON DELETE SET NULL
 );
 
 -- Controle de idempotência das requisições.
 CREATE TABLE IF NOT EXISTS idempotency_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
     idempotency_key TEXT NOT NULL,  -- Hash identificador da requisição do consumidor.
     request_path TEXT NOT NULL,     -- Endpoint relacionado ao token gerado.
@@ -399,14 +399,14 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT unique_idempotency_key_per_tenant
-        UNIQUE (tenant_id, idempotency_key)
+    CONSTRAINT unique_idempotency_key_per_organization
+        UNIQUE (organization_id, idempotency_key)
 );
 
 -- Movimentações de saldo do cliente.
 CREATE TABLE IF NOT EXISTS customer_balance_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     customer_id UUID NOT NULL,
 
     type VARCHAR(10) NOT NULL CHECK (type IN ('credit', 'debit')), -- Direção monetária da movimentação.
@@ -420,15 +420,15 @@ CREATE TABLE IF NOT EXISTS customer_balance_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT fk_balance_customer_tenant
-        FOREIGN KEY (tenant_id, customer_id)
-        REFERENCES customers (tenant_id, id)
+    CONSTRAINT fk_balance_customer_organization
+        FOREIGN KEY (organization_id, customer_id)
+        REFERENCES customers (organization_id, id)
 );
 
 -- Histórico de mudanças de estado das assinaturas.
 CREATE TABLE IF NOT EXISTS subscription_status_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     subscription_id UUID NOT NULL,
 
     old_status subscription_status_type,          -- Estado anterior da assinatura.
@@ -438,15 +438,15 @@ CREATE TABLE IF NOT EXISTS subscription_status_history (
     event_source_id UUID,                         -- Entidade associada que disparou a mudança (transaction ou invoice).
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_sub_history_subscription_tenant
-        FOREIGN KEY (tenant_id, subscription_id)
-        REFERENCES subscriptions (tenant_id, id) ON DELETE CASCADE
+    CONSTRAINT fk_sub_history_subscription_organization
+        FOREIGN KEY (organization_id, subscription_id)
+        REFERENCES subscriptions (organization_id, id) ON DELETE CASCADE
 );
 
 -- Agendamento de alterações futuras em assinaturas.
 CREATE TABLE IF NOT EXISTS subscription_schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     subscription_id UUID NOT NULL,
 
     scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -455,7 +455,7 @@ CREATE TABLE IF NOT EXISTS subscription_schedules (
     applied_at TIMESTAMP WITH TIME ZONE,    -- Preenchido pelo job após execução bem-sucedida.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_sub_schedules_subscription_tenant
-        FOREIGN KEY (tenant_id, subscription_id)
-        REFERENCES subscriptions (tenant_id, id) ON DELETE CASCADE
+    CONSTRAINT fk_sub_schedules_subscription_organization
+        FOREIGN KEY (organization_id, subscription_id)
+        REFERENCES subscriptions (organization_id, id) ON DELETE CASCADE
 );

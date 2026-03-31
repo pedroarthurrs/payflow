@@ -15,24 +15,24 @@ import (
 
 const createAddress = `-- name: CreateAddress :one
 
-INSERT INTO addresses (tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main)
+INSERT INTO addresses (organization_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at
+RETURNING id, organization_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at
 `
 
 type CreateAddressParams struct {
-	TenantID     uuid.UUID       `json:"tenant_id"`
-	CustomerID   uuid.UUID       `json:"customer_id"`
-	Type         NullAddressType `json:"type"`
-	PostalCode   string          `json:"postal_code"`
-	Street       string          `json:"street"`
-	Number       sql.NullString  `json:"number"`
-	Complement   sql.NullString  `json:"complement"`
-	Neighborhood sql.NullString  `json:"neighborhood"`
-	City         string          `json:"city"`
-	State        string          `json:"state"`
-	Country      sql.NullString  `json:"country"`
-	IsMain       sql.NullBool    `json:"is_main"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
+	CustomerID     uuid.UUID       `json:"customer_id"`
+	Type           NullAddressType `json:"type"`
+	PostalCode     string          `json:"postal_code"`
+	Street         string          `json:"street"`
+	Number         sql.NullString  `json:"number"`
+	Complement     sql.NullString  `json:"complement"`
+	Neighborhood   sql.NullString  `json:"neighborhood"`
+	City           string          `json:"city"`
+	State          string          `json:"state"`
+	Country        sql.NullString  `json:"country"`
+	IsMain         sql.NullBool    `json:"is_main"`
 }
 
 // =================================
@@ -40,7 +40,7 @@ type CreateAddressParams struct {
 // =================================
 func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error) {
 	row := q.db.QueryRowContext(ctx, createAddress,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.CustomerID,
 		arg.Type,
 		arg.PostalCode,
@@ -56,7 +56,7 @@ func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (A
 	var i Address
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CustomerID,
 		&i.Type,
 		&i.PostalCode,
@@ -77,13 +77,13 @@ func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (A
 
 const createCustomer = `-- name: CreateCustomer :one
 
-INSERT INTO customers (tenant_id, name, email, phone, document, document_type, external_reference, metadata)
+INSERT INTO customers (organization_id, name, email, phone, document, document_type, external_reference, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at
+RETURNING id, organization_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at
 `
 
 type CreateCustomerParams struct {
-	TenantID          uuid.UUID             `json:"tenant_id"`
+	OrganizationID    uuid.UUID             `json:"organization_id"`
 	Name              string                `json:"name"`
 	Email             string                `json:"email"`
 	Phone             sql.NullString        `json:"phone"`
@@ -98,7 +98,7 @@ type CreateCustomerParams struct {
 // =================================
 func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
 	row := q.db.QueryRowContext(ctx, createCustomer,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.Name,
 		arg.Email,
 		arg.Phone,
@@ -110,7 +110,7 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 	var i Customer
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.Email,
 		&i.Phone,
@@ -127,22 +127,22 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (tenant_id, name, email, password, role)
+INSERT INTO users (organization_id, name, email, password, role)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at
+RETURNING id, organization_id, email, name, password, role, created_at, updated_at, deleted_at
 `
 
 type CreateUserParams struct {
-	TenantID uuid.UUID `json:"tenant_id"`
-	Name     string    `json:"name"`
-	Email    string    `json:"email"`
-	Password string    `json:"password"`
-	Role     string    `json:"role"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Name           string    `json:"name"`
+	Email          string    `json:"email"`
+	Password       string    `json:"password"`
+	Role           string    `json:"role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, createUser,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.Name,
 		arg.Email,
 		arg.Password,
@@ -151,7 +151,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Email,
 		&i.Name,
 		&i.Password,
@@ -165,23 +165,23 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 
 const deleteAddress = `-- name: DeleteAddress :exec
 UPDATE addresses SET deleted_at = NOW()
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
+WHERE id = $1 AND customer_id = $2 AND organization_id = $3 AND deleted_at IS NULL
 `
 
 type DeleteAddressParams struct {
-	ID         uuid.UUID `json:"id"`
-	CustomerID uuid.UUID `json:"customer_id"`
-	TenantID   uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) DeleteAddress(ctx context.Context, arg DeleteAddressParams) error {
-	_, err := q.db.ExecContext(ctx, deleteAddress, arg.ID, arg.CustomerID, arg.TenantID)
+	_, err := q.db.ExecContext(ctx, deleteAddress, arg.ID, arg.CustomerID, arg.OrganizationID)
 	return err
 }
 
 const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
 
-SELECT id, tenant_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, deleted_at FROM api_keys
+SELECT id, organization_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, deleted_at FROM api_keys
 WHERE key_hash = $1
   AND deleted_at IS NULL
   AND (expires_at IS NULL OR expires_at > NOW())
@@ -195,7 +195,7 @@ func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, 
 	var i ApiKey
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.KeyHash,
 		&i.KeyPrefix,
@@ -209,23 +209,23 @@ func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, 
 }
 
 const getAddressByID = `-- name: GetAddressByID :one
-SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
+SELECT id, organization_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
+WHERE id = $1 AND customer_id = $2 AND organization_id = $3 AND deleted_at IS NULL
 LIMIT 1
 `
 
 type GetAddressByIDParams struct {
-	ID         uuid.UUID `json:"id"`
-	CustomerID uuid.UUID `json:"customer_id"`
-	TenantID   uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) GetAddressByID(ctx context.Context, arg GetAddressByIDParams) (Address, error) {
-	row := q.db.QueryRowContext(ctx, getAddressByID, arg.ID, arg.CustomerID, arg.TenantID)
+	row := q.db.QueryRowContext(ctx, getAddressByID, arg.ID, arg.CustomerID, arg.OrganizationID)
 	var i Address
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CustomerID,
 		&i.Type,
 		&i.PostalCode,
@@ -245,22 +245,22 @@ func (q *Queries) GetAddressByID(ctx context.Context, arg GetAddressByIDParams) 
 }
 
 const getCustomerByID = `-- name: GetCustomerByID :one
-SELECT id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
-WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+SELECT id, organization_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 LIMIT 1
 `
 
 type GetCustomerByIDParams struct {
-	ID       uuid.UUID `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error) {
-	row := q.db.QueryRowContext(ctx, getCustomerByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRowContext(ctx, getCustomerByID, arg.ID, arg.OrganizationID)
 	var i Customer
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.Email,
 		&i.Phone,
@@ -276,14 +276,14 @@ func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams
 	return i, err
 }
 
-const getTenant = `-- name: GetTenant :one
-SELECT id, name, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
+const getOrganization = `-- name: GetOrganization :one
+SELECT id, name, webhook_secret, status, created_at, updated_at, deleted_at FROM organizations
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
-	row := q.db.QueryRowContext(ctx, getTenant, id)
-	var i Tenant
+func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error) {
+	row := q.db.QueryRowContext(ctx, getOrganization, id)
+	var i Organization
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -297,7 +297,7 @@ func (q *Queries) GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1
+SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -305,7 +305,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Email,
 		&i.Name,
 		&i.Password,
@@ -317,25 +317,25 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
-const getUserByEmailAndTenant = `-- name: GetUserByEmailAndTenant :one
+const getUserByEmailAndOrganization = `-- name: GetUserByEmailAndOrganization :one
 
-SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND tenant_id = $2 AND deleted_at IS NULL
+SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND organization_id = $2 AND deleted_at IS NULL
 `
 
-type GetUserByEmailAndTenantParams struct {
-	Email    string    `json:"email"`
-	TenantID uuid.UUID `json:"tenant_id"`
+type GetUserByEmailAndOrganizationParams struct {
+	Email          string    `json:"email"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 // =================================
 // User
 // =================================
-func (q *Queries) GetUserByEmailAndTenant(ctx context.Context, arg GetUserByEmailAndTenantParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmailAndTenant, arg.Email, arg.TenantID)
+func (q *Queries) GetUserByEmailAndOrganization(ctx context.Context, arg GetUserByEmailAndOrganizationParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmailAndOrganization, arg.Email, arg.OrganizationID)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Email,
 		&i.Name,
 		&i.Password,
@@ -348,20 +348,20 @@ func (q *Queries) GetUserByEmailAndTenant(ctx context.Context, arg GetUserByEmai
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 `
 
 type GetUserByIDParams struct {
-	ID       uuid.UUID `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRowContext(ctx, getUserByID, arg.ID, arg.OrganizationID)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Email,
 		&i.Name,
 		&i.Password,
@@ -375,32 +375,32 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User,
 
 const hardDeleteCustomer = `-- name: HardDeleteCustomer :exec
 DELETE FROM customers
-WHERE id = $1 AND tenant_id = $2
+WHERE id = $1 AND organization_id = $2
 `
 
 type HardDeleteCustomerParams struct {
-	ID       uuid.UUID `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error {
-	_, err := q.db.ExecContext(ctx, hardDeleteCustomer, arg.ID, arg.TenantID)
+	_, err := q.db.ExecContext(ctx, hardDeleteCustomer, arg.ID, arg.OrganizationID)
 	return err
 }
 
 const listAddressesByCustomer = `-- name: ListAddressesByCustomer :many
-SELECT id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
-WHERE customer_id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+SELECT id, organization_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
+WHERE customer_id = $1 AND organization_id = $2 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
 
 type ListAddressesByCustomerParams struct {
-	CustomerID uuid.UUID `json:"customer_id"`
-	TenantID   uuid.UUID `json:"tenant_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error) {
-	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer, arg.CustomerID, arg.TenantID)
+	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer, arg.CustomerID, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +410,7 @@ func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddresses
 		var i Address
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.CustomerID,
 			&i.Type,
 			&i.PostalCode,
@@ -439,14 +439,14 @@ func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddresses
 	return items, nil
 }
 
-const listCustomersByTenant = `-- name: ListCustomersByTenant :many
-SELECT id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
-WHERE tenant_id = $1 AND deleted_at IS NULL
+const listCustomersByOrganization = `-- name: ListCustomersByOrganization :many
+SELECT id, organization_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
+WHERE organization_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]Customer, error) {
-	rows, err := q.db.QueryContext(ctx, listCustomersByTenant, tenantID)
+func (q *Queries) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Customer, error) {
+	rows, err := q.db.QueryContext(ctx, listCustomersByOrganization, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +456,7 @@ func (q *Queries) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID)
 		var i Customer
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.Name,
 			&i.Email,
 			&i.Phone,
@@ -482,20 +482,20 @@ func (q *Queries) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID)
 	return items, nil
 }
 
-const listTenants = `-- name: ListTenants :many
-SELECT id, name, webhook_secret, status, created_at, updated_at, deleted_at FROM tenants
+const listOrganizations = `-- name: ListOrganizations :many
+SELECT id, name, webhook_secret, status, created_at, updated_at, deleted_at FROM organizations
 ORDER BY name
 `
 
-func (q *Queries) ListTenants(ctx context.Context) ([]Tenant, error) {
-	rows, err := q.db.QueryContext(ctx, listTenants)
+func (q *Queries) ListOrganizations(ctx context.Context) ([]Organization, error) {
+	rows, err := q.db.QueryContext(ctx, listOrganizations)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Tenant
+	var items []Organization
 	for rows.Next() {
-		var i Tenant
+		var i Organization
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -518,12 +518,12 @@ func (q *Queries) ListTenants(ctx context.Context) ([]Tenant, error) {
 	return items, nil
 }
 
-const listUsersByTenant = `-- name: ListUsersByTenant :many
-SELECT id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC
+const listUsersByOrganization = `-- name: ListUsersByOrganization :many
+SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE organization_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC
 `
 
-func (q *Queries) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsersByTenant, tenantID)
+func (q *Queries) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, listUsersByOrganization, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +533,7 @@ func (q *Queries) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]
 		var i User
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.Email,
 			&i.Name,
 			&i.Password,
@@ -557,31 +557,31 @@ func (q *Queries) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]
 
 const softDeleteCustomer = `-- name: SoftDeleteCustomer :exec
 UPDATE customers SET deleted_at = NOW()
-WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 `
 
 type SoftDeleteCustomerParams struct {
-	ID       uuid.UUID `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error {
-	_, err := q.db.ExecContext(ctx, softDeleteCustomer, arg.ID, arg.TenantID)
+	_, err := q.db.ExecContext(ctx, softDeleteCustomer, arg.ID, arg.OrganizationID)
 	return err
 }
 
 const softDeleteUser = `-- name: SoftDeleteUser :exec
 UPDATE users SET deleted_at = NOW()
-WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 `
 
 type SoftDeleteUserParams struct {
-	ID       uuid.UUID `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error {
-	_, err := q.db.ExecContext(ctx, softDeleteUser, arg.ID, arg.TenantID)
+	_, err := q.db.ExecContext(ctx, softDeleteUser, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -597,31 +597,31 @@ func (q *Queries) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error 
 const updateAddress = `-- name: UpdateAddress :one
 UPDATE addresses
 SET type = $4, postal_code = $5, street = $6, number = $7, complement = $8, neighborhood = $9, city = $10, state = $11, country = $12, is_main = $13
-WHERE id = $1 AND customer_id = $2 AND tenant_id = $3 AND deleted_at IS NULL
-RETURNING id, tenant_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at
+WHERE id = $1 AND customer_id = $2 AND organization_id = $3 AND deleted_at IS NULL
+RETURNING id, organization_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at
 `
 
 type UpdateAddressParams struct {
-	ID           uuid.UUID       `json:"id"`
-	CustomerID   uuid.UUID       `json:"customer_id"`
-	TenantID     uuid.UUID       `json:"tenant_id"`
-	Type         NullAddressType `json:"type"`
-	PostalCode   string          `json:"postal_code"`
-	Street       string          `json:"street"`
-	Number       sql.NullString  `json:"number"`
-	Complement   sql.NullString  `json:"complement"`
-	Neighborhood sql.NullString  `json:"neighborhood"`
-	City         string          `json:"city"`
-	State        string          `json:"state"`
-	Country      sql.NullString  `json:"country"`
-	IsMain       sql.NullBool    `json:"is_main"`
+	ID             uuid.UUID       `json:"id"`
+	CustomerID     uuid.UUID       `json:"customer_id"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
+	Type           NullAddressType `json:"type"`
+	PostalCode     string          `json:"postal_code"`
+	Street         string          `json:"street"`
+	Number         sql.NullString  `json:"number"`
+	Complement     sql.NullString  `json:"complement"`
+	Neighborhood   sql.NullString  `json:"neighborhood"`
+	City           string          `json:"city"`
+	State          string          `json:"state"`
+	Country        sql.NullString  `json:"country"`
+	IsMain         sql.NullBool    `json:"is_main"`
 }
 
 func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error) {
 	row := q.db.QueryRowContext(ctx, updateAddress,
 		arg.ID,
 		arg.CustomerID,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.Type,
 		arg.PostalCode,
 		arg.Street,
@@ -636,7 +636,7 @@ func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (A
 	var i Address
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CustomerID,
 		&i.Type,
 		&i.PostalCode,
@@ -658,13 +658,13 @@ func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (A
 const updateCustomer = `-- name: UpdateCustomer :one
 UPDATE customers
 SET name = $3, email = $4, phone = $5, document = $6, document_type = $7, external_reference = $8, metadata = $9
-WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
-RETURNING id, tenant_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
+RETURNING id, organization_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at
 `
 
 type UpdateCustomerParams struct {
 	ID                uuid.UUID             `json:"id"`
-	TenantID          uuid.UUID             `json:"tenant_id"`
+	OrganizationID    uuid.UUID             `json:"organization_id"`
 	Name              string                `json:"name"`
 	Email             string                `json:"email"`
 	Phone             sql.NullString        `json:"phone"`
@@ -677,7 +677,7 @@ type UpdateCustomerParams struct {
 func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error) {
 	row := q.db.QueryRowContext(ctx, updateCustomer,
 		arg.ID,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.Name,
 		arg.Email,
 		arg.Phone,
@@ -689,7 +689,7 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 	var i Customer
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.Email,
 		&i.Phone,
@@ -707,15 +707,15 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET name = $1, role = $2, updated_at = NOW()
-WHERE id = $3 AND tenant_id = $4 AND deleted_at IS NULL
-RETURNING id, tenant_id, email, name, password, role, created_at, updated_at, deleted_at
+WHERE id = $3 AND organization_id = $4 AND deleted_at IS NULL
+RETURNING id, organization_id, email, name, password, role, created_at, updated_at, deleted_at
 `
 
 type UpdateUserParams struct {
-	Name     string    `json:"name"`
-	Role     string    `json:"role"`
-	ID       uuid.UUID `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
+	Name           string    `json:"name"`
+	Role           string    `json:"role"`
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
@@ -723,12 +723,12 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.Name,
 		arg.Role,
 		arg.ID,
-		arg.TenantID,
+		arg.OrganizationID,
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Email,
 		&i.Name,
 		&i.Password,

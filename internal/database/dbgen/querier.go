@@ -27,18 +27,18 @@ type Querier interface {
 	GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error)
 	GetAddressByID(ctx context.Context, arg GetAddressByIDParams) (Address, error)
 	GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error)
-	GetTenant(ctx context.Context, id uuid.UUID) (Tenant, error)
+	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// =================================
 	// User
 	// =================================
-	GetUserByEmailAndTenant(ctx context.Context, arg GetUserByEmailAndTenantParams) (User, error)
+	GetUserByEmailAndOrganization(ctx context.Context, arg GetUserByEmailAndOrganizationParams) (User, error)
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
 	HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error
 	ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error)
-	ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]Customer, error)
-	ListTenants(ctx context.Context) ([]Tenant, error)
-	ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]User, error)
+	ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Customer, error)
+	ListOrganizations(ctx context.Context) ([]Organization, error)
+	ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]User, error)
 	SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
 	UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error

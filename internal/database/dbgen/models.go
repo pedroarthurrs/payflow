@@ -196,55 +196,55 @@ func (ns NullTransactionStatusType) Value() (driver.Value, error) {
 }
 
 type Address struct {
-	ID           uuid.UUID       `json:"id"`
-	TenantID     uuid.UUID       `json:"tenant_id"`
-	CustomerID   uuid.UUID       `json:"customer_id"`
-	Type         NullAddressType `json:"type"`
-	PostalCode   string          `json:"postal_code"`
-	Street       string          `json:"street"`
-	Number       sql.NullString  `json:"number"`
-	Complement   sql.NullString  `json:"complement"`
-	Neighborhood sql.NullString  `json:"neighborhood"`
-	City         string          `json:"city"`
-	State        string          `json:"state"`
-	Country      sql.NullString  `json:"country"`
-	IsMain       sql.NullBool    `json:"is_main"`
-	CreatedAt    sql.NullTime    `json:"created_at"`
-	UpdatedAt    sql.NullTime    `json:"updated_at"`
-	DeletedAt    sql.NullTime    `json:"deleted_at"`
+	ID             uuid.UUID       `json:"id"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
+	CustomerID     uuid.UUID       `json:"customer_id"`
+	Type           NullAddressType `json:"type"`
+	PostalCode     string          `json:"postal_code"`
+	Street         string          `json:"street"`
+	Number         sql.NullString  `json:"number"`
+	Complement     sql.NullString  `json:"complement"`
+	Neighborhood   sql.NullString  `json:"neighborhood"`
+	City           string          `json:"city"`
+	State          string          `json:"state"`
+	Country        sql.NullString  `json:"country"`
+	IsMain         sql.NullBool    `json:"is_main"`
+	CreatedAt      sql.NullTime    `json:"created_at"`
+	UpdatedAt      sql.NullTime    `json:"updated_at"`
+	DeletedAt      sql.NullTime    `json:"deleted_at"`
 }
 
 type ApiKey struct {
-	ID          uuid.UUID       `json:"id"`
-	TenantID    uuid.UUID       `json:"tenant_id"`
-	Name        string          `json:"name"`
-	KeyHash     string          `json:"key_hash"`
-	KeyPrefix   string          `json:"key_prefix"`
-	Environment EnvironmentType `json:"environment"`
-	LastUsedAt  sql.NullTime    `json:"last_used_at"`
-	ExpiresAt   sql.NullTime    `json:"expires_at"`
-	CreatedAt   sql.NullTime    `json:"created_at"`
-	DeletedAt   sql.NullTime    `json:"deleted_at"`
+	ID             uuid.UUID       `json:"id"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
+	Name           string          `json:"name"`
+	KeyHash        string          `json:"key_hash"`
+	KeyPrefix      string          `json:"key_prefix"`
+	Environment    EnvironmentType `json:"environment"`
+	LastUsedAt     sql.NullTime    `json:"last_used_at"`
+	ExpiresAt      sql.NullTime    `json:"expires_at"`
+	CreatedAt      sql.NullTime    `json:"created_at"`
+	DeletedAt      sql.NullTime    `json:"deleted_at"`
 }
 
 type ApiLog struct {
-	ID           uuid.UUID             `json:"id"`
-	TenantID     uuid.UUID             `json:"tenant_id"`
-	ApiKeyID     uuid.NullUUID         `json:"api_key_id"`
-	Method       sql.NullString        `json:"method"`
-	Path         sql.NullString        `json:"path"`
-	RequestBody  pqtype.NullRawMessage `json:"request_body"`
-	ResponseBody pqtype.NullRawMessage `json:"response_body"`
-	StatusCode   sql.NullInt32         `json:"status_code"`
-	LatencyMs    sql.NullInt32         `json:"latency_ms"`
-	IpAddress    sql.NullString        `json:"ip_address"`
-	UserAgent    sql.NullString        `json:"user_agent"`
-	CreatedAt    sql.NullTime          `json:"created_at"`
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	ApiKeyID       uuid.NullUUID         `json:"api_key_id"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	RequestBody    pqtype.NullRawMessage `json:"request_body"`
+	ResponseBody   pqtype.NullRawMessage `json:"response_body"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
 }
 
 type Customer struct {
 	ID                uuid.UUID             `json:"id"`
-	TenantID          uuid.UUID             `json:"tenant_id"`
+	OrganizationID    uuid.UUID             `json:"organization_id"`
 	Name              string                `json:"name"`
 	Email             string                `json:"email"`
 	Phone             sql.NullString        `json:"phone"`
@@ -260,7 +260,7 @@ type Customer struct {
 
 type CustomerBalanceTransaction struct {
 	ID             uuid.UUID             `json:"id"`
-	TenantID       uuid.UUID             `json:"tenant_id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
 	CustomerID     uuid.UUID             `json:"customer_id"`
 	Type           string                `json:"type"`
 	AmountCents    int32                 `json:"amount_cents"`
@@ -274,7 +274,7 @@ type CustomerBalanceTransaction struct {
 
 type IdempotencyKey struct {
 	ID             uuid.UUID             `json:"id"`
-	TenantID       uuid.UUID             `json:"tenant_id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
 	IdempotencyKey string                `json:"idempotency_key"`
 	RequestPath    string                `json:"request_path"`
 	ResponseCode   sql.NullInt32         `json:"response_code"`
@@ -285,7 +285,7 @@ type IdempotencyKey struct {
 
 type Invoice struct {
 	ID               uuid.UUID             `json:"id"`
-	TenantID         uuid.UUID             `json:"tenant_id"`
+	OrganizationID   uuid.UUID             `json:"organization_id"`
 	CustomerID       uuid.UUID             `json:"customer_id"`
 	SubscriptionID   uuid.NullUUID         `json:"subscription_id"`
 	InvoiceType      string                `json:"invoice_type"`
@@ -303,7 +303,7 @@ type Invoice struct {
 
 type InvoiceItem struct {
 	ID              uuid.UUID             `json:"id"`
-	TenantID        uuid.UUID             `json:"tenant_id"`
+	OrganizationID  uuid.UUID             `json:"organization_id"`
 	InvoiceID       uuid.UUID             `json:"invoice_id"`
 	Description     string                `json:"description"`
 	Quantity        string                `json:"quantity"`
@@ -315,7 +315,7 @@ type InvoiceItem struct {
 
 type InvoiceLog struct {
 	ID              uuid.UUID             `json:"id"`
-	TenantID        uuid.UUID             `json:"tenant_id"`
+	OrganizationID  uuid.UUID             `json:"organization_id"`
 	InvoiceID       uuid.UUID             `json:"invoice_id"`
 	EventType       string                `json:"event_type"`
 	InvoiceStatus   sql.NullString        `json:"invoice_status"`
@@ -334,7 +334,7 @@ type InvoiceLog struct {
 
 type InvoiceSetting struct {
 	ID                  uuid.UUID      `json:"id"`
-	TenantID            uuid.UUID      `json:"tenant_id"`
+	OrganizationID      uuid.UUID      `json:"organization_id"`
 	Type                string         `json:"type"`
 	ErpApiKey           sql.NullString `json:"erp_api_key"`
 	ErpApiSecret        sql.NullString `json:"erp_api_secret"`
@@ -351,36 +351,56 @@ type InvoiceSetting struct {
 	UpdatedAt           sql.NullTime   `json:"updated_at"`
 }
 
-type Plan struct {
+type Organization struct {
 	ID            uuid.UUID      `json:"id"`
-	TenantID      uuid.UUID      `json:"tenant_id"`
-	ProductID     uuid.UUID      `json:"product_id"`
-	Name          sql.NullString `json:"name"`
-	Slug          sql.NullString `json:"slug"`
-	AmountCents   int32          `json:"amount_cents"`
-	Currency      sql.NullString `json:"currency"`
-	Interval      sql.NullString `json:"interval"`
-	IntervalCount sql.NullInt32  `json:"interval_count"`
-	Active        sql.NullBool   `json:"active"`
-	Version       sql.NullInt32  `json:"version"`
+	Name          string         `json:"name"`
+	WebhookSecret sql.NullString `json:"webhook_secret"`
+	Status        sql.NullString `json:"status"`
 	CreatedAt     sql.NullTime   `json:"created_at"`
 	UpdatedAt     sql.NullTime   `json:"updated_at"`
 	DeletedAt     sql.NullTime   `json:"deleted_at"`
 }
 
+type OrganizationConfig struct {
+	ID             uuid.UUID      `json:"id"`
+	OrganizationID uuid.UUID      `json:"organization_id"`
+	SupportEmail   sql.NullString `json:"support_email"`
+	LogoUrl        sql.NullString `json:"logo_url"`
+	PrimaryColor   sql.NullString `json:"primary_color"`
+	CreatedAt      sql.NullTime   `json:"created_at"`
+	UpdatedAt      sql.NullTime   `json:"updated_at"`
+}
+
+type Plan struct {
+	ID             uuid.UUID      `json:"id"`
+	OrganizationID uuid.UUID      `json:"organization_id"`
+	ProductID      uuid.UUID      `json:"product_id"`
+	Name           sql.NullString `json:"name"`
+	Slug           sql.NullString `json:"slug"`
+	AmountCents    int32          `json:"amount_cents"`
+	Currency       sql.NullString `json:"currency"`
+	Interval       sql.NullString `json:"interval"`
+	IntervalCount  sql.NullInt32  `json:"interval_count"`
+	Active         sql.NullBool   `json:"active"`
+	Version        sql.NullInt32  `json:"version"`
+	CreatedAt      sql.NullTime   `json:"created_at"`
+	UpdatedAt      sql.NullTime   `json:"updated_at"`
+	DeletedAt      sql.NullTime   `json:"deleted_at"`
+}
+
 type Product struct {
-	ID        uuid.UUID    `json:"id"`
-	TenantID  uuid.UUID    `json:"tenant_id"`
-	Name      string       `json:"name"`
-	Active    sql.NullBool `json:"active"`
-	CreatedAt sql.NullTime `json:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
-	DeletedAt sql.NullTime `json:"deleted_at"`
+	ID             uuid.UUID    `json:"id"`
+	OrganizationID uuid.UUID    `json:"organization_id"`
+	Name           string       `json:"name"`
+	Active         sql.NullBool `json:"active"`
+	CreatedAt      sql.NullTime `json:"created_at"`
+	UpdatedAt      sql.NullTime `json:"updated_at"`
+	DeletedAt      sql.NullTime `json:"deleted_at"`
 }
 
 type Subscription struct {
 	ID                 uuid.UUID              `json:"id"`
-	TenantID           uuid.UUID              `json:"tenant_id"`
+	OrganizationID     uuid.UUID              `json:"organization_id"`
 	CustomerID         uuid.UUID              `json:"customer_id"`
 	Status             SubscriptionStatusType `json:"status"`
 	CurrentPeriodStart time.Time              `json:"current_period_start"`
@@ -393,7 +413,7 @@ type Subscription struct {
 
 type SubscriptionItem struct {
 	ID             uuid.UUID     `json:"id"`
-	TenantID       uuid.UUID     `json:"tenant_id"`
+	OrganizationID uuid.UUID     `json:"organization_id"`
 	SubscriptionID uuid.UUID     `json:"subscription_id"`
 	PlanID         uuid.UUID     `json:"plan_id"`
 	Quantity       sql.NullInt32 `json:"quantity"`
@@ -403,7 +423,7 @@ type SubscriptionItem struct {
 
 type SubscriptionSchedule struct {
 	ID             uuid.UUID                  `json:"id"`
-	TenantID       uuid.UUID                  `json:"tenant_id"`
+	OrganizationID uuid.UUID                  `json:"organization_id"`
 	SubscriptionID uuid.UUID                  `json:"subscription_id"`
 	ScheduledAt    time.Time                  `json:"scheduled_at"`
 	TargetStatus   NullSubscriptionStatusType `json:"target_status"`
@@ -414,7 +434,7 @@ type SubscriptionSchedule struct {
 
 type SubscriptionStatusHistory struct {
 	ID             uuid.UUID                  `json:"id"`
-	TenantID       uuid.UUID                  `json:"tenant_id"`
+	OrganizationID uuid.UUID                  `json:"organization_id"`
 	SubscriptionID uuid.UUID                  `json:"subscription_id"`
 	OldStatus      NullSubscriptionStatusType `json:"old_status"`
 	NewStatus      SubscriptionStatusType     `json:"new_status"`
@@ -424,29 +444,9 @@ type SubscriptionStatusHistory struct {
 	CreatedAt      sql.NullTime               `json:"created_at"`
 }
 
-type Tenant struct {
-	ID            uuid.UUID      `json:"id"`
-	Name          string         `json:"name"`
-	WebhookSecret sql.NullString `json:"webhook_secret"`
-	Status        sql.NullString `json:"status"`
-	CreatedAt     sql.NullTime   `json:"created_at"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
-	DeletedAt     sql.NullTime   `json:"deleted_at"`
-}
-
-type TenantConfig struct {
-	ID           uuid.UUID      `json:"id"`
-	TenantID     uuid.UUID      `json:"tenant_id"`
-	SupportEmail sql.NullString `json:"support_email"`
-	LogoUrl      sql.NullString `json:"logo_url"`
-	PrimaryColor sql.NullString `json:"primary_color"`
-	CreatedAt    sql.NullTime   `json:"created_at"`
-	UpdatedAt    sql.NullTime   `json:"updated_at"`
-}
-
 type Transaction struct {
 	ID               uuid.UUID             `json:"id"`
-	TenantID         uuid.UUID             `json:"tenant_id"`
+	OrganizationID   uuid.UUID             `json:"organization_id"`
 	InvoiceID        uuid.NullUUID         `json:"invoice_id"`
 	GatewayName      sql.NullString        `json:"gateway_name"`
 	GatewayReference sql.NullString        `json:"gateway_reference"`
@@ -459,33 +459,33 @@ type Transaction struct {
 }
 
 type User struct {
-	ID        uuid.UUID    `json:"id"`
-	TenantID  uuid.UUID    `json:"tenant_id"`
-	Email     string       `json:"email"`
-	Name      string       `json:"name"`
-	Password  string       `json:"password"`
-	Role      string       `json:"role"`
-	CreatedAt sql.NullTime `json:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
-	DeletedAt sql.NullTime `json:"deleted_at"`
+	ID             uuid.UUID    `json:"id"`
+	OrganizationID uuid.UUID    `json:"organization_id"`
+	Email          string       `json:"email"`
+	Name           string       `json:"name"`
+	Password       string       `json:"password"`
+	Role           string       `json:"role"`
+	CreatedAt      sql.NullTime `json:"created_at"`
+	UpdatedAt      sql.NullTime `json:"updated_at"`
+	DeletedAt      sql.NullTime `json:"deleted_at"`
 }
 
 type WebhookEndpoint struct {
-	ID            uuid.UUID           `json:"id"`
-	TenantID      uuid.UUID           `json:"tenant_id"`
-	Url           string              `json:"url"`
-	Description   sql.NullString      `json:"description"`
-	EnabledEvents []string            `json:"enabled_events"`
-	Environment   NullEnvironmentType `json:"environment"`
-	IsActive      sql.NullBool        `json:"is_active"`
-	CreatedAt     sql.NullTime        `json:"created_at"`
-	UpdatedAt     sql.NullTime        `json:"updated_at"`
-	DeletedAt     sql.NullTime        `json:"deleted_at"`
+	ID             uuid.UUID           `json:"id"`
+	OrganizationID uuid.UUID           `json:"organization_id"`
+	Url            string              `json:"url"`
+	Description    sql.NullString      `json:"description"`
+	EnabledEvents  []string            `json:"enabled_events"`
+	Environment    NullEnvironmentType `json:"environment"`
+	IsActive       sql.NullBool        `json:"is_active"`
+	CreatedAt      sql.NullTime        `json:"created_at"`
+	UpdatedAt      sql.NullTime        `json:"updated_at"`
+	DeletedAt      sql.NullTime        `json:"deleted_at"`
 }
 
 type WebhookLog struct {
 	ID             uuid.UUID       `json:"id"`
-	TenantID       uuid.UUID       `json:"tenant_id"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
 	EndpointID     uuid.UUID       `json:"endpoint_id"`
 	EventType      string          `json:"event_type"`
 	Payload        json.RawMessage `json:"payload"`
