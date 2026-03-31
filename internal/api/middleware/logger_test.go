@@ -134,13 +134,13 @@ func TestStructuredLogger_500_ErrorLevel(t *testing.T) {
 
 func TestStructuredLogger_WithClaims_UserIDPopulated(t *testing.T) {
 	_, buf := setupLoggerTest(http.StatusOK, func(c *gin.Context) {
-		c.Set(ClaimsKey, &token.Claims{TenantID: "tenant-abc-123"})
+		c.Set(ClaimsKey, &token.Claims{OrganizationID: "organization-abc-123"})
 	})
 
 	entry := parseLogEntry(t, buf)
 
-	if entry.UserID != "tenant-abc-123" {
-		t.Errorf("expected user_id=tenant-abc-123, got %q", entry.UserID)
+	if entry.UserID != "organization-abc-123" {
+		t.Errorf("expected user_id=organization-abc-123, got %q", entry.UserID)
 	}
 }
 

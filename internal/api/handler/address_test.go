@@ -32,8 +32,8 @@ type mockQuerier struct {
 	updateAddressFn           func(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error)
 	getCustomerByIDFn         func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
 	createCustomerFn          func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
-	getTenantFn               func(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error)
-	listCustomersByTenantFn   func(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error)
+	getOrganizationFn               func(ctx context.Context, id uuid.UUID) (dbgen.Organization, error)
+	listCustomersByOrganizationFn   func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error)
 	softDeleteCustomerFn      func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
 	updateCustomerFn          func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
 	hardDeleteCustomerFn      func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
@@ -83,19 +83,19 @@ func (m *mockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustom
 	}
 	return dbgen.Customer{}, nil
 }
-func (m *mockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
-	if m.getTenantFn != nil {
-		return m.getTenantFn(ctx, id)
+func (m *mockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
+	if m.getOrganizationFn != nil {
+		return m.getOrganizationFn(ctx, id)
 	}
-	return dbgen.Tenant{}, nil
+	return dbgen.Organization{}, nil
 }
-func (m *mockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
-	if m.listCustomersByTenantFn != nil {
-		return m.listCustomersByTenantFn(ctx, tenantID)
+func (m *mockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
+	if m.listCustomersByOrganizationFn != nil {
+		return m.listCustomersByOrganizationFn(ctx, organizationID)
 	}
 	return nil, nil
 }
-func (m *mockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
+func (m *mockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
 	return nil, nil
 }
 func (m *mockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
@@ -122,13 +122,13 @@ func (m *mockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams
 func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
-func (m *mockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+func (m *mockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
 func (m *mockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
-func (m *mockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
+func (m *mockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
 	return nil, nil
 }
 func (m *mockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
@@ -145,15 +145,15 @@ func (m *mockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) er
 }
 
 // withClaims injects JWT claims into the Gin context for testing.
-func withClaims(tenantID string) gin.HandlerFunc {
+func withClaims(organizationID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Set(middleware.ClaimsKey, &token.Claims{TenantID: tenantID})
+		c.Set(middleware.ClaimsKey, &token.Claims{OrganizationID: organizationID})
 		c.Next()
 	}
 }
 
 // setupAddressRouter creates a Gin test router with the error middleware, claims, and address handler routes.
-func setupAddressRouter(mock *mockQuerier, tenantID string) *gin.Engine {
+func setupAddressRouter(mock *mockQuerier, organizationID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	db := &database.DB{Queries: mock}
 	svc := service.NewAddressService(db)
@@ -161,7 +161,7 @@ func setupAddressRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 
 	r := gin.New()
 	r.Use(middleware.Errors())
-	r.Use(withClaims(tenantID))
+	r.Use(withClaims(organizationID))
 
 	r.POST("/v1/customers/:customer_id/addresses", h.Create)
 	r.GET("/v1/customers/:customer_id/addresses", h.List)
@@ -175,7 +175,7 @@ func setupAddressRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 // customerExistsMock returns a mock that always finds the customer.
 func customerExistsMock() func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 	return func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-		return dbgen.Customer{ID: arg.ID, TenantID: arg.TenantID}, nil
+		return dbgen.Customer{ID: arg.ID, OrganizationID: arg.OrganizationID}, nil
 	}
 }
 
@@ -195,10 +195,10 @@ func basePath(customerID string) string {
 
 func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New().String()
+		organizationID := uuid.New().String()
 		customerID := uuid.New().String()
 		mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-		router := setupAddressRouter(mock, tenantID)
+		router := setupAddressRouter(mock, organizationID)
 
 		requiredFields := []string{"postal_code", "street", "city", "state"}
 		removeCount := rapid.IntRange(1, 4).Draw(t, "remove_count")
@@ -248,10 +248,10 @@ func TestProperty_MissingRequiredFields_Returns400(t *testing.T) {
 func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 	validTypes := map[string]bool{"billing": true, "shipping": true, "home": true}
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New().String()
+		organizationID := uuid.New().String()
 		customerID := uuid.New().String()
 		mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-		router := setupAddressRouter(mock, tenantID)
+		router := setupAddressRouter(mock, organizationID)
 
 		invalidType := rapid.StringMatching(`[a-z]{1,20}`).Draw(t, "bad_type")
 		if validTypes[invalidType] {
@@ -288,7 +288,7 @@ func TestProperty_InvalidAddressType_Returns400(t *testing.T) {
 
 func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New().String()
+		organizationID := uuid.New().String()
 		customerID := uuid.New().String()
 
 		mock := &mockQuerier{
@@ -296,7 +296,7 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 				return dbgen.Customer{}, sql.ErrNoRows
 			},
 		}
-		router := setupAddressRouter(mock, tenantID)
+		router := setupAddressRouter(mock, organizationID)
 
 		body := validAddressJSON()
 		addrID := uuid.New().String()
@@ -363,10 +363,10 @@ func assertErrorMessage(t *rapid.T, w *httptest.ResponseRecorder, expected strin
 
 func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New().String()
+		organizationID := uuid.New().String()
 		customerID := uuid.New().String()
 		mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-		router := setupAddressRouter(mock, tenantID)
+		router := setupAddressRouter(mock, organizationID)
 
 		category := rapid.IntRange(0, 3).Draw(t, "category")
 		payload := map[string]any{}
@@ -445,7 +445,7 @@ func TestProperty_ValidationErrorResponseFormat(t *testing.T) {
 // ============================================================
 
 func TestCreate_ValidPayload_Returns201(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addressID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -454,7 +454,7 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addressID, TenantID: tenantID, CustomerID: customerID,
+				ID: addressID, OrganizationID: organizationID, CustomerID: customerID,
 				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 				PostalCode: arg.PostalCode, Street: arg.Street, City: arg.City, State: arg.State,
 				Country:   sql.NullString{String: "BR", Valid: true},
@@ -463,7 +463,7 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupAddressRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, organizationID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID.String()), strings.NewReader(validAddressJSON()))
@@ -487,10 +487,10 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 }
 
 func TestCreate_InvalidPayload_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(`{}`))
@@ -510,7 +510,7 @@ func TestCreate_InvalidPayload_Returns400(t *testing.T) {
 }
 
 func TestList_Empty_Returns200(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
@@ -518,7 +518,7 @@ func TestList_Empty_Returns200(t *testing.T) {
 			return []dbgen.Address{}, nil
 		},
 	}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID), http.NoBody)
@@ -537,7 +537,7 @@ func TestList_Empty_Returns200(t *testing.T) {
 }
 
 func TestList_WithAddresses_Returns200(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	now := time.Now().Truncate(time.Second)
 
@@ -545,13 +545,13 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		listAddressesByCustomerFn: func(_ context.Context, _ dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
 			return []dbgen.Address{
-				{ID: uuid.New(), TenantID: tenantID, CustomerID: customerID,
+				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
 					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 					PostalCode: "11111", Street: "St A", City: "City A", State: "AA",
 					Country:   sql.NullString{String: "BR", Valid: true},
 					IsMain:    sql.NullBool{Bool: true, Valid: true},
 					CreatedAt: sql.NullTime{Time: now, Valid: true}},
-				{ID: uuid.New(), TenantID: tenantID, CustomerID: customerID,
+				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
 					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeShipping, Valid: true},
 					PostalCode: "22222", Street: "St B", City: "City B", State: "BB",
 					Country:   sql.NullString{String: "US", Valid: true},
@@ -560,7 +560,7 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupAddressRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, organizationID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
@@ -579,7 +579,7 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 }
 
 func TestGetByID_Found_Returns200(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addrID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -588,7 +588,7 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addrID, TenantID: tenantID, CustomerID: customerID,
+				ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 				PostalCode: "12345", Street: "Main St", City: "City", State: "ST",
 				Country:   sql.NullString{String: "BR", Valid: true},
@@ -597,7 +597,7 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupAddressRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, organizationID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
@@ -616,7 +616,7 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 }
 
 func TestGetByID_NotFound_Returns404(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	addrID := uuid.New().String()
 
@@ -626,7 +626,7 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 			return dbgen.Address{}, sql.ErrNoRows
 		},
 	}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/"+addrID, http.NoBody)
@@ -645,10 +645,10 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 }
 
 func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID)+"/not-a-uuid", http.NoBody)
@@ -667,7 +667,7 @@ func TestGetByID_InvalidUUID_Returns400(t *testing.T) {
 }
 
 func TestUpdate_ValidPayload_Returns200(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addrID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -676,7 +676,7 @@ func TestUpdate_ValidPayload_Returns200(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addrID, TenantID: tenantID, CustomerID: customerID,
+				ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 				Type: arg.Type, PostalCode: arg.PostalCode, Street: arg.Street,
 				City: arg.City, State: arg.State,
 				Country: arg.Country, IsMain: arg.IsMain,
@@ -684,7 +684,7 @@ func TestUpdate_ValidPayload_Returns200(t *testing.T) {
 			}, nil
 		},
 	}
-	router := setupAddressRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, organizationID.String())
 
 	body := `{"postal_code":"99999","street":"Updated St","city":"New City","state":"NC"}`
 	w := httptest.NewRecorder()
@@ -698,11 +698,11 @@ func TestUpdate_ValidPayload_Returns200(t *testing.T) {
 }
 
 func TestUpdate_InvalidPayload_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	addrID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(`{}`))
@@ -715,7 +715,7 @@ func TestUpdate_InvalidPayload_Returns400(t *testing.T) {
 }
 
 func TestUpdate_NotFound_Returns404(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	addrID := uuid.New().String()
 
@@ -725,7 +725,7 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 			return dbgen.Address{}, sql.ErrNoRows
 		},
 	}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, basePath(customerID)+"/"+addrID, strings.NewReader(validAddressJSON()))
@@ -745,7 +745,7 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 }
 
 func TestDelete_Found_Returns204(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addrID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -754,7 +754,7 @@ func TestDelete_Found_Returns204(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addrID, TenantID: tenantID, CustomerID: customerID,
+				ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 				PostalCode: "12345", Street: "St", City: "C", State: "ST",
 				CreatedAt: sql.NullTime{Time: now, Valid: true},
 			}, nil
@@ -763,7 +763,7 @@ func TestDelete_Found_Returns204(t *testing.T) {
 			return nil
 		},
 	}
-	router := setupAddressRouter(mock, tenantID.String())
+	router := setupAddressRouter(mock, organizationID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
@@ -775,7 +775,7 @@ func TestDelete_Found_Returns204(t *testing.T) {
 }
 
 func TestDelete_NotFound_Returns404(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	addrID := uuid.New().String()
 
@@ -785,7 +785,7 @@ func TestDelete_NotFound_Returns404(t *testing.T) {
 			return dbgen.Address{}, sql.ErrNoRows
 		},
 	}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/"+addrID, http.NoBody)
@@ -804,10 +804,10 @@ func TestDelete_NotFound_Returns404(t *testing.T) {
 }
 
 func TestDelete_InvalidUUID_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 	mock := &mockQuerier{getCustomerByIDFn: customerExistsMock()}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID)+"/not-a-uuid", http.NoBody)
@@ -826,7 +826,7 @@ func TestDelete_InvalidUUID_Returns400(t *testing.T) {
 }
 
 func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	customerID := uuid.New().String()
 
 	mock := &mockQuerier{
@@ -834,7 +834,7 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 			return dbgen.Customer{}, sql.ErrNoRows
 		},
 	}
-	router := setupAddressRouter(mock, tenantID)
+	router := setupAddressRouter(mock, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, basePath(customerID), strings.NewReader(validAddressJSON()))
@@ -859,7 +859,7 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 
 func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		customerID := uuid.New()
 
 		n := rapid.IntRange(1, 10).Draw(t, "n")
@@ -867,7 +867,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 		addresses := make([]dbgen.Address, n)
 		for i := 0; i < n; i++ {
 			addresses[i] = dbgen.Address{
-				ID: uuid.New(), TenantID: tenantID, CustomerID: customerID,
+				ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
 				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 				PostalCode: rapid.StringMatching(`[0-9]{5}`).Draw(t, "pc"),
 				Street:     rapid.StringMatching(`[A-Za-z ]{5,20}`).Draw(t, "st"),
@@ -899,7 +899,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 				return sorted, nil
 			},
 		}
-		router := setupAddressRouter(mock, tenantID.String())
+		router := setupAddressRouter(mock, organizationID.String())
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
@@ -929,7 +929,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 
 func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		customerID := uuid.New()
 		addrID := uuid.New()
 		now := time.Now().Truncate(time.Second)
@@ -947,7 +947,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 			getCustomerByIDFn: customerExistsMock(),
 			updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
 				updatedRow = dbgen.Address{
-					ID: addrID, TenantID: tenantID, CustomerID: customerID,
+					ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 					Type:       arg.Type,
 					PostalCode: arg.PostalCode, Street: arg.Street,
 					City: arg.City, State: arg.State,
@@ -961,7 +961,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 				return updatedRow, nil
 			},
 		}
-		router := setupAddressRouter(mock, tenantID.String())
+		router := setupAddressRouter(mock, organizationID.String())
 
 		payload := map[string]any{
 			"type": newType, "postal_code": newPC,
@@ -1013,7 +1013,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 
 func TestProperty_DeleteRemovesAddress(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		customerID := uuid.New()
 		addrID := uuid.New()
 		now := time.Now().Truncate(time.Second)
@@ -1027,7 +1027,7 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 					return dbgen.Address{}, sql.ErrNoRows
 				}
 				return dbgen.Address{
-					ID: addrID, TenantID: tenantID, CustomerID: customerID,
+					ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 					PostalCode: "12345", Street: "St", City: "City", State: "ST",
 					Country:   sql.NullString{String: "BR", Valid: true},
@@ -1040,7 +1040,7 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 				return nil
 			},
 		}
-		router := setupAddressRouter(mock, tenantID.String())
+		router := setupAddressRouter(mock, organizationID.String())
 
 		// Verify address exists first
 		w1 := httptest.NewRecorder()
@@ -1076,25 +1076,25 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 	})
 }
 
-func TestProperty_MultiTenantIsolation(t *testing.T) {
+func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantA := uuid.New()
-		tenantB := uuid.New()
+		organizationA := uuid.New()
+		organizationB := uuid.New()
 		customerID := uuid.New()
 		addrID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 
 		mock := &mockQuerier{
 			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-				// Customer only exists for tenant A
-				if arg.TenantID == tenantA {
-					return dbgen.Customer{ID: arg.ID, TenantID: tenantA}, nil
+				// Customer only exists for organization A
+				if arg.OrganizationID == organizationA {
+					return dbgen.Customer{ID: arg.ID, OrganizationID: organizationA}, nil
 				}
 				return dbgen.Customer{}, sql.ErrNoRows
 			},
 			createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
 				return dbgen.Address{
-					ID: addrID, TenantID: arg.TenantID, CustomerID: arg.CustomerID,
+					ID: addrID, OrganizationID: arg.OrganizationID, CustomerID: arg.CustomerID,
 					Type:       arg.Type,
 					PostalCode: arg.PostalCode, Street: arg.Street, City: arg.City, State: arg.State,
 					Country:   arg.Country,
@@ -1103,10 +1103,10 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 				}, nil
 			},
 			getAddressByIDFn: func(_ context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-				// Address only visible to tenant A
-				if arg.TenantID == tenantA {
+				// Address only visible to organization A
+				if arg.OrganizationID == organizationA {
 					return dbgen.Address{
-						ID: addrID, TenantID: tenantA, CustomerID: customerID,
+						ID: addrID, OrganizationID: organizationA, CustomerID: customerID,
 						Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 						PostalCode: "12345", Street: "St", City: "City", State: "ST",
 						Country:   sql.NullString{String: "BR", Valid: true},
@@ -1117,9 +1117,9 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 				return dbgen.Address{}, sql.ErrNoRows
 			},
 			listAddressesByCustomerFn: func(_ context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
-				if arg.TenantID == tenantA {
+				if arg.OrganizationID == organizationA {
 					return []dbgen.Address{{
-						ID: addrID, TenantID: tenantA, CustomerID: customerID,
+						ID: addrID, OrganizationID: organizationA, CustomerID: customerID,
 						Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 						PostalCode: "12345", Street: "St", City: "City", State: "ST",
 						Country:   sql.NullString{String: "BR", Valid: true},
@@ -1130,9 +1130,9 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 				return []dbgen.Address{}, nil
 			},
 			updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
-				if arg.TenantID == tenantA {
+				if arg.OrganizationID == organizationA {
 					return dbgen.Address{
-						ID: addrID, TenantID: tenantA, CustomerID: customerID,
+						ID: addrID, OrganizationID: organizationA, CustomerID: customerID,
 						Type: arg.Type, PostalCode: arg.PostalCode, Street: arg.Street,
 						City: arg.City, State: arg.State, Country: arg.Country, IsMain: arg.IsMain,
 						CreatedAt: sql.NullTime{Time: now, Valid: true},
@@ -1145,24 +1145,24 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 			},
 		}
 
-		// Tenant A can access the address
-		routerA := setupAddressRouter(mock, tenantA.String())
+		// Organization A can access the address
+		routerA := setupAddressRouter(mock, organizationA.String())
 		wA := httptest.NewRecorder()
 		rA := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerA.ServeHTTP(wA, rA)
 		if wA.Code != http.StatusOK {
-			t.Fatalf("Tenant A GET: expected 200, got %d", wA.Code)
+			t.Fatalf("Organization A GET: expected 200, got %d", wA.Code)
 		}
 
-		// Tenant B gets 404 for customer (customer doesn't exist for tenant B)
-		routerB := setupAddressRouter(mock, tenantB.String())
+		// Organization B gets 404 for customer (customer doesn't exist for organization B)
+		routerB := setupAddressRouter(mock, organizationB.String())
 
 		// GET by ID
 		wB1 := httptest.NewRecorder()
 		rB1 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerB.ServeHTTP(wB1, rB1)
 		if wB1.Code != http.StatusNotFound {
-			t.Fatalf("Tenant B GET: expected 404, got %d", wB1.Code)
+			t.Fatalf("Organization B GET: expected 404, got %d", wB1.Code)
 		}
 
 		// LIST
@@ -1170,7 +1170,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		rB2 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, basePath(customerID.String()), http.NoBody)
 		routerB.ServeHTTP(wB2, rB2)
 		if wB2.Code != http.StatusNotFound {
-			t.Fatalf("Tenant B LIST: expected 404, got %d", wB2.Code)
+			t.Fatalf("Organization B LIST: expected 404, got %d", wB2.Code)
 		}
 
 		// PUT
@@ -1179,7 +1179,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		rB3.Header.Set("Content-Type", "application/json")
 		routerB.ServeHTTP(wB3, rB3)
 		if wB3.Code != http.StatusNotFound {
-			t.Fatalf("Tenant B PUT: expected 404, got %d", wB3.Code)
+			t.Fatalf("Organization B PUT: expected 404, got %d", wB3.Code)
 		}
 
 		// DELETE
@@ -1187,7 +1187,7 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		rB4 := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, basePath(customerID.String())+"/"+addrID.String(), http.NoBody)
 		routerB.ServeHTTP(wB4, rB4)
 		if wB4.Code != http.StatusNotFound {
-			t.Fatalf("Tenant B DELETE: expected 404, got %d", wB4.Code)
+			t.Fatalf("Organization B DELETE: expected 404, got %d", wB4.Code)
 		}
 	})
 }

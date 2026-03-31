@@ -10,16 +10,16 @@ import (
 	"pgregory.net/rapid"
 )
 
-// TestProperty_ClaimsTenantIDAndAuthType verifies that for any authentication mode
-// (user or system), the emitted token always contains a non-empty tenant_id and
+// TestProperty_ClaimsOrganizationIDAndAuthType verifies that for any authentication mode
+// (user or system), the emitted token always contains a non-empty organization_id and
 // a valid auth_type ("user" or "system").
-func TestProperty_ClaimsTenantIDAndAuthType(t *testing.T) {
+func TestProperty_ClaimsOrganizationIDAndAuthType(t *testing.T) {
 	svc := token.NewService("test-secret-key", 15*time.Minute, 7*24*time.Hour)
 
 	validAuthTypes := []domain.AuthType{domain.AuthTypeUser, domain.AuthTypeSystem}
 
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := rapid.StringMatching(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`).Draw(t, "tenantID")
+		organizationID := rapid.StringMatching(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`).Draw(t, "organizationID")
 		authType := rapid.SampledFrom(validAuthTypes).Draw(t, "authType")
 
 		var userID string
@@ -30,10 +30,10 @@ func TestProperty_ClaimsTenantIDAndAuthType(t *testing.T) {
 		}
 
 		input := token.ClaimsInput{
-			TenantID: tenantID,
-			UserID:   userID,
-			Role:     role,
-			AuthType: authType,
+			OrganizationID: organizationID,
+			UserID:         userID,
+			Role:           role,
+			AuthType:       authType,
 		}
 
 		pair, err := svc.NewPairWithClaims(input)
@@ -47,11 +47,11 @@ func TestProperty_ClaimsTenantIDAndAuthType(t *testing.T) {
 			t.Fatalf("Verify access token failed: %v", err)
 		}
 
-		if claims.TenantID == "" {
-			t.Fatal("access token: tenant_id must not be empty")
+		if claims.OrganizationID == "" {
+			t.Fatal("access token: organization_id must not be empty")
 		}
-		if claims.TenantID != tenantID {
-			t.Fatalf("access token: tenant_id mismatch: got %q, want %q", claims.TenantID, tenantID)
+		if claims.OrganizationID != organizationID {
+			t.Fatalf("access token: organization_id mismatch: got %q, want %q", claims.OrganizationID, organizationID)
 		}
 		if claims.AuthType != authType {
 			t.Fatalf("access token: auth_type mismatch: got %q, want %q", claims.AuthType, authType)
@@ -66,11 +66,11 @@ func TestProperty_ClaimsTenantIDAndAuthType(t *testing.T) {
 			t.Fatalf("Verify refresh token failed: %v", err)
 		}
 
-		if refreshClaims.TenantID == "" {
-			t.Fatal("refresh token: tenant_id must not be empty")
+		if refreshClaims.OrganizationID == "" {
+			t.Fatal("refresh token: organization_id must not be empty")
 		}
-		if refreshClaims.TenantID != tenantID {
-			t.Fatalf("refresh token: tenant_id mismatch: got %q, want %q", refreshClaims.TenantID, tenantID)
+		if refreshClaims.OrganizationID != organizationID {
+			t.Fatalf("refresh token: organization_id mismatch: got %q, want %q", refreshClaims.OrganizationID, organizationID)
 		}
 		if refreshClaims.AuthType != authType {
 			t.Fatalf("refresh token: auth_type mismatch: got %q, want %q", refreshClaims.AuthType, authType)

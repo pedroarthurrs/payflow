@@ -9,17 +9,17 @@ import (
 	"github.com/google/uuid"
 )
 
-// TenantID extracts the tenant UUID from the JWT claims in the Gin context.
+// OrganizationID extracts the organization UUID from the JWT claims in the Gin context.
 // Uses safe type assertion to avoid panics.
-func TenantID(c *gin.Context) (uuid.UUID, bool) {
+func OrganizationID(c *gin.Context) (uuid.UUID, bool) {
 	claims, ok := c.MustGet(middleware.ClaimsKey).(*token.Claims)
 	if !ok {
 		_ = c.Error(apierr.Internal("could not parse claims"))
 		return uuid.UUID{}, false
 	}
-	tid, err := uuid.Parse(claims.TenantID)
+	tid, err := uuid.Parse(claims.OrganizationID)
 	if err != nil {
-		_ = c.Error(apierr.Internal("invalid tenant id in claims"))
+		_ = c.Error(apierr.Internal("invalid organization id in claims"))
 		return uuid.UUID{}, false
 	}
 	return tid, true

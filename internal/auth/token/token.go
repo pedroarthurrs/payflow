@@ -33,15 +33,15 @@ const (
 
 // Claims is the JWT payload shared by both access and refresh tokens.
 type Claims struct {
-	// TenantID identifies the authenticated tenant (stored in the "sub" field).
-	TenantID string `json:"sub"`
+	// OrganizationID identifies the authenticated organization (stored in the "sub" field).
+	OrganizationID string `json:"sub"`
 
 	// TokenType indicates whether this is an access or refresh token.
 	TokenType TokenType `json:"token_type"`
 
 	// UserID is the authenticated user's UUID. Empty for system tokens.
 	UserID string `json:"user_id,omitempty"`
-	// Role is the user's role within the tenant. Empty for system tokens.
+	// Role is the user's role within the organization. Empty for system tokens.
 	Role domain.Role `json:"role,omitempty"`
 	// AuthType indicates the authentication mode (user or system). Always present.
 	AuthType domain.AuthType `json:"auth_type"`
@@ -51,10 +51,10 @@ type Claims struct {
 
 // ClaimsInput holds the data needed to issue a token pair with extended claims.
 type ClaimsInput struct {
-	TenantID string          // tenant UUID
-	UserID   string          // empty for system tokens
-	Role     domain.Role     // empty for system tokens
-	AuthType domain.AuthType // user or system
+	OrganizationID string          // organization UUID
+	UserID         string          // empty for system tokens
+	Role           domain.Role     // empty for system tokens
+	AuthType       domain.AuthType // user or system
 }
 
 // Pair is returned on a successful login or token refresh.
@@ -84,10 +84,10 @@ func NewService(secret string, accessTTL, refreshTTL time.Duration) *Service {
 	}
 }
 
-// NewPair issues a new access/refresh token pair for the given tenantID.
+// NewPair issues a new access/refresh token pair for the given organizationID.
 // NewPair is kept for backward compatibility; it emits tokens without user/role claims.
-func (s *Service) NewPair(tenantID string) (*Pair, error) {
-	return s.NewPairWithClaims(ClaimsInput{TenantID: tenantID})
+func (s *Service) NewPair(organizationID string) (*Pair, error) {
+	return s.NewPairWithClaims(ClaimsInput{OrganizationID: organizationID})
 }
 
 // NewPairWithClaims issues a new access/refresh token pair with extended claims.
@@ -118,7 +118,7 @@ func (s *Service) Refresh(refreshToken string) (*Pair, error) {
 		return nil, err
 	}
 
-	return s.NewPair(claims.TenantID)
+	return s.NewPair(claims.OrganizationID)
 }
 
 // RefreshWithClaims validates a refresh token and issues a fresh token pair,
@@ -130,10 +130,10 @@ func (s *Service) RefreshWithClaims(refreshToken string) (*Pair, error) {
 	}
 
 	return s.NewPairWithClaims(ClaimsInput{
-		TenantID: claims.TenantID,
-		UserID:   claims.UserID,
-		Role:     claims.Role,
-		AuthType: claims.AuthType,
+		OrganizationID: claims.OrganizationID,
+		UserID:         claims.UserID,
+		Role:           claims.Role,
+		AuthType:       claims.AuthType,
 	})
 }
 
@@ -175,11 +175,11 @@ func (s *Service) sign(input ClaimsInput, tokenType TokenType, ttl time.Duration
 	expiry := now.Add(ttl)
 
 	claims := Claims{
-		TenantID:  input.TenantID,
-		TokenType: tokenType,
-		UserID:    input.UserID,
-		Role:      input.Role,
-		AuthType:  input.AuthType,
+		OrganizationID: input.OrganizationID,
+		TokenType:      tokenType,
+		UserID:         input.UserID,
+		Role:           input.Role,
+		AuthType:       input.AuthType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			IssuedAt:  jwt.NewNumericDate(now),

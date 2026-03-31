@@ -45,7 +45,7 @@ func addressID(c *gin.Context) (uuid.UUID, bool) {
 
 // Create handles POST /v1/customers/:customer_id/addresses.
 func (h *AddressHandler) Create(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -87,7 +87,7 @@ func (h *AddressHandler) Create(c *gin.Context) {
 
 // List handles GET /v1/customers/:customer_id/addresses.
 func (h *AddressHandler) List(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -117,7 +117,7 @@ func (h *AddressHandler) List(c *gin.Context) {
 
 // GetByID handles GET /v1/customers/:customer_id/addresses/:id.
 func (h *AddressHandler) GetByID(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -151,7 +151,7 @@ func (h *AddressHandler) GetByID(c *gin.Context) {
 
 // Update handles PUT /v1/customers/:customer_id/addresses/:id.
 func (h *AddressHandler) Update(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -202,7 +202,7 @@ func (h *AddressHandler) Update(c *gin.Context) {
 
 // Delete handles DELETE /v1/customers/:customer_id/addresses/:id.
 func (h *AddressHandler) Delete(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}

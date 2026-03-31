@@ -24,7 +24,7 @@ import (
 )
 
 // setupCustomerRouter creates a Gin test router with the error middleware, claims, and customer handler routes.
-func setupCustomerRouter(mock *mockQuerier, tenantID string) *gin.Engine {
+func setupCustomerRouter(mock *mockQuerier, organizationID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	db := &database.DB{Queries: mock}
 	svc := service.NewCustomerService(db, nil)
@@ -32,7 +32,7 @@ func setupCustomerRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 
 	r := gin.New()
 	r.Use(middleware.Errors())
-	r.Use(withClaims(tenantID))
+	r.Use(withClaims(organizationID))
 
 	r.POST("/v1/customers", h.Create)
 	r.GET("/v1/customers", h.List)
@@ -46,8 +46,8 @@ func setupCustomerRouter(mock *mockQuerier, tenantID string) *gin.Engine {
 // --- Test 1: Validation of required fields ---
 
 func TestCustomerCreate_MissingRequiredFields_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
-	router := setupCustomerRouter(&mockQuerier{}, tenantID)
+	organizationID := uuid.New().String()
+	router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 	// Empty body — all required fields missing.
 	body := `{}`
@@ -85,8 +85,8 @@ func TestCustomerCreate_MissingRequiredFields_Returns400(t *testing.T) {
 }
 
 func TestCustomerCreate_MissingName_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
-	router := setupCustomerRouter(&mockQuerier{}, tenantID)
+	organizationID := uuid.New().String()
+	router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 	body := `{"email":"test@example.com","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
@@ -118,8 +118,8 @@ func TestCustomerCreate_MissingName_Returns400(t *testing.T) {
 // --- Test 2: Invalid email format ---
 
 func TestCustomerCreate_InvalidEmail_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
-	router := setupCustomerRouter(&mockQuerier{}, tenantID)
+	organizationID := uuid.New().String()
+	router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 	body := `{"name":"Alice","email":"not-an-email","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
@@ -151,8 +151,8 @@ func TestCustomerCreate_InvalidEmail_Returns400(t *testing.T) {
 // --- Test 3: Invalid UUID in path param ---
 
 func TestCustomerGetByID_InvalidUUID_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
-	router := setupCustomerRouter(&mockQuerier{}, tenantID)
+	organizationID := uuid.New().String()
+	router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/customers/not-a-uuid", http.NoBody)
@@ -173,8 +173,8 @@ func TestCustomerGetByID_InvalidUUID_Returns400(t *testing.T) {
 }
 
 func TestCustomerUpdate_InvalidUUID_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
-	router := setupCustomerRouter(&mockQuerier{}, tenantID)
+	organizationID := uuid.New().String()
+	router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 	body := `{"name":"Alice","email":"a@b.com","document":"12345","document_type":"cpf"}`
 	w := httptest.NewRecorder()
@@ -197,8 +197,8 @@ func TestCustomerUpdate_InvalidUUID_Returns400(t *testing.T) {
 }
 
 func TestCustomerDelete_InvalidUUID_Returns400(t *testing.T) {
-	tenantID := uuid.New().String()
-	router := setupCustomerRouter(&mockQuerier{}, tenantID)
+	organizationID := uuid.New().String()
+	router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/xyz", http.NoBody)
@@ -221,13 +221,13 @@ func TestCustomerDelete_InvalidUUID_Returns400(t *testing.T) {
 // --- Test 4: 404 for customer not found ---
 
 func TestCustomerGetByID_NotFound_Returns404(t *testing.T) {
-	tenantID := uuid.New().String()
+	organizationID := uuid.New().String()
 	mock := &mockQuerier{
 		getCustomerByIDFn: func(_ context.Context, _ dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 			return dbgen.Customer{}, sql.ErrNoRows
 		},
 	}
-	router := setupCustomerRouter(mock, tenantID)
+	router := setupCustomerRouter(mock, organizationID)
 
 	customerID := uuid.New().String()
 	w := httptest.NewRecorder()
@@ -251,7 +251,7 @@ func TestCustomerGetByID_NotFound_Returns404(t *testing.T) {
 // --- Test 5: 204 for soft delete ---
 
 func TestCustomerDelete_Success_Returns204(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	now := time.Now().Truncate(time.Second)
 
@@ -260,7 +260,7 @@ func TestCustomerDelete_Success_Returns204(t *testing.T) {
 			if arg.ID == customerID {
 				return dbgen.Customer{
 					ID:           customerID,
-					TenantID:     tenantID,
+					OrganizationID:     organizationID,
 					Name:         "Alice",
 					Email:        "alice@example.com",
 					Document:     "12345",
@@ -277,7 +277,7 @@ func TestCustomerDelete_Success_Returns204(t *testing.T) {
 			return nil
 		},
 	}
-	router := setupCustomerRouter(mock, tenantID.String())
+	router := setupCustomerRouter(mock, organizationID.String())
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/v1/customers/"+customerID.String(), http.NoBody)
@@ -363,8 +363,8 @@ func TestCustomerProperty_InvalidInput_Returns400(t *testing.T) {
 		}
 		body := string(bodyBytes)
 
-		tenantID := uuid.New().String()
-		router := setupCustomerRouter(&mockQuerier{}, tenantID)
+		organizationID := uuid.New().String()
+		router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 		// --- Test POST /v1/customers ---
 		wPost := httptest.NewRecorder()
@@ -475,8 +475,8 @@ func TestCustomerProperty_InvalidUUID_Returns400(t *testing.T) {
 			return true
 		}
 
-		tenantID := uuid.New().String()
-		router := setupCustomerRouter(&mockQuerier{}, tenantID)
+		organizationID := uuid.New().String()
+		router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 		// --- GET /v1/customers/:id ---
 		wGet := httptest.NewRecorder()
@@ -614,8 +614,8 @@ func TestCustomerProperty_ValidationErrorResponseFormat(t *testing.T) {
 			return false
 		}
 
-		tenantID := uuid.New().String()
-		router := setupCustomerRouter(&mockQuerier{}, tenantID)
+		organizationID := uuid.New().String()
+		router := setupCustomerRouter(&mockQuerier{}, organizationID)
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/customers", strings.NewReader(string(bodyBytes)))
@@ -737,7 +737,7 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 		document := randStr(int(nextR()%15) + 1)
 		documentType := randStr(int(nextR()%10) + 1)
 
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 
 		// In-memory store simulating soft delete behavior.
@@ -752,7 +752,7 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 				id := uuid.New()
 				c := dbgen.Customer{
 					ID:           id,
-					TenantID:     arg.TenantID,
+					OrganizationID:     arg.OrganizationID,
 					Name:         arg.Name,
 					Email:        arg.Email,
 					Phone:        arg.Phone,
@@ -768,15 +768,15 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			},
 			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 				sc, ok := store[arg.ID]
-				if !ok || sc.deletedAt.Valid || arg.TenantID != sc.customer.TenantID {
+				if !ok || sc.deletedAt.Valid || arg.OrganizationID != sc.customer.OrganizationID {
 					return dbgen.Customer{}, sql.ErrNoRows
 				}
 				return sc.customer, nil
 			},
-			listCustomersByTenantFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) {
+			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) {
 				var result []dbgen.Customer
 				for _, sc := range store {
-					if sc.customer.TenantID == tid && !sc.deletedAt.Valid {
+					if sc.customer.OrganizationID == tid && !sc.deletedAt.Valid {
 						result = append(result, sc.customer)
 					}
 				}
@@ -784,14 +784,14 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			},
 			softDeleteCustomerFn: func(_ context.Context, arg dbgen.SoftDeleteCustomerParams) error {
 				sc, ok := store[arg.ID]
-				if ok && sc.customer.TenantID == arg.TenantID && !sc.deletedAt.Valid {
+				if ok && sc.customer.OrganizationID == arg.OrganizationID && !sc.deletedAt.Valid {
 					sc.deletedAt = sql.NullTime{Time: time.Now(), Valid: true}
 				}
 				return nil
 			},
 			updateCustomerFn: func(_ context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
 				sc, ok := store[arg.ID]
-				if !ok || sc.deletedAt.Valid || arg.TenantID != sc.customer.TenantID {
+				if !ok || sc.deletedAt.Valid || arg.OrganizationID != sc.customer.OrganizationID {
 					return dbgen.Customer{}, sql.ErrNoRows
 				}
 				sc.customer.Name = arg.Name
@@ -804,7 +804,7 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			},
 		}
 
-		router := setupCustomerRouter(mock, tenantID.String())
+		router := setupCustomerRouter(mock, organizationID.String())
 
 		// Step 1: Create a customer via POST — expect 201.
 		createBody := fmt.Sprintf(
@@ -963,7 +963,7 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 		updateDocument := randStr(int(nextR()%15) + 1)
 		updateDocType := randStr(int(nextR()%10) + 1)
 
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		createTime := time.Now().Truncate(time.Second)
 
 		// In-memory store simulating create, update, and get behavior.
@@ -974,7 +974,7 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 				id := uuid.New()
 				c := dbgen.Customer{
 					ID:           id,
-					TenantID:     arg.TenantID,
+					OrganizationID:     arg.OrganizationID,
 					Name:         arg.Name,
 					Email:        arg.Email,
 					Phone:        arg.Phone,
@@ -990,7 +990,7 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 			},
 			updateCustomerFn: func(_ context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
 				c, ok := store[arg.ID]
-				if !ok || arg.TenantID != c.TenantID {
+				if !ok || arg.OrganizationID != c.OrganizationID {
 					return dbgen.Customer{}, sql.ErrNoRows
 				}
 				// Simulate DB trigger: updated_at advances on update.
@@ -1007,14 +1007,14 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 			},
 			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 				c, ok := store[arg.ID]
-				if !ok || arg.TenantID != c.TenantID {
+				if !ok || arg.OrganizationID != c.OrganizationID {
 					return dbgen.Customer{}, sql.ErrNoRows
 				}
 				return c, nil
 			},
 		}
 
-		router := setupCustomerRouter(mock, tenantID.String())
+		router := setupCustomerRouter(mock, organizationID.String())
 
 		// Step 1: Create a customer via POST — expect 201.
 		createBody := fmt.Sprintf(
@@ -1133,7 +1133,7 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 // --- Property-based test: Listing order by created_at descending ---
 
 func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
-	// For any tenant with multiple customers, the listing should return
+	// For any organization with multiple customers, the listing should return
 	// customers ordered by created_at DESC (most recent first).
 
 	f := func(seed uint64) bool {
@@ -1153,7 +1153,7 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 			return string(buf)
 		}
 
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		// Determine how many customers to create (2-5).
@@ -1175,7 +1175,7 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 				createCounter++
 				c := dbgen.Customer{
 					ID:           id,
-					TenantID:     arg.TenantID,
+					OrganizationID:     arg.OrganizationID,
 					Name:         arg.Name,
 					Email:        arg.Email,
 					Phone:        arg.Phone,
@@ -1190,11 +1190,11 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 				createdOrder = append(createdOrder, id)
 				return c, nil
 			},
-			listCustomersByTenantFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) {
-				// Collect active customers for this tenant.
+			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) {
+				// Collect active customers for this organization.
 				var customers []dbgen.Customer
 				for _, sc := range store {
-					if sc.dbCustomer.TenantID == tid {
+					if sc.dbCustomer.OrganizationID == tid {
 						customers = append(customers, sc.dbCustomer)
 					}
 				}
@@ -1210,7 +1210,7 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 			},
 		}
 
-		router := setupCustomerRouter(mock, tenantID.String())
+		router := setupCustomerRouter(mock, organizationID.String())
 
 		// Step 1: Create 2-5 customers via POST with different timestamps.
 		for i := 0; i < numCustomers; i++ {
@@ -1295,7 +1295,7 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 
 func TestCustomerProperty_NonExistentCustomerReturns404(t *testing.T) {
 	// Any valid UUID that doesn't correspond to a customer of the authenticated
-	// tenant should return 404 with "customer not found" for GET, PUT, and DELETE.
+	// organization should return 404 with "customer not found" for GET, PUT, and DELETE.
 
 	f := func(seed uint64) bool {
 		r := seed
@@ -1319,7 +1319,7 @@ func TestCustomerProperty_NonExistentCustomerReturns404(t *testing.T) {
 			return false
 		}
 
-		tenantID := uuid.New().String()
+		organizationID := uuid.New().String()
 
 		// Mock always returns sql.ErrNoRows for GetCustomerByID (no customer exists).
 		mock := &mockQuerier{
@@ -1334,7 +1334,7 @@ func TestCustomerProperty_NonExistentCustomerReturns404(t *testing.T) {
 			},
 		}
 
-		router := setupCustomerRouter(mock, tenantID)
+		router := setupCustomerRouter(mock, organizationID)
 
 		// --- GET /v1/customers/:id — expect 404 ---
 		wGet := httptest.NewRecorder()

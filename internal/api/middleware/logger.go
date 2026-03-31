@@ -27,7 +27,7 @@ func StructuredLogger(logger *slog.Logger) gin.HandlerFunc {
 		userID := ""
 		if claims, exists := c.Get(ClaimsKey); exists {
 			if tc, ok := claims.(*token.Claims); ok {
-				userID = tc.TenantID
+				userID = tc.OrganizationID
 			}
 		}
 

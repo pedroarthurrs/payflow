@@ -46,7 +46,7 @@ type updateUserRequest struct {
 
 // Create handles POST /v1/users.
 func (h *UserHandler) Create(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -81,7 +81,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 
 // List handles GET /v1/users.
 func (h *UserHandler) List(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -97,7 +97,7 @@ func (h *UserHandler) List(c *gin.Context) {
 
 // Update handles PUT /v1/users/:user_id.
 func (h *UserHandler) Update(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -128,7 +128,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 
 // Delete handles DELETE /v1/users/:user_id.
 func (h *UserHandler) Delete(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}

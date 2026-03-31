@@ -28,12 +28,12 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.En
 	// Rate limiter stores
 	ipStore := middleware.NewRateLimiterStore()
 	loginStore := middleware.NewRateLimiterStore()
-	tenantStore := middleware.NewRateLimiterStore()
+	organizationStore := middleware.NewRateLimiterStore()
 
 	// Rate limiter windows
 	ipWindow := time.Duration(cfg.RateLimitWindowSeconds) * time.Second
 	loginWindow := time.Duration(cfg.RateLimitLoginWindowSeconds) * time.Second
-	tenantWindow := time.Duration(cfg.RateLimitTenantWindowSeconds) * time.Second
+	organizationWindow := time.Duration(cfg.RateLimitOrganizationWindowSeconds) * time.Second
 
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
@@ -68,7 +68,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.En
 	// Rotas protegidas
 	protected := v1.Group("/")
 	protected.Use(middleware.Auth(tokenSvc))
-	protected.Use(middleware.RateLimitByTenant(tenantStore, cfg.RateLimitTenantMaxRequests, tenantWindow))
+	protected.Use(middleware.RateLimitByOrganization(organizationStore, cfg.RateLimitOrganizationMaxRequests, organizationWindow))
 
 	meHandler.RegisterRoutes(protected)
 	customerHandler.RegisterRoutes(protected)

@@ -222,7 +222,7 @@ func TestRateLimitByIP_RemainingDecreasesWithEachRequest(t *testing.T) {
 	}
 }
 
-func TestRateLimitByTenant_AllowedRequestReturnsHeaders(t *testing.T) {
+func TestRateLimitByOrganization_AllowedRequestReturnsHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := NewRateLimiterStore()
 	maxReqs := 5
@@ -231,9 +231,9 @@ func TestRateLimitByTenant_AllowedRequestReturnsHeaders(t *testing.T) {
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
 	r.GET("/test", func(c *gin.Context) {
-		c.Set(ClaimsKey, &token.Claims{TenantID: "tenant-123"})
+		c.Set(ClaimsKey, &token.Claims{OrganizationID: "organization-123"})
 		c.Next()
-	}, RateLimitByTenant(store, maxReqs, window), func(c *gin.Context) {
+	}, RateLimitByOrganization(store, maxReqs, window), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
@@ -251,17 +251,17 @@ func TestRateLimitByTenant_AllowedRequestReturnsHeaders(t *testing.T) {
 	}
 }
 
-func TestRateLimitByTenant_RejectedRequestReturns429WithBodyAndHeaders(t *testing.T) {
+func TestRateLimitByOrganization_RejectedRequestReturns429WithBodyAndHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := NewRateLimiterStore()
 	maxReqs := 1
 	window := time.Minute
 
 	setClaims := func(c *gin.Context) {
-		c.Set(ClaimsKey, &token.Claims{TenantID: "tenant-456"})
+		c.Set(ClaimsKey, &token.Claims{OrganizationID: "organization-456"})
 		c.Next()
 	}
-	handler := RateLimitByTenant(store, maxReqs, window)
+	handler := RateLimitByOrganization(store, maxReqs, window)
 
 	// First request — allowed, exhausts the limit
 	w1 := httptest.NewRecorder()
@@ -299,7 +299,7 @@ func TestRateLimitByTenant_RejectedRequestReturns429WithBodyAndHeaders(t *testin
 	}
 }
 
-func TestRateLimitByTenant_NoClaims_Returns401(t *testing.T) {
+func TestRateLimitByOrganization_NoClaims_Returns401(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := NewRateLimiterStore()
 	maxReqs := 5
@@ -308,7 +308,7 @@ func TestRateLimitByTenant_NoClaims_Returns401(t *testing.T) {
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
 	// No claims set in context — middleware should return 401
-	r.GET("/test", RateLimitByTenant(store, maxReqs, window), func(c *gin.Context) {
+	r.GET("/test", RateLimitByOrganization(store, maxReqs, window), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 

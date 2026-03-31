@@ -82,7 +82,7 @@ func toCustomerResponse(c *domain.Customer) customerResponse {
 
 // Create handles POST /v1/customers.
 func (h *CustomerHandler) Create(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -136,7 +136,7 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 
 // List handles GET /v1/customers.
 func (h *CustomerHandler) List(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -157,7 +157,7 @@ func (h *CustomerHandler) List(c *gin.Context) {
 
 // GetByID handles GET /v1/customers/:id.
 func (h *CustomerHandler) GetByID(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -182,7 +182,7 @@ func (h *CustomerHandler) GetByID(c *gin.Context) {
 
 // Update handles PUT /v1/customers/:id.
 func (h *CustomerHandler) Update(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}
@@ -245,7 +245,7 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 
 // Delete handles DELETE /v1/customers/:id.
 func (h *CustomerHandler) Delete(c *gin.Context) {
-	tid, ok := dto.TenantID(c)
+	tid, ok := dto.OrganizationID(c)
 	if !ok {
 		return
 	}

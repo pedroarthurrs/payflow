@@ -300,7 +300,7 @@ func buildRBACTestEngine() *gin.Engine {
 			return
 		}
 		claims := &token.Claims{
-			TenantID: uuid.New().String(),
+			OrganizationID: uuid.New().String(),
 			UserID:   uuid.New().String(),
 			Role:     role,
 			AuthType: domain.AuthTypeUser,

@@ -11,14 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// visitor tracks request count and window expiry for a single key (IP or tenant_id).
+// visitor tracks request count and window expiry for a single key (IP or organization_id).
 type visitor struct {
 	count     int
 	expiresAt time.Time
 }
 
 // RateLimiterStore is an in-memory store protected by sync.Mutex.
-// Keys are IP addresses or tenant IDs. Expired entries are lazily cleaned.
+// Keys are IP addresses or organization IDs. Expired entries are lazily cleaned.
 type RateLimiterStore struct {
 	mu       sync.Mutex
 	visitors map[string]*visitor
@@ -78,18 +78,18 @@ func RateLimitByIP(store *RateLimiterStore, maxRequests int, window time.Duratio
 	}
 }
 
-// RateLimitByTenant returns a Gin middleware that rate-limits by tenant_id
+// RateLimitByOrganization returns a Gin middleware that rate-limits by organization_id
 // extracted from JWT claims stored in the Gin context by the Auth middleware.
-func RateLimitByTenant(store *RateLimiterStore, maxRequests int, window time.Duration) gin.HandlerFunc {
+func RateLimitByOrganization(store *RateLimiterStore, maxRequests int, window time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, exists := c.Get(ClaimsKey)
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-		tenantID := claims.(*token.Claims).TenantID
+		organizationID := claims.(*token.Claims).OrganizationID
 
-		allowed, remaining, resetAt := store.Allow(tenantID, maxRequests, window)
+		allowed, remaining, resetAt := store.Allow(organizationID, maxRequests, window)
 
 		c.Header("X-RateLimit-Limit", strconv.Itoa(maxRequests))
 		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
