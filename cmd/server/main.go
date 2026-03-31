@@ -7,6 +7,7 @@ import (
 	"i9pay/internal/api/router"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
+	"i9pay/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,7 +50,10 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 
-	r := router.NewRouter(cfg, logger, db)
+	healthSvc := service.NewHealthService()
+	healthSvc.Start(db)
+
+	r := router.NewRouter(cfg, logger, db, healthSvc)
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		logger.Error("server stopped", "error", err)

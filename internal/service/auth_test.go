@@ -174,11 +174,11 @@ func TestLogin_UserMode_Success(t *testing.T) {
 	q := &authMockQuerier{
 		getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
 			return dbgen.User{
-				ID:       userID,
+				ID:             userID,
 				OrganizationID: organizationID,
-				Email:    email,
-				Role:     "admin",
-				Password: string(hash),
+				Email:          email,
+				Role:           "admin",
+				Password:       string(hash),
 			}, nil
 		},
 	}
@@ -379,11 +379,11 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 		q := &authMockQuerier{
 			getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
 				return dbgen.User{
-					ID:       userID,
+					ID:             userID,
 					OrganizationID: organizationID,
-					Email:    "user@example.com",
-					Role:     role,
-					Password: string(fixedHash),
+					Email:          "user@example.com",
+					Role:           role,
+					Password:       string(fixedHash),
 				}, nil
 			},
 		}
@@ -483,10 +483,10 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 			},
 			getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
 				return dbgen.User{
-					ID:       userID,
+					ID:             userID,
 					OrganizationID: organizationID,
-					Role:     "member",
-					Password: string(fixedHash),
+					Role:           "member",
+					Password:       string(fixedHash),
 				}, nil
 			},
 		}
@@ -569,9 +569,9 @@ func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
 		// Issue an original pair with user claims.
 		original, err := tokenSvc.NewPairWithClaims(token.ClaimsInput{
 			OrganizationID: organizationID,
-			UserID:   userID,
-			Role:     role,
-			AuthType: domain.AuthTypeUser,
+			UserID:         userID,
+			Role:           role,
+			AuthType:       domain.AuthTypeUser,
 		})
 		if err != nil {
 			t.Fatalf("failed to issue original token: %v", err)
@@ -631,18 +631,11 @@ func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 // Bug condition exploration test
 // ============================================================
 
-// TestLogin_BugCondition_EmailPasswordWithoutOrganizationID confirms the bug described in
-// .kiro/specs/login-remove-organization-id/bugfix.md:
+// TestLogin_BugCondition_EmailPasswordWithoutOrganizationID confirms that Login
+// succeeds when called with email+password and no OrganizationID.
 //
-//	isBugCondition(X) = X.APIKey="" AND X.Email!="" AND X.Password!="" AND X.OrganizationID=""
+// The test asserts the correct behavior: err==nil AND pair!=nil.
 //
-// The test asserts the CORRECT (post-fix) behavior: err==nil AND pair!=nil.
-// On UNFIXED code the guard `req.OrganizationID != ""` is false, so Login returns
-// ErrBadRequest — causing this test to FAIL and confirming the bug.
-//
-// Counterexample (confirmed on unfixed code):
-//
-//	Login({Email: "000@example.com", Password: "testpassword1"}) → ErrBadRequest
 //	("organization_id, email and password or api_key required")
 //
 // Root cause: `req.OrganizationID != ""` guard in AuthService.Login (auth.go) is false
@@ -658,11 +651,11 @@ func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
 			getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
 				// Return a valid user for any email so the bug is isolated to the dispatch guard.
 				return dbgen.User{
-					ID:       uuid.New(),
+					ID:             uuid.New(),
 					OrganizationID: uuid.New(),
-					Email:    email,
-					Role:     "member",
-					Password: string(fixedHash),
+					Email:          email,
+					Role:           "member",
+					Password:       string(fixedHash),
 				}, nil
 			},
 		}
@@ -760,11 +753,11 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 			q := &authMockQuerier{
 				getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
 					return dbgen.User{
-						ID:       uuid.New(),
+						ID:             uuid.New(),
 						OrganizationID: organizationID,
-						Email:    email,
-						Role:     "member",
-						Password: string(knownHash),
+						Email:          email,
+						Role:           "member",
+						Password:       string(knownHash),
 					}, nil
 				},
 			}

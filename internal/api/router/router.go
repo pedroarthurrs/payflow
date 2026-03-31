@@ -18,7 +18,7 @@ const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
-func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.Engine {
+func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthSvc *service.HealthService) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recovery())
 	r.Use(middleware.RequestID())
@@ -48,7 +48,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB) *gin.En
 	// Handlers
 	rootHandler := handler.NewRootHandler()
 	authHandler := handler.NewAuthHandler(authSvc, loginRL)
-	healthHandler := handler.NewHealthHandler(db)
+	healthHandler := handler.NewHealthHandler(healthSvc)
 	meHandler := handler.NewMeHandler()
 	customerHandler := handler.NewCustomerHandler(customerSvc)
 	addressHandler := handler.NewAddressHandler(addressSvc)

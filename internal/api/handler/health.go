@@ -1,45 +1,40 @@
 package handler
 
 import (
-	"context"
 	"net/http"
-	"time"
 
-	"i9pay/internal/api/err"
-	"i9pay/internal/database"
+	"i9pay/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-// HealthHandler handles health check endpoints.
+// HealthHandler serves liveness and readiness probes.
 type HealthHandler struct {
-	db *database.DB
+	healthSvc *service.HealthService
 }
 
-// NewHealthHandler creates a HealthHandler.
-func NewHealthHandler(db *database.DB) *HealthHandler {
-	return &HealthHandler{db: db}
+// NewHealthHandler creates a HealthHandler backed by a HealthService.
+func NewHealthHandler(healthSvc *service.HealthService) *HealthHandler {
+	return &HealthHandler{healthSvc: healthSvc}
 }
 
-// RegisterRoutes registers the health handler routes.
+// RegisterRoutes registers GET /live and GET /ready on the given router group.
 func (h *HealthHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.GET("/health", h.Get)
+	rg.GET("/live", h.Live)
+	rg.GET("/ready", h.Ready)
 }
 
-// Get returns the health status of the service and its dependencies.
-func (h *HealthHandler) Get(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-	defer cancel()
+// Live returns 200 {"status": "alive"} unconditionally.
+func (h *HealthHandler) Live(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "alive"})
+}
 
-	if e := h.db.PingContext(ctx); e != nil {
-		_ = c.Error(err.ServiceUnavailable("database unavailable: " + e.Error()))
+// Ready returns 200 {"status": "ready"} or 503 {"status": "unavailable"}
+// based on the cached database health state.
+func (h *HealthHandler) Ready(c *gin.Context) {
+	if h.healthSvc.DatabaseOK() {
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
-		"services": gin.H{
-			"database": "ok",
-		},
-	})
+	c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
 }

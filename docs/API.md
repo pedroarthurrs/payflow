@@ -43,24 +43,36 @@ Informações básicas sobre a API.
 
 ---
 
-### GET /v1/health
+### GET /v1/live
 
-Health check da aplicação e dependências.
+Liveness probe — indica que o processo está rodando.
 
 **Response (200 OK):**
 ```json
 {
-  "status": "ok",
-  "services": {
-    "database": "ok"
-  }
+  "status": "alive"
+}
+```
+
+---
+
+### GET /v1/ready
+
+Readiness probe — indica que a aplicação está pronta para receber tráfego (banco de dados acessível).
+
+Um `HealthMonitor` em background faz ping no banco a cada 15 segundos e cacheia o resultado. A resposta reflete o último estado conhecido.
+
+**Response (200 OK):**
+```json
+{
+  "status": "ready"
 }
 ```
 
 **Response (503 Service Unavailable):**
 ```json
 {
-  "error": "database unavailable: connection refused"
+  "status": "unavailable"
 }
 ```
 
@@ -489,9 +501,14 @@ Remove um endereço.
 
 ## cURL Examples
 
-### Health Check
+### Liveness Probe
 ```bash
-curl http://localhost:8080/v1/health
+curl http://localhost:8080/v1/live
+```
+
+### Readiness Probe
+```bash
+curl http://localhost:8080/v1/ready
 ```
 
 ### Login
@@ -554,9 +571,11 @@ Você pode importar as rotas em ferramentas como **Postman**, **Insomnia** ou **
 
 API_BASE="http://localhost:8080"
 
-# 1. Health Check
-echo "=== Health Check ==="
-curl $API_BASE/v1/health
+# 1. Health Probes
+echo "=== Liveness ==="
+curl $API_BASE/v1/live
+echo "\n=== Readiness ==="
+curl $API_BASE/v1/ready
 
 # 2. Login
 echo "\n=== Login ==="

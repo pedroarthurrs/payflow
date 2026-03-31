@@ -115,7 +115,15 @@ Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
 **SQLC Generated** (`database/dbgen/`)
 - `db.go`: Configuração do DB
 - `models.go`: Structs geradas do schema
-### 5. Auth Service (`auth/token/`)
+### 5. Health Monitor (`service/health.go`)
+
+**HealthService** (`service/health.go`)
+- Background goroutine pinga o banco a cada 15 segundos
+- Cacheia resultado com `sync.RWMutex` para leituras concorrentes seguras
+- Expõe `DatabaseOK() bool` consumido pelo `HealthHandler`
+- Separa liveness (processo vivo) de readiness (banco acessível)
+
+### 6. Auth Service (`auth/token/`)
 - `queries.sql.go`: Implementação type-safe das queries
 **JWT Service** (`auth/token/token.go`)
 **SQL** (`database/queries.sql`)
@@ -123,14 +131,14 @@ Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
 - Versionadas com migrations
 - Suporta claims estendidos (user_id, role, auth_type)
 
-### 5. Token Service (`token/`)
+### 7. Token Service (`token/`)
 
 **JWT Service** (`token/token.go`)
 - Criação de tokens (access + refresh)
 - Validação e parsing de JWT
 - Isolado da lógica HTTP
 
-### 6. Config (`config/`)
+### 8. Config (`config/`)
 
 **Configuration** (`config/config.go`)
 - Carrega variáveis de ambiente
