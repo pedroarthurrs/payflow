@@ -14,7 +14,7 @@ import (
 
 // TokenProvider defines the token operations required by AuthService.
 type TokenProvider interface {
-	NewPair(tenantID string) (*token.Pair, error)
+	NewPair(organizationID string) (*token.Pair, error)
 	NewPairWithClaims(input token.ClaimsInput) (*token.Pair, error)
 	Refresh(refreshToken string) (*token.Pair, error)
 	RefreshWithClaims(refreshToken string) (*token.Pair, error)
@@ -33,7 +33,7 @@ func NewAuthService(tokenSvc TokenProvider, db *database.DB) *AuthService {
 
 // Login authenticates via dynamic mode detection:
 //   - If req.APIKey is set → system mode (API Key)
-//   - If req.Email + req.Password are set → user mode (tenant resolved from user record)
+//   - If req.Email + req.Password are set → user mode (organization resolved from user record)
 //   - Otherwise → ErrBadRequest
 func (s *AuthService) Login(ctx context.Context, req domain.LoginRequest) (*token.Pair, error) {
 	if req.APIKey != "" {
@@ -63,7 +63,7 @@ func (s *AuthService) loginByAPIKey(ctx context.Context, apiKey string) (*token.
 	_ = s.db.Queries.UpdateAPIKeyLastUsed(ctx, key.ID)
 
 	pair, err := s.tokenSvc.NewPairWithClaims(token.ClaimsInput{
-		TenantID: key.TenantID.String(),
+		OrganizationID: key.OrganizationID.String(),
 		AuthType: domain.AuthTypeSystem,
 	})
 	if err != nil {
@@ -72,7 +72,7 @@ func (s *AuthService) loginByAPIKey(ctx context.Context, apiKey string) (*token.
 	return pair, nil
 }
 
-// loginByUser authenticates a human user with email + password; tenant is resolved from the user record.
+// loginByUser authenticates a human user with email + password; organization is resolved from the user record.
 func (s *AuthService) loginByUser(ctx context.Context, email, password string) (*token.Pair, error) {
 	user, err := s.db.Queries.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *AuthService) loginByUser(ctx context.Context, email, password string) (
 	}
 
 	pair, err := s.tokenSvc.NewPairWithClaims(token.ClaimsInput{
-		TenantID: user.TenantID.String(),
+		OrganizationID: user.OrganizationID.String(),
 		UserID:   user.ID.String(),
 		Role:     domain.Role(user.Role),
 		AuthType: domain.AuthTypeUser,

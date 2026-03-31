@@ -19,15 +19,15 @@ import (
 // ============================================================
 
 type userMockQuerier struct {
-	getUserByEmailFn    func(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error)
+	getUserByEmailFn    func(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error)
 	getUserByIDFn       func(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error)
-	listUsersByTenantFn func(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error)
+	listUsersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error)
 	createUserFn        func(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error)
 	softDeleteUserFn    func(ctx context.Context, arg dbgen.SoftDeleteUserParams) error
 	updateUserFn        func(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error)
 }
 
-func (m *userMockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+func (m *userMockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
 	if m.getUserByEmailFn != nil {
 		return m.getUserByEmailFn(ctx, arg)
 	}
@@ -41,9 +41,9 @@ func (m *userMockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByID
 	return dbgen.User{}, sql.ErrNoRows
 }
 
-func (m *userMockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
-	if m.listUsersByTenantFn != nil {
-		return m.listUsersByTenantFn(ctx, tenantID)
+func (m *userMockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
+	if m.listUsersByOrganizationFn != nil {
+		return m.listUsersByOrganizationFn(ctx, organizationID)
 	}
 	return nil, nil
 }
@@ -88,8 +88,8 @@ func (m *userMockQuerier) GetAddressByID(ctx context.Context, arg dbgen.GetAddre
 func (m *userMockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 	return dbgen.Customer{}, nil
 }
-func (m *userMockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
-	return dbgen.Tenant{}, nil
+func (m *userMockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
+	return dbgen.Organization{}, nil
 }
 func (m *userMockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error {
 	return nil
@@ -97,10 +97,10 @@ func (m *userMockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.Hard
 func (m *userMockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
 	return nil, nil
 }
-func (m *userMockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
+func (m *userMockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
 	return nil, nil
 }
-func (m *userMockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
+func (m *userMockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
 	return nil, nil
 }
 func (m *userMockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
@@ -126,14 +126,14 @@ var _ dbgen.Querier = (*userMockQuerier)(nil)
 // Property-based tests
 // ============================================================
 
-// TestProperty_UserMultiTenantIsolation verifies that for any List call with tenantID_A,
-// no user belonging to tenantID_B appears in results.
-func TestProperty_UserMultiTenantIsolation(t *testing.T) {
+// TestProperty_UserMultiOrganizationIsolation verifies that for any List call with organizationID_A,
+// no user belonging to organizationID_B appears in results.
+func TestProperty_UserMultiOrganizationIsolation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantA := uuid.New()
-		tenantB := uuid.New()
+		organizationA := uuid.New()
+		organizationB := uuid.New()
 
-		// Generate 1–5 users for tenant A and 1–5 for tenant B
+		// Generate 1–5 users for organization A and 1–5 for organization B
 		countA := rapid.IntRange(1, 5).Draw(t, "countA")
 		countB := rapid.IntRange(1, 5).Draw(t, "countB")
 
@@ -141,7 +141,7 @@ func TestProperty_UserMultiTenantIsolation(t *testing.T) {
 		for i := range usersA {
 			usersA[i] = dbgen.User{
 				ID:       uuid.New(),
-				TenantID: tenantA,
+				OrganizationID: organizationA,
 				Email:    rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "emailA"),
 				Name:     "User A",
 				Role:     "member",
@@ -152,7 +152,7 @@ func TestProperty_UserMultiTenantIsolation(t *testing.T) {
 		for i := range usersB {
 			usersB[i] = dbgen.User{
 				ID:       uuid.New(),
-				TenantID: tenantB,
+				OrganizationID: organizationB,
 				Email:    rapid.StringMatching(`[a-z]{4,8}@other\.com`).Draw(t, "emailB"),
 				Name:     "User B",
 				Role:     "member",
@@ -160,11 +160,11 @@ func TestProperty_UserMultiTenantIsolation(t *testing.T) {
 		}
 
 		q := &userMockQuerier{
-			listUsersByTenantFn: func(_ context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
-				if tenantID == tenantA {
+			listUsersByOrganizationFn: func(_ context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
+				if organizationID == organizationA {
 					return usersA, nil
 				}
-				if tenantID == tenantB {
+				if organizationID == organizationB {
 					return usersB, nil
 				}
 				return nil, nil
@@ -173,19 +173,19 @@ func TestProperty_UserMultiTenantIsolation(t *testing.T) {
 
 		svc := NewUserService(newMockDB(q))
 
-		results, err := svc.List(context.Background(), tenantA.String())
+		results, err := svc.List(context.Background(), organizationA.String())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
 		for _, u := range results {
-			if u.TenantID != tenantA.String() {
-				t.Fatalf("isolation violation: got user with tenantID=%s, expected %s", u.TenantID, tenantA)
+			if u.OrganizationID != organizationA.String() {
+				t.Fatalf("isolation violation: got user with organizationID=%s, expected %s", u.OrganizationID, organizationA)
 			}
 		}
 
 		if len(results) != countA {
-			t.Fatalf("expected %d users for tenantA, got %d", countA, len(results))
+			t.Fatalf("expected %d users for organizationA, got %d", countA, len(results))
 		}
 	})
 }
@@ -198,14 +198,14 @@ func TestProperty_UserListNoPassword(t *testing.T) {
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
 
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		count := rapid.IntRange(1, 3).Draw(t, "count")
 
 		dbUsers := make([]dbgen.User, count)
 		for i := range dbUsers {
 			dbUsers[i] = dbgen.User{
 				ID:       uuid.New(),
-				TenantID: tenantID,
+				OrganizationID: organizationID,
 				Email:    rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "email"),
 				Name:     rapid.StringMatching(`[A-Za-z ]{3,20}`).Draw(t, "name"),
 				Password: string(fixedHash),
@@ -214,13 +214,13 @@ func TestProperty_UserListNoPassword(t *testing.T) {
 		}
 
 		q := &userMockQuerier{
-			listUsersByTenantFn: func(_ context.Context, _ uuid.UUID) ([]dbgen.User, error) {
+			listUsersByOrganizationFn: func(_ context.Context, _ uuid.UUID) ([]dbgen.User, error) {
 				return dbUsers, nil
 			},
 		}
 
 		svc := NewUserService(newMockDB(q))
-		results, err := svc.List(context.Background(), tenantID.String())
+		results, err := svc.List(context.Background(), organizationID.String())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -248,13 +248,13 @@ func TestProperty_UserListNoPassword(t *testing.T) {
 
 // TestProperty_UserCreationRoundTrip verifies that for any valid CreateUserRequest
 // (role != owner), after Create succeeds, the returned domain.User must have the
-// same email and role as the request, and be linked to the correct tenantID.
+// same email and role as the request, and be linked to the correct organizationID.
 func TestProperty_UserCreationRoundTrip(t *testing.T) {
 	// Use a fixed password — bcrypt cost is not what this property tests.
 	const fixedPassword = "testpassword1"
 
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		email := rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "email")
 		name := rapid.StringMatching(`[A-Za-z ]{3,20}`).Draw(t, "name")
 		role := rapid.SampledFrom([]domain.Role{domain.RoleAdmin, domain.RoleMember}).Draw(t, "role")
@@ -262,7 +262,7 @@ func TestProperty_UserCreationRoundTrip(t *testing.T) {
 		newUserID := uuid.New()
 
 		q := &userMockQuerier{
-			getUserByEmailFn: func(_ context.Context, _ dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+			getUserByEmailFn: func(_ context.Context, _ dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
 				return dbgen.User{}, errors.New("not found")
 			},
 			createUserFn: func(_ context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
@@ -271,7 +271,7 @@ func TestProperty_UserCreationRoundTrip(t *testing.T) {
 				}
 				return dbgen.User{
 					ID:       newUserID,
-					TenantID: arg.TenantID,
+					OrganizationID: arg.OrganizationID,
 					Email:    arg.Email,
 					Name:     arg.Name,
 					Password: arg.Password,
@@ -281,7 +281,7 @@ func TestProperty_UserCreationRoundTrip(t *testing.T) {
 		}
 
 		svc := newUserServiceWithCost(newMockDB(q), bcrypt.MinCost)
-		result, err := svc.Create(context.Background(), tenantID.String(), CreateUserRequest{
+		result, err := svc.Create(context.Background(), organizationID.String(), CreateUserRequest{
 			Name:     name,
 			Email:    email,
 			Password: fixedPassword,
@@ -297,8 +297,8 @@ func TestProperty_UserCreationRoundTrip(t *testing.T) {
 		if result.Role != role {
 			t.Fatalf("expected role=%q, got %q", role, result.Role)
 		}
-		if result.TenantID != tenantID.String() {
-			t.Fatalf("expected tenantID=%q, got %q", tenantID, result.TenantID)
+		if result.OrganizationID != organizationID.String() {
+			t.Fatalf("expected organizationID=%q, got %q", organizationID, result.OrganizationID)
 		}
 		if result.ID == "" {
 			t.Fatal("expected non-empty user ID")

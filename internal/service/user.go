@@ -44,19 +44,19 @@ func newUserServiceWithCost(db *database.DB, cost int) *UserService {
 	return &UserService{db: db, bcryptCost: cost}
 }
 
-// Create creates a new user within a tenant.
-// Returns ErrConflict if the email is already taken in the tenant.
+// Create creates a new user within an organization.
+// Returns ErrConflict if the email is already taken in the organization.
 // Returns ErrForbidden if trying to create a second owner.
-func (s *UserService) Create(ctx context.Context, tenantID string, req CreateUserRequest) (*domain.User, error) {
-	tid, err := uuid.Parse(tenantID)
+func (s *UserService) Create(ctx context.Context, organizationID string, req CreateUserRequest) (*domain.User, error) {
+	tid, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
 
-	// Check email uniqueness within tenant
-	_, err = s.db.Queries.GetUserByEmailAndTenant(ctx, dbgen.GetUserByEmailAndTenantParams{
+	// Check email uniqueness within organization
+	_, err = s.db.Queries.GetUserByEmailAndOrganization(ctx, dbgen.GetUserByEmailAndOrganizationParams{
 		Email:    req.Email,
-		TenantID: tid,
+		OrganizationID: tid,
 	})
 	if err == nil {
 		// User found — email already taken
@@ -65,7 +65,7 @@ func (s *UserService) Create(ctx context.Context, tenantID string, req CreateUse
 
 	// Block creation of a second owner
 	if req.Role == domain.RoleOwner {
-		existing, listErr := s.db.Queries.ListUsersByTenant(ctx, tid)
+		existing, listErr := s.db.Queries.ListUsersByOrganization(ctx, tid)
 		if listErr != nil {
 			return nil, listErr
 		}
@@ -83,7 +83,7 @@ func (s *UserService) Create(ctx context.Context, tenantID string, req CreateUse
 	}
 
 	row, err := s.db.Queries.CreateUser(ctx, dbgen.CreateUserParams{
-		TenantID: tid,
+		OrganizationID: tid,
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: string(hash),
@@ -96,14 +96,14 @@ func (s *UserService) Create(ctx context.Context, tenantID string, req CreateUse
 	return mapUser(row), nil
 }
 
-// List returns all active users for a tenant, without password fields.
-func (s *UserService) List(ctx context.Context, tenantID string) ([]domain.User, error) {
-	tid, err := uuid.Parse(tenantID)
+// List returns all active users for an organization, without password fields.
+func (s *UserService) List(ctx context.Context, organizationID string) ([]domain.User, error) {
+	tid, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
 
-	rows, err := s.db.Queries.ListUsersByTenant(ctx, tid)
+	rows, err := s.db.Queries.ListUsersByOrganization(ctx, tid)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +115,10 @@ func (s *UserService) List(ctx context.Context, tenantID string) ([]domain.User,
 	return users, nil
 }
 
-// Update updates a user's name and role within a tenant.
-// Returns ErrNotFound if the user does not exist in the tenant.
-func (s *UserService) Update(ctx context.Context, tenantID, userID string, req UpdateUserRequest) (*domain.User, error) {
-	tid, err := uuid.Parse(tenantID)
+// Update updates a user's name and role within an organization.
+// Returns ErrNotFound if the user does not exist in the organization.
+func (s *UserService) Update(ctx context.Context, organizationID, userID string, req UpdateUserRequest) (*domain.User, error) {
+	tid, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
@@ -131,7 +131,7 @@ func (s *UserService) Update(ctx context.Context, tenantID, userID string, req U
 		Name:     req.Name,
 		Role:     string(req.Role),
 		ID:       uid,
-		TenantID: tid,
+		OrganizationID: tid,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -143,10 +143,10 @@ func (s *UserService) Update(ctx context.Context, tenantID, userID string, req U
 	return mapUser(row), nil
 }
 
-// Delete soft-deletes a user within a tenant.
-// Returns ErrNotFound if the user does not exist in the tenant.
-func (s *UserService) Delete(ctx context.Context, tenantID, userID string) error {
-	tid, err := uuid.Parse(tenantID)
+// Delete soft-deletes a user within an organization.
+// Returns ErrNotFound if the user does not exist in the organization.
+func (s *UserService) Delete(ctx context.Context, organizationID, userID string) error {
+	tid, err := uuid.Parse(organizationID)
 	if err != nil {
 		return domain.ErrNotFound
 	}
@@ -158,7 +158,7 @@ func (s *UserService) Delete(ctx context.Context, tenantID, userID string) error
 	// Check existence before soft-deleting
 	_, err = s.db.Queries.GetUserByID(ctx, dbgen.GetUserByIDParams{
 		ID:       uid,
-		TenantID: tid,
+		OrganizationID: tid,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -169,7 +169,7 @@ func (s *UserService) Delete(ctx context.Context, tenantID, userID string) error
 
 	return s.db.Queries.SoftDeleteUser(ctx, dbgen.SoftDeleteUserParams{
 		ID:       uid,
-		TenantID: tid,
+		OrganizationID: tid,
 	})
 }
 
@@ -177,7 +177,7 @@ func (s *UserService) Delete(ctx context.Context, tenantID, userID string) error
 func mapUser(u dbgen.User) *domain.User {
 	return &domain.User{
 		ID:       u.ID.String(),
-		TenantID: u.TenantID.String(),
+		OrganizationID: u.OrganizationID.String(),
 		Email:    u.Email,
 		Name:     u.Name,
 		Role:     domain.Role(u.Role),

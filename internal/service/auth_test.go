@@ -24,15 +24,15 @@ import (
 // ============================================================
 
 type mockTokenProvider struct {
-	newPairFn           func(tenantID string) (*token.Pair, error)
+	newPairFn           func(organizationID string) (*token.Pair, error)
 	newPairWithClaimsFn func(input token.ClaimsInput) (*token.Pair, error)
 	refreshFn           func(refreshToken string) (*token.Pair, error)
 	refreshWithClaimsFn func(refreshToken string) (*token.Pair, error)
 }
 
-func (m *mockTokenProvider) NewPair(tenantID string) (*token.Pair, error) {
+func (m *mockTokenProvider) NewPair(organizationID string) (*token.Pair, error) {
 	if m.newPairFn != nil {
-		return m.newPairFn(tenantID)
+		return m.newPairFn(organizationID)
 	}
 	return nil, nil
 }
@@ -42,9 +42,9 @@ func (m *mockTokenProvider) NewPairWithClaims(input token.ClaimsInput) (*token.P
 		return m.newPairWithClaimsFn(input)
 	}
 	return &token.Pair{
-		AccessToken:           "access-" + input.TenantID,
+		AccessToken:           "access-" + input.OrganizationID,
 		AccessTokenExpiresAt:  time.Now().Add(15 * time.Minute),
-		RefreshToken:          "refresh-" + input.TenantID,
+		RefreshToken:          "refresh-" + input.OrganizationID,
 		RefreshTokenExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 	}, nil
 }
@@ -97,7 +97,7 @@ func (m *authMockQuerier) GetUserByEmail(ctx context.Context, email string) (dbg
 	return dbgen.User{}, errors.New("not found")
 }
 
-func (m *authMockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+func (m *authMockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
 	return dbgen.User{}, errors.New("not implemented")
 }
 
@@ -119,8 +119,8 @@ func (m *authMockQuerier) GetAddressByID(ctx context.Context, arg dbgen.GetAddre
 func (m *authMockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 	return dbgen.Customer{}, nil
 }
-func (m *authMockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
-	return dbgen.Tenant{}, nil
+func (m *authMockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
+	return dbgen.Organization{}, nil
 }
 func (m *authMockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
@@ -131,13 +131,13 @@ func (m *authMockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.Hard
 func (m *authMockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
 	return nil, nil
 }
-func (m *authMockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
+func (m *authMockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
 	return nil, nil
 }
-func (m *authMockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
+func (m *authMockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
 	return nil, nil
 }
-func (m *authMockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
+func (m *authMockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
 	return nil, nil
 }
 func (m *authMockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
@@ -166,7 +166,7 @@ func newMockDB(q dbgen.Querier) *database.DB {
 // ============================================================
 
 func TestLogin_UserMode_Success(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	userID := uuid.New()
 	password := "s3cret"
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
@@ -175,7 +175,7 @@ func TestLogin_UserMode_Success(t *testing.T) {
 		getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
 			return dbgen.User{
 				ID:       userID,
-				TenantID: tenantID,
+				OrganizationID: organizationID,
 				Email:    email,
 				Role:     "admin",
 				Password: string(hash),
@@ -235,7 +235,7 @@ func TestLogin_UserMode_WrongPassword(t *testing.T) {
 }
 
 func TestLogin_APIKeyMode_Success(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	keyID := uuid.New()
 	apiKey := "sk_live_testkey123"
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
@@ -245,7 +245,7 @@ func TestLogin_APIKeyMode_Success(t *testing.T) {
 			if keyHash != hash {
 				return dbgen.ApiKey{}, errors.New("not found")
 			}
-			return dbgen.ApiKey{ID: keyID, TenantID: tenantID}, nil
+			return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
 		},
 	}
 
@@ -372,7 +372,7 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
 
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		userID := uuid.New()
 		role := rapid.SampledFrom([]string{"owner", "admin", "member"}).Draw(t, "role")
 
@@ -380,7 +380,7 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 			getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
 				return dbgen.User{
 					ID:       userID,
-					TenantID: tenantID,
+					OrganizationID: organizationID,
 					Email:    "user@example.com",
 					Role:     role,
 					Password: string(fixedHash),
@@ -421,7 +421,7 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 // empty role, and auth_type == "system".
 func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		keyID := uuid.New()
 		apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 		expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
@@ -431,7 +431,7 @@ func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 				if keyHash != expectedHash {
 					return dbgen.ApiKey{}, errors.New("not found")
 				}
-				return dbgen.ApiKey{ID: keyID, TenantID: tenantID}, nil
+				return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
 			},
 		}
 
@@ -462,14 +462,14 @@ func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 }
 
 // For any payload with api_key present, mode must be system.
-// For any payload with tenant_id+email+password and no api_key, mode must be user.
+// For any payload with organization_id+email+password and no api_key, mode must be user.
 func TestProperty_LoginModeDetection(t *testing.T) {
 	// Pre-compute hash once — bcrypt cost is not what this property tests.
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
 
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		userID := uuid.New()
 		apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 		apiKeyHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
@@ -477,14 +477,14 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 		q := &authMockQuerier{
 			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
 				if keyHash == apiKeyHash {
-					return dbgen.ApiKey{ID: uuid.New(), TenantID: tenantID}, nil
+					return dbgen.ApiKey{ID: uuid.New(), OrganizationID: organizationID}, nil
 				}
 				return dbgen.ApiKey{}, errors.New("not found")
 			},
 			getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
 				return dbgen.User{
 					ID:       userID,
-					TenantID: tenantID,
+					OrganizationID: organizationID,
 					Role:     "member",
 					Password: string(fixedHash),
 				}, nil
@@ -529,7 +529,7 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 // After a successful API key login, UpdateAPIKeyLastUsed must have been called.
 func TestProperty_APIKeyLastUsedAtUpdated(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		keyID := uuid.New()
 		apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 		expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
@@ -537,7 +537,7 @@ func TestProperty_APIKeyLastUsedAtUpdated(t *testing.T) {
 		q := &authMockQuerier{
 			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
 				if keyHash == expectedHash {
-					return dbgen.ApiKey{ID: keyID, TenantID: tenantID}, nil
+					return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
 				}
 				return dbgen.ApiKey{}, errors.New("not found")
 			},
@@ -559,7 +559,7 @@ func TestProperty_APIKeyLastUsedAtUpdated(t *testing.T) {
 // the same user_id and role as the original.
 func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := rapid.StringMatching(`[a-f0-9\-]{36}`).Draw(t, "tenantID")
+		organizationID := rapid.StringMatching(`[a-f0-9\-]{36}`).Draw(t, "organizationID")
 		userID := rapid.StringMatching(`[a-f0-9\-]{36}`).Draw(t, "userID")
 		role := rapid.SampledFrom([]domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleMember}).Draw(t, "role")
 
@@ -568,7 +568,7 @@ func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
 
 		// Issue an original pair with user claims.
 		original, err := tokenSvc.NewPairWithClaims(token.ClaimsInput{
-			TenantID: tenantID,
+			OrganizationID: organizationID,
 			UserID:   userID,
 			Role:     role,
 			AuthType: domain.AuthTypeUser,
@@ -631,23 +631,23 @@ func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 // Bug condition exploration test
 // ============================================================
 
-// TestLogin_BugCondition_EmailPasswordWithoutTenantID confirms the bug described in
-// .kiro/specs/login-remove-tenant-id/bugfix.md:
+// TestLogin_BugCondition_EmailPasswordWithoutOrganizationID confirms the bug described in
+// .kiro/specs/login-remove-organization-id/bugfix.md:
 //
-//	isBugCondition(X) = X.APIKey="" AND X.Email!="" AND X.Password!="" AND X.TenantID=""
+//	isBugCondition(X) = X.APIKey="" AND X.Email!="" AND X.Password!="" AND X.OrganizationID=""
 //
 // The test asserts the CORRECT (post-fix) behavior: err==nil AND pair!=nil.
-// On UNFIXED code the guard `req.TenantID != ""` is false, so Login returns
+// On UNFIXED code the guard `req.OrganizationID != ""` is false, so Login returns
 // ErrBadRequest — causing this test to FAIL and confirming the bug.
 //
 // Counterexample (confirmed on unfixed code):
 //
 //	Login({Email: "000@example.com", Password: "testpassword1"}) → ErrBadRequest
-//	("tenant_id, email and password or api_key required")
+//	("organization_id, email and password or api_key required")
 //
-// Root cause: `req.TenantID != ""` guard in AuthService.Login (auth.go) is false
-// when TenantID is empty, so the function falls through to `return nil, ErrBadRequest`.
-func TestLogin_BugCondition_EmailPasswordWithoutTenantID(t *testing.T) {
+// Root cause: `req.OrganizationID != ""` guard in AuthService.Login (auth.go) is false
+// when OrganizationID is empty, so the function falls through to `return nil, ErrBadRequest`.
+func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
 
@@ -659,7 +659,7 @@ func TestLogin_BugCondition_EmailPasswordWithoutTenantID(t *testing.T) {
 				// Return a valid user for any email so the bug is isolated to the dispatch guard.
 				return dbgen.User{
 					ID:       uuid.New(),
-					TenantID: uuid.New(),
+					OrganizationID: uuid.New(),
 					Email:    email,
 					Role:     "member",
 					Password: string(fixedHash),
@@ -675,17 +675,17 @@ func TestLogin_BugCondition_EmailPasswordWithoutTenantID(t *testing.T) {
 
 		svc := NewAuthService(mock, newMockDB(q))
 
-		// Bug condition: no TenantID supplied.
+		// Bug condition: no OrganizationID supplied.
 		pair, err := svc.Login(context.Background(), domain.LoginRequest{
 			Email:    email,
 			Password: fixedPassword,
-			// TenantID intentionally omitted
+			// OrganizationID intentionally omitted
 		})
 
 		// CORRECT behavior: should succeed.
-		// On UNFIXED code this fails because `req.TenantID != ""` is false → ErrBadRequest.
+		// On UNFIXED code this fails because `req.OrganizationID != ""` is false → ErrBadRequest.
 		if err != nil {
-			t.Fatalf("expected no error for email+password login without TenantID, got: %v", err)
+			t.Fatalf("expected no error for email+password login without OrganizationID, got: %v", err)
 		}
 		if pair == nil {
 			t.Fatal("expected token pair, got nil")
@@ -700,7 +700,7 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	// For any valid API key, auth_type=system token is returned.
 	t.Run("A_APIKeyPreservation", func(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {
-			tenantID := uuid.New()
+			organizationID := uuid.New()
 			keyID := uuid.New()
 			apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 			expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
@@ -708,7 +708,7 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 			q := &authMockQuerier{
 				getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
 					if keyHash == expectedHash {
-						return dbgen.ApiKey{ID: keyID, TenantID: tenantID}, nil
+						return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
 					}
 					return dbgen.ApiKey{}, errors.New("not found")
 				},
@@ -748,20 +748,20 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	})
 
 	// Sub-property C: Wrong password preservation
-	// For any {Email, Password: "wrong", TenantID: <valid uuid>} where DB returns a user
+	// For any {Email, Password: "wrong", OrganizationID: <valid uuid>} where DB returns a user
 	// with a different password hash, ErrUnauthorized is returned.
 	t.Run("C_WrongPasswordPreservation", func(t *testing.T) {
 		knownHash, _ := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.MinCost)
 
 		rapid.Check(t, func(t *rapid.T) {
-			tenantID := uuid.New()
+			organizationID := uuid.New()
 			email := rapid.StringMatching(`[a-zA-Z0-9]{3,10}@example\.com`).Draw(t, "email")
 
 			q := &authMockQuerier{
 				getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
 					return dbgen.User{
 						ID:       uuid.New(),
-						TenantID: tenantID,
+						OrganizationID: organizationID,
 						Email:    email,
 						Role:     "member",
 						Password: string(knownHash),
@@ -782,7 +782,7 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	})
 
 	// Sub-property D: Unknown email preservation
-	// For any {Email: generated, Password: generated, TenantID: <valid uuid>} where DB
+	// For any {Email: generated, Password: generated, OrganizationID: <valid uuid>} where DB
 	// returns not-found, ErrUnauthorized is returned.
 	t.Run("D_UnknownEmailPreservation", func(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {

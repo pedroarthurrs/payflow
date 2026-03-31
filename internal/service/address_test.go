@@ -71,13 +71,13 @@ func (m *addressMockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetC
 func (m *addressMockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 	return dbgen.Customer{}, nil
 }
-func (m *addressMockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
-	return dbgen.Tenant{}, nil
+func (m *addressMockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
+	return dbgen.Organization{}, nil
 }
-func (m *addressMockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
+func (m *addressMockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
 	return nil, nil
 }
-func (m *addressMockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
+func (m *addressMockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
 	return nil, nil
 }
 func (m *addressMockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
@@ -94,7 +94,7 @@ func (m *addressMockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.H
 func (m *addressMockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
-func (m *addressMockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+func (m *addressMockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
 func (m *addressMockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
@@ -103,7 +103,7 @@ func (m *addressMockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserB
 func (m *addressMockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
-func (m *addressMockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
+func (m *addressMockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
 	return nil, nil
 }
 func (m *addressMockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
@@ -127,17 +127,17 @@ func newAddressTestService(mock *addressMockQuerier) *AddressService {
 // customerExistsMock returns a getCustomerByIDFn that always finds the customer.
 func customerExistsMock() func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 	return func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-		return dbgen.Customer{ID: arg.ID, TenantID: arg.TenantID}, nil
+		return dbgen.Customer{ID: arg.ID, OrganizationID: arg.OrganizationID}, nil
 	}
 }
 
 // --- Helper to build a dbgen.Address from params ---
 
-func buildDBAddress(id, tenantID, customerID uuid.UUID, arg dbgen.CreateAddressParams) dbgen.Address {
+func buildDBAddress(id, organizationID, customerID uuid.UUID, arg dbgen.CreateAddressParams) dbgen.Address {
 	now := time.Now().Truncate(time.Second)
 	return dbgen.Address{
 		ID:           id,
-		TenantID:     tenantID,
+		OrganizationID:     organizationID,
 		CustomerID:   customerID,
 		Type:         arg.Type,
 		PostalCode:   arg.PostalCode,
@@ -160,7 +160,7 @@ func buildDBAddress(id, tenantID, customerID uuid.UUID, arg dbgen.CreateAddressP
 // TestProperty_AddressCreateAndGetByID_RoundTrip verifies the round trip of address creation.
 func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		customerID := uuid.New()
 		addressID := uuid.New()
 
@@ -198,11 +198,11 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 		mock := &addressMockQuerier{
 			getCustomerByIDFn: customerExistsMock(),
 			createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-				stored = buildDBAddress(addressID, tenantID, customerID, arg)
+				stored = buildDBAddress(addressID, organizationID, customerID, arg)
 				return stored, nil
 			},
 			getAddressByIDFn: func(_ context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-				if arg.ID == addressID && arg.CustomerID == customerID && arg.TenantID == tenantID {
+				if arg.ID == addressID && arg.CustomerID == customerID && arg.OrganizationID == organizationID {
 					return stored, nil
 				}
 				return dbgen.Address{}, sql.ErrNoRows
@@ -225,12 +225,12 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 			IsMain:       &isMain,
 		}
 
-		created, err := svc.Create(ctx, tenantID, customerID, input)
+		created, err := svc.Create(ctx, organizationID, customerID, input)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 
-		got, err := svc.GetByID(ctx, tenantID, customerID, created.ID)
+		got, err := svc.GetByID(ctx, organizationID, customerID, created.ID)
 		if err != nil {
 			t.Fatalf("GetByID failed: %v", err)
 		}
@@ -244,9 +244,9 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 			t.Fatalf("ID variant is not RFC 4122: got %d", idBytes[8]>>6)
 		}
 
-		// Verify tenant and customer IDs
-		if got.TenantID != tenantID {
-			t.Fatalf("expected TenantID %v, got %v", tenantID, got.TenantID)
+		// Verify organization and customer IDs
+		if got.OrganizationID != organizationID {
+			t.Fatalf("expected OrganizationID %v, got %v", organizationID, got.OrganizationID)
 		}
 		if got.CustomerID != customerID {
 			t.Fatalf("expected CustomerID %v, got %v", customerID, got.CustomerID)
@@ -309,7 +309,7 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 // TestProperty_AddressDefaultValues verifies that default values are applied when fields are omitted.
 func TestProperty_AddressDefaultValues(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		customerID := uuid.New()
 		addressID := uuid.New()
 
@@ -321,7 +321,7 @@ func TestProperty_AddressDefaultValues(t *testing.T) {
 		mock := &addressMockQuerier{
 			getCustomerByIDFn: customerExistsMock(),
 			createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-				return buildDBAddress(addressID, tenantID, customerID, arg), nil
+				return buildDBAddress(addressID, organizationID, customerID, arg), nil
 			},
 		}
 
@@ -336,7 +336,7 @@ func TestProperty_AddressDefaultValues(t *testing.T) {
 			State:      state,
 		}
 
-		created, err := svc.Create(ctx, tenantID, customerID, input)
+		created, err := svc.Create(ctx, organizationID, customerID, input)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -358,7 +358,7 @@ func TestProperty_AddressDefaultValues(t *testing.T) {
 // ============================================================
 
 func TestAddressCreate_AllFields(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addressID := uuid.New()
 	addrType := "shipping"
@@ -371,7 +371,7 @@ func TestAddressCreate_AllFields(t *testing.T) {
 	mock := &addressMockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
 		createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-			return buildDBAddress(addressID, tenantID, customerID, arg), nil
+			return buildDBAddress(addressID, organizationID, customerID, arg), nil
 		},
 	}
 
@@ -389,7 +389,7 @@ func TestAddressCreate_AllFields(t *testing.T) {
 		IsMain:       &isMain,
 	}
 
-	addr, err := svc.Create(context.Background(), tenantID, customerID, input)
+	addr, err := svc.Create(context.Background(), organizationID, customerID, input)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -408,7 +408,7 @@ func TestAddressCreate_AllFields(t *testing.T) {
 }
 
 func TestAddressList_Empty(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 
 	mock := &addressMockQuerier{
@@ -419,7 +419,7 @@ func TestAddressList_Empty(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	list, err := svc.List(context.Background(), tenantID, customerID)
+	list, err := svc.List(context.Background(), organizationID, customerID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -429,7 +429,7 @@ func TestAddressList_Empty(t *testing.T) {
 }
 
 func TestAddressList_Multiple(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	now := time.Now().Truncate(time.Second)
 
@@ -437,13 +437,13 @@ func TestAddressList_Multiple(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		listAddressesByCustomerFn: func(_ context.Context, _ dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
 			return []dbgen.Address{
-				{ID: uuid.New(), TenantID: tenantID, CustomerID: customerID,
+				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
 					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 					PostalCode: "11111", Street: "St A", City: "City A", State: "AA",
 					Country:   sql.NullString{String: "BR", Valid: true},
 					IsMain:    sql.NullBool{Bool: true, Valid: true},
 					CreatedAt: sql.NullTime{Time: now, Valid: true}},
-				{ID: uuid.New(), TenantID: tenantID, CustomerID: customerID,
+				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
 					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeShipping, Valid: true},
 					PostalCode: "22222", Street: "St B", City: "City B", State: "BB",
 					Country:   sql.NullString{String: "US", Valid: true},
@@ -454,7 +454,7 @@ func TestAddressList_Multiple(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	list, err := svc.List(context.Background(), tenantID, customerID)
+	list, err := svc.List(context.Background(), organizationID, customerID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -464,7 +464,7 @@ func TestAddressList_Multiple(t *testing.T) {
 }
 
 func TestAddressGetByID_Found(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addressID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -473,7 +473,7 @@ func TestAddressGetByID_Found(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		getAddressByIDFn: func(_ context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addressID, TenantID: tenantID, CustomerID: customerID,
+				ID: addressID, OrganizationID: organizationID, CustomerID: customerID,
 				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
 				PostalCode: "12345", Street: "Main St", City: "City", State: "ST",
 				Country:   sql.NullString{String: "BR", Valid: true},
@@ -484,7 +484,7 @@ func TestAddressGetByID_Found(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	addr, err := svc.GetByID(context.Background(), tenantID, customerID, addressID)
+	addr, err := svc.GetByID(context.Background(), organizationID, customerID, addressID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -494,7 +494,7 @@ func TestAddressGetByID_Found(t *testing.T) {
 }
 
 func TestAddressGetByID_NotFound(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 
 	mock := &addressMockQuerier{
@@ -505,14 +505,14 @@ func TestAddressGetByID_NotFound(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	_, err := svc.GetByID(context.Background(), tenantID, customerID, uuid.New())
+	_, err := svc.GetByID(context.Background(), organizationID, customerID, uuid.New())
 	if !errors.Is(err, domain.ErrAddressNotFound) {
 		t.Fatalf("expected ErrAddressNotFound, got %v", err)
 	}
 }
 
 func TestAddressUpdate_Found(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addressID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -524,7 +524,7 @@ func TestAddressUpdate_Found(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addressID, TenantID: tenantID, CustomerID: customerID,
+				ID: addressID, OrganizationID: organizationID, CustomerID: customerID,
 				Type:         arg.Type,
 				PostalCode:   arg.PostalCode,
 				Street:       arg.Street,
@@ -541,7 +541,7 @@ func TestAddressUpdate_Found(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	addr, err := svc.Update(context.Background(), tenantID, customerID, addressID, domain.UpdateAddressInput{
+	addr, err := svc.Update(context.Background(), organizationID, customerID, addressID, domain.UpdateAddressInput{
 		Type:       &addrType,
 		PostalCode: "99999",
 		Street:     "Updated St",
@@ -562,7 +562,7 @@ func TestAddressUpdate_Found(t *testing.T) {
 }
 
 func TestAddressUpdate_NotFound(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 
 	mock := &addressMockQuerier{
@@ -573,7 +573,7 @@ func TestAddressUpdate_NotFound(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	_, err := svc.Update(context.Background(), tenantID, customerID, uuid.New(), domain.UpdateAddressInput{
+	_, err := svc.Update(context.Background(), organizationID, customerID, uuid.New(), domain.UpdateAddressInput{
 		PostalCode: "12345", Street: "St", City: "C", State: "ST",
 	})
 	if !errors.Is(err, domain.ErrAddressNotFound) {
@@ -582,7 +582,7 @@ func TestAddressUpdate_NotFound(t *testing.T) {
 }
 
 func TestAddressDelete_Found(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addressID := uuid.New()
 	now := time.Now().Truncate(time.Second)
@@ -592,7 +592,7 @@ func TestAddressDelete_Found(t *testing.T) {
 		getCustomerByIDFn: customerExistsMock(),
 		getAddressByIDFn: func(_ context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
 			return dbgen.Address{
-				ID: addressID, TenantID: tenantID, CustomerID: customerID,
+				ID: addressID, OrganizationID: organizationID, CustomerID: customerID,
 				PostalCode: "12345", Street: "St", City: "C", State: "ST",
 				CreatedAt: sql.NullTime{Time: now, Valid: true},
 			}, nil
@@ -604,7 +604,7 @@ func TestAddressDelete_Found(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	err := svc.Delete(context.Background(), tenantID, customerID, addressID)
+	err := svc.Delete(context.Background(), organizationID, customerID, addressID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -614,7 +614,7 @@ func TestAddressDelete_Found(t *testing.T) {
 }
 
 func TestAddressDelete_NotFound(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 
 	mock := &addressMockQuerier{
@@ -625,7 +625,7 @@ func TestAddressDelete_NotFound(t *testing.T) {
 	}
 
 	svc := newAddressTestService(mock)
-	err := svc.Delete(context.Background(), tenantID, customerID, uuid.New())
+	err := svc.Delete(context.Background(), organizationID, customerID, uuid.New())
 	if !errors.Is(err, domain.ErrAddressNotFound) {
 		t.Fatalf("expected ErrAddressNotFound, got %v", err)
 	}

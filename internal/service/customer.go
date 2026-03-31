@@ -28,12 +28,12 @@ func NewCustomerService(db *database.DB, addressSvc *AddressService) *CustomerSe
 	return &CustomerService{db: db, addressSvc: addressSvc}
 }
 
-// Create creates a new customer for the given tenant.
+// Create creates a new customer for the given organization.
 // When input.Address is provided, the customer and address are created atomically within a transaction.
-func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, *domain.Address, error) {
+func (s *CustomerService) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, *domain.Address, error) {
 	if input.Address == nil {
 		row, dbErr := s.db.Queries.CreateCustomer(ctx, dbgen.CreateCustomerParams{
-			TenantID:     tenantID,
+			OrganizationID: organizationID,
 			Name:         input.Name,
 			Email:        input.Email,
 			Phone:        toNullString(input.Phone),
@@ -58,7 +58,7 @@ func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input 
 	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
 
 	row, dbErr := qtx.CreateCustomer(ctx, dbgen.CreateCustomerParams{
-		TenantID:     tenantID,
+		OrganizationID: organizationID,
 		Name:         input.Name,
 		Email:        input.Email,
 		Phone:        toNullString(input.Phone),
@@ -72,7 +72,7 @@ func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input 
 
 	c := toDomainCustomer(row)
 
-	addr, addrErr := s.addressSvc.CreateWithTx(ctx, tx, tenantID, c.ID, *input.Address)
+	addr, addrErr := s.addressSvc.CreateWithTx(ctx, tx, organizationID, c.ID, *input.Address)
 	if addrErr != nil {
 		return nil, nil, addrErr
 	}
@@ -85,11 +85,11 @@ func (s *CustomerService) Create(ctx context.Context, tenantID uuid.UUID, input 
 	return &c, addr, nil
 }
 
-// List returns all active customers for the given tenant.
-func (s *CustomerService) List(ctx context.Context, tenantID uuid.UUID) ([]domain.Customer, error) {
-	rows, dbErr := s.db.Queries.ListCustomersByTenant(ctx, tenantID)
+// List returns all active customers for the given organization.
+func (s *CustomerService) List(ctx context.Context, organizationID uuid.UUID) ([]domain.Customer, error) {
+	rows, dbErr := s.db.Queries.ListCustomersByOrganization(ctx, organizationID)
 	if dbErr != nil {
-		slog.Error("failed to list customers", "tenant_id", tenantID, "error", dbErr)
+		slog.Error("failed to list customers", "organization_id", organizationID, "error", dbErr)
 		return nil, apierr.Internal("internal server error")
 	}
 
@@ -100,17 +100,17 @@ func (s *CustomerService) List(ctx context.Context, tenantID uuid.UUID) ([]domai
 	return customers, nil
 }
 
-// GetByID returns a single customer by ID for the given tenant.
-func (s *CustomerService) GetByID(ctx context.Context, tenantID, customerID uuid.UUID) (*domain.Customer, error) {
+// GetByID returns a single customer by ID for the given organization.
+func (s *CustomerService) GetByID(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.Customer, error) {
 	row, dbErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
 		ID:       customerID,
-		TenantID: tenantID,
+		OrganizationID: organizationID,
 	})
 	if dbErr != nil {
 		if errors.Is(dbErr, sql.ErrNoRows) {
 			return nil, domain.ErrCustomerNotFound
 		}
-		slog.Error("failed to get customer", "tenant_id", tenantID, "customer_id", customerID, "error", dbErr)
+		slog.Error("failed to get customer", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
 		return nil, apierr.Internal("internal server error")
 	}
 
@@ -118,13 +118,13 @@ func (s *CustomerService) GetByID(ctx context.Context, tenantID, customerID uuid
 	return &c, nil
 }
 
-// Update updates an existing customer for the given tenant.
+// Update updates an existing customer for the given organization.
 // When input.Address is provided, the customer update and address creation are performed atomically.
-func (s *CustomerService) Update(ctx context.Context, tenantID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
+func (s *CustomerService) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
 	if input.Address == nil {
 		row, dbErr := s.db.Queries.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
 			ID:           customerID,
-			TenantID:     tenantID,
+			OrganizationID: organizationID,
 			Name:         input.Name,
 			Email:        input.Email,
 			Phone:        toNullString(input.Phone),
@@ -153,7 +153,7 @@ func (s *CustomerService) Update(ctx context.Context, tenantID, customerID uuid.
 
 	row, dbErr := qtx.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
 		ID:           customerID,
-		TenantID:     tenantID,
+		OrganizationID: organizationID,
 		Name:         input.Name,
 		Email:        input.Email,
 		Phone:        toNullString(input.Phone),
@@ -170,7 +170,7 @@ func (s *CustomerService) Update(ctx context.Context, tenantID, customerID uuid.
 
 	c := toDomainCustomer(row)
 
-	addr, addrErr := s.addressSvc.CreateWithTx(ctx, tx, tenantID, customerID, *input.Address)
+	addr, addrErr := s.addressSvc.CreateWithTx(ctx, tx, organizationID, customerID, *input.Address)
 	if addrErr != nil {
 		return nil, nil, addrErr
 	}
@@ -183,26 +183,26 @@ func (s *CustomerService) Update(ctx context.Context, tenantID, customerID uuid.
 	return &c, addr, nil
 }
 
-// Delete performs a soft delete on a customer for the given tenant.
-func (s *CustomerService) Delete(ctx context.Context, tenantID, customerID uuid.UUID) error {
+// Delete performs a soft delete on a customer for the given organization.
+func (s *CustomerService) Delete(ctx context.Context, organizationID, customerID uuid.UUID) error {
 	// First verify the customer exists (SoftDeleteCustomer is :exec and won't return sql.ErrNoRows)
 	_, getErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
 		ID:       customerID,
-		TenantID: tenantID,
+		OrganizationID: organizationID,
 	})
 	if getErr != nil {
 		if errors.Is(getErr, sql.ErrNoRows) {
 			return domain.ErrCustomerNotFound
 		}
-		slog.Error("failed to get customer for delete", "tenant_id", tenantID, "customer_id", customerID, "error", getErr)
+		slog.Error("failed to get customer for delete", "organization_id", organizationID, "customer_id", customerID, "error", getErr)
 		return apierr.Internal("internal server error")
 	}
 
 	if dbErr := s.db.Queries.SoftDeleteCustomer(ctx, dbgen.SoftDeleteCustomerParams{
 		ID:       customerID,
-		TenantID: tenantID,
+		OrganizationID: organizationID,
 	}); dbErr != nil {
-		slog.Error("failed to soft delete customer", "tenant_id", tenantID, "customer_id", customerID, "error", dbErr)
+		slog.Error("failed to soft delete customer", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
 		return apierr.Internal("internal server error")
 	}
 
@@ -214,9 +214,9 @@ func (s *CustomerService) handleWriteError(dbErr error) error {
 	var pqErr *pq.Error
 	if errors.As(dbErr, &pqErr) && pqErr.Code == "23505" {
 		switch pqErr.Constraint {
-		case "unique_customer_email_per_tenant":
+		case "unique_customer_email_per_organization":
 			return apierr.Conflict("customer with this email already exists")
-		case "unique_customer_doc_per_tenant":
+		case "unique_customer_doc_per_organization":
 			return apierr.Conflict("customer with this document already exists")
 		}
 	}
@@ -228,7 +228,7 @@ func (s *CustomerService) handleWriteError(dbErr error) error {
 func toDomainCustomer(row dbgen.Customer) domain.Customer {
 	c := domain.Customer{
 		ID:           row.ID,
-		TenantID:     row.TenantID,
+		OrganizationID: row.OrganizationID,
 		Name:         row.Name,
 		Email:        row.Email,
 		Document:     row.Document,
@@ -286,19 +286,19 @@ func toNullRawMessage(data json.RawMessage) pqtype.NullRawMessage {
 // Example usage for LGPD compliance:
 //
 //	// After receiving a legal request for data erasure
-//	err := customerSvc.HardDelete(ctx, tenantID, customerID)
+//	err := customerSvc.HardDelete(ctx, organizationID, customerID)
 //	if err != nil {
 //	    // Log the failure and notify compliance team
 //	}
-func (s *CustomerService) HardDelete(ctx context.Context, tenantID, customerID uuid.UUID) error {
+func (s *CustomerService) HardDelete(ctx context.Context, organizationID, customerID uuid.UUID) error {
 	if dbErr := s.db.Queries.HardDeleteCustomer(ctx, dbgen.HardDeleteCustomerParams{
 		ID:       customerID,
-		TenantID: tenantID,
+		OrganizationID: organizationID,
 	}); dbErr != nil {
-		slog.Error("failed to hard delete customer", "tenant_id", tenantID, "customer_id", customerID, "error", dbErr)
+		slog.Error("failed to hard delete customer", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
 		return apierr.Internal("internal server error")
 	}
 
-	slog.Warn("customer permanently deleted", "tenant_id", tenantID, "customer_id", customerID, "reason", "hard_delete")
+	slog.Warn("customer permanently deleted", "organization_id", organizationID, "customer_id", customerID, "reason", "hard_delete")
 	return nil
 }

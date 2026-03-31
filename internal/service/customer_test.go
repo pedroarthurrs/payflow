@@ -30,9 +30,9 @@ import (
 type mockQuerier struct {
 	createCustomerFn        func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
 	getCustomerByIDFn       func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
-	getTenantFn             func(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error)
-	listCustomersByTenantFn func(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error)
-	listTenantsFn           func(ctx context.Context) ([]dbgen.Tenant, error)
+	getOrganizationFn             func(ctx context.Context, id uuid.UUID) (dbgen.Organization, error)
+	listCustomersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error)
+	listOrganizationsFn           func(ctx context.Context) ([]dbgen.Organization, error)
 	softDeleteCustomerFn    func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
 	updateCustomerFn        func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
 	hardDeleteCustomerFn    func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
@@ -51,21 +51,21 @@ func (m *mockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomer
 	}
 	return dbgen.Customer{}, nil
 }
-func (m *mockQuerier) GetTenant(ctx context.Context, id uuid.UUID) (dbgen.Tenant, error) {
-	if m.getTenantFn != nil {
-		return m.getTenantFn(ctx, id)
+func (m *mockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
+	if m.getOrganizationFn != nil {
+		return m.getOrganizationFn(ctx, id)
 	}
-	return dbgen.Tenant{}, nil
+	return dbgen.Organization{}, nil
 }
-func (m *mockQuerier) ListCustomersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.Customer, error) {
-	if m.listCustomersByTenantFn != nil {
-		return m.listCustomersByTenantFn(ctx, tenantID)
+func (m *mockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
+	if m.listCustomersByOrganizationFn != nil {
+		return m.listCustomersByOrganizationFn(ctx, organizationID)
 	}
 	return nil, nil
 }
-func (m *mockQuerier) ListTenants(ctx context.Context) ([]dbgen.Tenant, error) {
-	if m.listTenantsFn != nil {
-		return m.listTenantsFn(ctx)
+func (m *mockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
+	if m.listOrganizationsFn != nil {
+		return m.listOrganizationsFn(ctx)
 	}
 	return nil, nil
 }
@@ -110,7 +110,7 @@ func (m *mockQuerier) UpdateAddress(ctx context.Context, arg dbgen.UpdateAddress
 func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
-func (m *mockQuerier) GetUserByEmailAndTenant(ctx context.Context, arg dbgen.GetUserByEmailAndTenantParams) (dbgen.User, error) {
+func (m *mockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
 func (m *mockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
@@ -119,7 +119,7 @@ func (m *mockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDPara
 func (m *mockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
 	return dbgen.User{}, nil
 }
-func (m *mockQuerier) ListUsersByTenant(ctx context.Context, tenantID uuid.UUID) ([]dbgen.User, error) {
+func (m *mockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
 	return nil, nil
 }
 func (m *mockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
@@ -201,11 +201,11 @@ func (s *txFakeStmt) Query(_ []driver.Value) (driver.Rows, error) {
 }
 
 func customerColumns() []string {
-	return []string{"id", "tenant_id", "name", "email", "phone", "document", "document_type", "status", "metadata", "created_at", "updated_at", "deleted_at"}
+	return []string{"id", "organization_id", "name", "email", "phone", "document", "document_type", "external_reference", "status", "metadata", "created_at", "updated_at", "deleted_at"}
 }
 
 func addressColumns() []string {
-	return []string{"id", "tenant_id", "customer_id", "type", "postal_code", "street", "number", "complement", "neighborhood", "city", "state", "country", "is_main", "created_at"}
+	return []string{"id", "organization_id", "customer_id", "type", "postal_code", "street", "number", "complement", "neighborhood", "city", "state", "country", "is_main", "created_at", "updated_at", "deleted_at"}
 }
 
 type txFakeResultRows struct {
@@ -242,16 +242,17 @@ func newTestServiceWithTx() *CustomerService {
 	return NewCustomerService(db, addrSvc)
 }
 
-func makeCustomerRow(id, tenantID uuid.UUID, name, email, document, documentType string) []driver.Value {
+func makeCustomerRow(id, organizationID uuid.UUID, name, email, document, documentType string) []driver.Value {
 	now := time.Now().Truncate(time.Second)
 	return []driver.Value{
 		id.String(),       // id
-		tenantID.String(), // tenant_id
+		organizationID.String(), // organization_id
 		name,              // name
 		email,             // email
 		nil,               // phone (NULL)
 		document,          // document
 		documentType,      // document_type
+		nil,               // external_reference (NULL)
 		"active",          // status
 		nil,               // metadata (NULL)
 		now,               // created_at
@@ -260,11 +261,11 @@ func makeCustomerRow(id, tenantID uuid.UUID, name, email, document, documentType
 	}
 }
 
-func makeAddressRow(addrID, tenantID, customerID uuid.UUID) []driver.Value {
+func makeAddressRow(addrID, organizationID, customerID uuid.UUID) []driver.Value {
 	now := time.Now().Truncate(time.Second)
 	return []driver.Value{
 		addrID.String(),     // id
-		tenantID.String(),   // tenant_id
+		organizationID.String(),   // organization_id
 		customerID.String(), // customer_id
 		"billing",           // type
 		"12345-678",         // postal_code
@@ -277,6 +278,8 @@ func makeAddressRow(addrID, tenantID, customerID uuid.UUID) []driver.Value {
 		"BR",                // country
 		true,                // is_main
 		now,                 // created_at
+		now,                 // updated_at
+		nil,                 // deleted_at (NULL)
 	}
 }
 
@@ -291,7 +294,7 @@ func TestToDomainCustomer_AllFieldsPopulated(t *testing.T) {
 	id := uuid.New()
 	tid := uuid.New()
 	row := dbgen.Customer{
-		ID: id, TenantID: tid, Name: "Alice", Email: "alice@example.com",
+		ID: id, OrganizationID: tid, Name: "Alice", Email: "alice@example.com",
 		Phone: sql.NullString{String: phone, Valid: true}, Document: "12345678900", DocumentType: "cpf",
 		Status:    sql.NullString{String: "active", Valid: true},
 		Metadata:  pqtype.NullRawMessage{RawMessage: meta, Valid: true},
@@ -301,8 +304,8 @@ func TestToDomainCustomer_AllFieldsPopulated(t *testing.T) {
 	if c.ID != id {
 		t.Fatalf("expected ID %v, got %v", id, c.ID)
 	}
-	if c.TenantID != tid {
-		t.Fatalf("expected TenantID %v, got %v", tid, c.TenantID)
+	if c.OrganizationID != tid {
+		t.Fatalf("expected OrganizationID %v, got %v", tid, c.OrganizationID)
 	}
 	if c.Name != "Alice" {
 		t.Fatalf("expected Name Alice, got %s", c.Name)
@@ -335,7 +338,7 @@ func TestToDomainCustomer_AllFieldsPopulated(t *testing.T) {
 
 func TestToDomainCustomer_NullableFieldsEmpty(t *testing.T) {
 	row := dbgen.Customer{
-		ID: uuid.New(), TenantID: uuid.New(), Name: "Bob", Email: "bob@example.com",
+		ID: uuid.New(), OrganizationID: uuid.New(), Name: "Bob", Email: "bob@example.com",
 		Document: "98765432100", DocumentType: "cnpj",
 		Phone: sql.NullString{Valid: false}, Status: sql.NullString{Valid: false},
 		Metadata:  pqtype.NullRawMessage{Valid: false},
@@ -385,7 +388,7 @@ func TestUpdate_NotFound_ReturnsDomainError(t *testing.T) {
 
 func TestHandleWriteError_EmailUniqueViolation(t *testing.T) {
 	svc := &CustomerService{}
-	err := svc.handleWriteError(&pq.Error{Code: "23505", Constraint: "unique_customer_email_per_tenant"})
+	err := svc.handleWriteError(&pq.Error{Code: "23505", Constraint: "unique_customer_email_per_organization"})
 	var appErr *apierr.AppError
 	if !errors.As(err, &appErr) {
 		t.Fatalf("expected AppError, got %T", err)
@@ -397,7 +400,7 @@ func TestHandleWriteError_EmailUniqueViolation(t *testing.T) {
 
 func TestHandleWriteError_DocumentUniqueViolation(t *testing.T) {
 	svc := &CustomerService{}
-	err := svc.handleWriteError(&pq.Error{Code: "23505", Constraint: "unique_customer_doc_per_tenant"})
+	err := svc.handleWriteError(&pq.Error{Code: "23505", Constraint: "unique_customer_doc_per_organization"})
 	var appErr *apierr.AppError
 	if !errors.As(err, &appErr) {
 		t.Fatalf("expected AppError, got %T", err)
@@ -433,7 +436,7 @@ func TestHandleWriteError_NonPqError_ReturnsInternal(t *testing.T) {
 
 func TestCreate_UniqueEmailViolation_ReturnsConflict(t *testing.T) {
 	mock := &mockQuerier{createCustomerFn: func(_ context.Context, _ dbgen.CreateCustomerParams) (dbgen.Customer, error) {
-		return dbgen.Customer{}, &pq.Error{Code: "23505", Constraint: "unique_customer_email_per_tenant"}
+		return dbgen.Customer{}, &pq.Error{Code: "23505", Constraint: "unique_customer_email_per_organization"}
 	}}
 	svc := newTestService(mock)
 	_, _, err := svc.Create(context.Background(), uuid.New(), domain.CreateCustomerInput{
@@ -449,17 +452,17 @@ func TestCreate_UniqueEmailViolation_ReturnsConflict(t *testing.T) {
 }
 
 func TestHardDelete_Success(t *testing.T) {
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	deleteCalled := false
 	mock := &mockQuerier{hardDeleteCustomerFn: func(_ context.Context, arg dbgen.HardDeleteCustomerParams) error {
-		if arg.ID == customerID && arg.TenantID == tenantID {
+		if arg.ID == customerID && arg.OrganizationID == organizationID {
 			deleteCalled = true
 		}
 		return nil
 	}}
 	svc := newTestService(mock)
-	err := svc.HardDelete(context.Background(), tenantID, customerID)
+	err := svc.HardDelete(context.Background(), organizationID, customerID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -511,14 +514,14 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 		if seed%3 == 0 {
 			metadata = json.RawMessage(`{"key":"` + randStr("v-", 4) + `"}`)
 		}
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		generatedID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 		var stored dbgen.Customer
 		mock := &mockQuerier{
 			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 				stored = dbgen.Customer{
-					ID: generatedID, TenantID: arg.TenantID, Name: arg.Name, Email: arg.Email,
+					ID: generatedID, OrganizationID: arg.OrganizationID, Name: arg.Name, Email: arg.Email,
 					Phone: arg.Phone, Document: arg.Document, DocumentType: arg.DocumentType,
 					Status: sql.NullString{String: "active", Valid: true}, Metadata: arg.Metadata,
 					CreatedAt: sql.NullTime{Time: now, Valid: true}, UpdatedAt: sql.NullTime{Time: now, Valid: true},
@@ -526,7 +529,7 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 				return stored, nil
 			},
 			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-				if arg.ID == stored.ID && arg.TenantID == stored.TenantID {
+				if arg.ID == stored.ID && arg.OrganizationID == stored.OrganizationID {
 					return stored, nil
 				}
 				return dbgen.Customer{}, sql.ErrNoRows
@@ -534,14 +537,14 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 		}
 		svc := newTestService(mock)
 		ctx := context.Background()
-		created, _, err := svc.Create(ctx, tenantID, domain.CreateCustomerInput{
+		created, _, err := svc.Create(ctx, organizationID, domain.CreateCustomerInput{
 			Name: name, Email: email, Phone: phone, Document: document, DocumentType: documentType, Metadata: metadata,
 		})
 		if err != nil {
 			t.Logf("Create failed: %v", err)
 			return false
 		}
-		got, err := svc.GetByID(ctx, tenantID, created.ID)
+		got, err := svc.GetByID(ctx, organizationID, created.ID)
 		if err != nil {
 			t.Logf("GetByID failed: %v", err)
 			return false
@@ -555,7 +558,7 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 		if got.Status != "active" {
 			return false
 		}
-		if got.TenantID != tenantID {
+		if got.OrganizationID != organizationID {
 			return false
 		}
 		if got.Name != name || got.Email != email || got.Document != document || got.DocumentType != documentType {
@@ -586,7 +589,7 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestProperty_MultiTenantIsolation(t *testing.T) {
+func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 	f := func(seed uint64) bool {
 		r := seed
 		randStr := func(prefix string, n int) string {
@@ -598,8 +601,8 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 			}
 			return prefix + string(buf)
 		}
-		tenantA := uuid.New()
-		tenantB := uuid.New()
+		organizationA := uuid.New()
+		organizationB := uuid.New()
 		name := randStr("name-", 8)
 		email := randStr("", 6) + "@test.com"
 		document := randStr("doc-", 10)
@@ -610,17 +613,17 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		mock := &mockQuerier{
 			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 				c := dbgen.Customer{
-					ID: customerID, TenantID: arg.TenantID, Name: arg.Name, Email: arg.Email,
+					ID: customerID, OrganizationID: arg.OrganizationID, Name: arg.Name, Email: arg.Email,
 					Phone: arg.Phone, Document: arg.Document, DocumentType: arg.DocumentType,
 					Status: sql.NullString{String: "active", Valid: true}, Metadata: arg.Metadata,
 					CreatedAt: sql.NullTime{Time: now, Valid: true}, UpdatedAt: sql.NullTime{Time: now, Valid: true},
 				}
-				store[arg.TenantID] = append(store[arg.TenantID], c)
+				store[arg.OrganizationID] = append(store[arg.OrganizationID], c)
 				return c, nil
 			},
-			listCustomersByTenantFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) { return store[tid], nil },
+			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) { return store[tid], nil },
 			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-				for _, c := range store[arg.TenantID] {
+				for _, c := range store[arg.OrganizationID] {
 					if c.ID == arg.ID {
 						return c, nil
 					}
@@ -628,10 +631,10 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 				return dbgen.Customer{}, sql.ErrNoRows
 			},
 			updateCustomerFn: func(_ context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
-				for i, c := range store[arg.TenantID] {
+				for i, c := range store[arg.OrganizationID] {
 					if c.ID == arg.ID {
-						store[arg.TenantID][i].Name = arg.Name
-						return store[arg.TenantID][i], nil
+						store[arg.OrganizationID][i].Name = arg.Name
+						return store[arg.OrganizationID][i], nil
 					}
 				}
 				return dbgen.Customer{}, sql.ErrNoRows
@@ -640,54 +643,54 @@ func TestProperty_MultiTenantIsolation(t *testing.T) {
 		}
 		svc := newTestService(mock)
 		ctx := context.Background()
-		created, _, err := svc.Create(ctx, tenantA, domain.CreateCustomerInput{Name: name, Email: email, Document: document, DocumentType: documentType})
+		created, _, err := svc.Create(ctx, organizationA, domain.CreateCustomerInput{Name: name, Email: email, Document: document, DocumentType: documentType})
 		if err != nil {
 			return false
 		}
-		listB, _ := svc.List(ctx, tenantB)
+		listB, _ := svc.List(ctx, organizationB)
 		if len(listB) != 0 {
 			return false
 		}
-		_, err = svc.GetByID(ctx, tenantB, created.ID)
+		_, err = svc.GetByID(ctx, organizationB, created.ID)
 		if !errors.Is(err, domain.ErrCustomerNotFound) {
 			return false
 		}
-		_, _, err = svc.Update(ctx, tenantB, created.ID, domain.UpdateCustomerInput{Name: "hacked", Email: "h@e.com", Document: document, DocumentType: documentType})
+		_, _, err = svc.Update(ctx, organizationB, created.ID, domain.UpdateCustomerInput{Name: "hacked", Email: "h@e.com", Document: document, DocumentType: documentType})
 		if !errors.Is(err, domain.ErrCustomerNotFound) {
 			return false
 		}
-		err = svc.Delete(ctx, tenantB, created.ID)
+		err = svc.Delete(ctx, organizationB, created.ID)
 		if !errors.Is(err, domain.ErrCustomerNotFound) {
 			return false
 		}
-		listA, _ := svc.List(ctx, tenantA)
+		listA, _ := svc.List(ctx, organizationA)
 		if len(listA) != 1 || listA[0].ID != created.ID {
 			return false
 		}
-		updatedA, _, err := svc.Update(ctx, tenantA, created.ID, domain.UpdateCustomerInput{Name: "updated", Email: email, Document: document, DocumentType: documentType})
+		updatedA, _, err := svc.Update(ctx, organizationA, created.ID, domain.UpdateCustomerInput{Name: "updated", Email: email, Document: document, DocumentType: documentType})
 		if err != nil || updatedA.Name != "updated" {
 			return false
 		}
 		return true
 	}
 	if err := quick.Check(f, &quick.Config{MaxCount: 100}); err != nil {
-		t.Fatalf("multi-tenant isolation failed: %v", err)
+		t.Fatalf("multi-organization isolation failed: %v", err)
 	}
 }
 
 func TestCreate_WithAddress_BothCreated(t *testing.T) {
 	resetTxTestStore()
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 	addressID := uuid.New()
 
-	txTestStore.customerRow = makeCustomerRow(customerID, tenantID, "Alice", "alice@test.com", "12345", "cpf")
-	txTestStore.addressRow = makeAddressRow(addressID, tenantID, customerID)
+	txTestStore.customerRow = makeCustomerRow(customerID, organizationID, "Alice", "alice@test.com", "12345", "cpf")
+	txTestStore.addressRow = makeAddressRow(addressID, organizationID, customerID)
 
 	svc := newTestServiceWithTx()
 	ctx := context.Background()
 
-	cust, addr, err := svc.Create(ctx, tenantID, domain.CreateCustomerInput{
+	cust, addr, err := svc.Create(ctx, organizationID, domain.CreateCustomerInput{
 		Name: "Alice", Email: "alice@test.com", Document: "12345", DocumentType: "cpf",
 		Address: &domain.CreateAddressInput{
 			PostalCode: "12345-678", Street: "Main St", City: "Springfield", State: "IL",
@@ -715,7 +718,7 @@ func TestCreate_WithoutAddress_OnlyCustomerCreated(t *testing.T) {
 	mock := &mockQuerier{
 		createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 			return dbgen.Customer{
-				ID: uuid.New(), TenantID: arg.TenantID, Name: arg.Name, Email: arg.Email,
+				ID: uuid.New(), OrganizationID: arg.OrganizationID, Name: arg.Name, Email: arg.Email,
 				Document: arg.Document, DocumentType: arg.DocumentType,
 				Status:    sql.NullString{String: "active", Valid: true},
 				CreatedAt: sql.NullTime{Time: now, Valid: true}, UpdatedAt: sql.NullTime{Time: now, Valid: true},
@@ -739,16 +742,16 @@ func TestCreate_WithoutAddress_OnlyCustomerCreated(t *testing.T) {
 
 func TestCreate_WithAddress_AddressFailure_Rollback(t *testing.T) {
 	resetTxTestStore()
-	tenantID := uuid.New()
+	organizationID := uuid.New()
 	customerID := uuid.New()
 
-	txTestStore.customerRow = makeCustomerRow(customerID, tenantID, "Charlie", "charlie@test.com", "11111", "cpf")
+	txTestStore.customerRow = makeCustomerRow(customerID, organizationID, "Charlie", "charlie@test.com", "11111", "cpf")
 	txTestStore.addressShouldFail = true
 
 	svc := newTestServiceWithTx()
 	ctx := context.Background()
 
-	cust, addr, err := svc.Create(ctx, tenantID, domain.CreateCustomerInput{
+	cust, addr, err := svc.Create(ctx, organizationID, domain.CreateCustomerInput{
 		Name: "Charlie", Email: "charlie@test.com", Document: "11111", DocumentType: "cpf",
 		Address: &domain.CreateAddressInput{
 			PostalCode: "12345-678", Street: "Main St", City: "Springfield", State: "IL",
@@ -773,7 +776,7 @@ func TestUpdate_WithoutAddress_OnlyCustomerUpdated(t *testing.T) {
 	mock := &mockQuerier{
 		updateCustomerFn: func(_ context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
 			return dbgen.Customer{
-				ID: arg.ID, TenantID: arg.TenantID, Name: arg.Name, Email: arg.Email,
+				ID: arg.ID, OrganizationID: arg.OrganizationID, Name: arg.Name, Email: arg.Email,
 				Document: arg.Document, DocumentType: arg.DocumentType,
 				Status:    sql.NullString{String: "active", Valid: true},
 				CreatedAt: sql.NullTime{Time: now, Valid: true}, UpdatedAt: sql.NullTime{Time: now, Valid: true},
@@ -802,7 +805,7 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		resetTxTestStore()
 
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		customerID := uuid.New()
 		addressID := uuid.New()
 
@@ -816,13 +819,13 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 		city := rapid.StringMatching(`[A-Za-z ]{3,20}`).Draw(t, "city")
 		state := rapid.StringMatching(`[A-Z]{2}`).Draw(t, "state")
 
-		txTestStore.customerRow = makeCustomerRow(customerID, tenantID, name, email, document, documentType)
-		txTestStore.addressRow = makeAddressRow(addressID, tenantID, customerID)
+		txTestStore.customerRow = makeCustomerRow(customerID, organizationID, name, email, document, documentType)
+		txTestStore.addressRow = makeAddressRow(addressID, organizationID, customerID)
 
 		svc := newTestServiceWithTx()
 		ctx := context.Background()
 
-		cust, addr, err := svc.Create(ctx, tenantID, domain.CreateCustomerInput{
+		cust, addr, err := svc.Create(ctx, organizationID, domain.CreateCustomerInput{
 			Name: name, Email: email, Document: document, DocumentType: documentType,
 			Address: &domain.CreateAddressInput{
 				PostalCode: postalCode, Street: street, City: city, State: state,
@@ -849,14 +852,14 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 			t.Fatal("address not created")
 		}
 
-		// Customer has correct tenant
-		if cust.TenantID != tenantID {
-			t.Fatalf("expected tenant %v, got %v", tenantID, cust.TenantID)
+		// Customer has correct organization
+		if cust.OrganizationID != organizationID {
+			t.Fatalf("expected organization %v, got %v", organizationID, cust.OrganizationID)
 		}
 
-		// Address has correct tenant and customer
-		if addr.TenantID != tenantID {
-			t.Fatalf("addr tenant mismatch")
+		// Address has correct organization and customer
+		if addr.OrganizationID != organizationID {
+			t.Fatalf("addr organization mismatch")
 		}
 		if addr.CustomerID != customerID {
 			t.Fatalf("addr customer mismatch")
@@ -865,7 +868,7 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 }
 func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		tenantID := uuid.New()
+		organizationID := uuid.New()
 		generatedID := uuid.New()
 		now := time.Now().Truncate(time.Second)
 
@@ -879,7 +882,7 @@ func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 		mock := &mockQuerier{
 			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 				return dbgen.Customer{
-					ID: generatedID, TenantID: arg.TenantID, Name: arg.Name, Email: arg.Email,
+					ID: generatedID, OrganizationID: arg.OrganizationID, Name: arg.Name, Email: arg.Email,
 					Phone: arg.Phone, Document: arg.Document, DocumentType: arg.DocumentType,
 					Status:    sql.NullString{String: "active", Valid: true},
 					CreatedAt: sql.NullTime{Time: now, Valid: true}, UpdatedAt: sql.NullTime{Time: now, Valid: true},
@@ -890,7 +893,7 @@ func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 		// Create an address service with a mock that tracks list calls
 		addrMock := &addressMockQuerier{
 			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-				return dbgen.Customer{ID: arg.ID, TenantID: arg.TenantID}, nil
+				return dbgen.Customer{ID: arg.ID, OrganizationID: arg.OrganizationID}, nil
 			},
 			listAddressesByCustomerFn: func(_ context.Context, _ dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
 				addressListCalled = true
@@ -904,7 +907,7 @@ func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 		svc := NewCustomerService(db, addrSvc)
 		ctx := context.Background()
 
-		cust, addr, err := svc.Create(ctx, tenantID, domain.CreateCustomerInput{
+		cust, addr, err := svc.Create(ctx, organizationID, domain.CreateCustomerInput{
 			Name: name, Email: email, Document: document, DocumentType: documentType,
 		})
 
@@ -919,7 +922,7 @@ func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 		}
 
 		// Verify no addresses exist by listing
-		addresses, err := addrSvc.List(ctx, tenantID, generatedID)
+		addresses, err := addrSvc.List(ctx, organizationID, generatedID)
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
