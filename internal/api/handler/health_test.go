@@ -21,7 +21,7 @@ func setupHealthRouter(svc *service.HealthService) *gin.Engine {
 }
 
 func TestLive_Returns200Alive(t *testing.T) {
-	svc := service.NewHealthService()
+	svc := service.NewHealthService(nil)
 	router := setupHealthRouter(svc)
 
 	w := httptest.NewRecorder()
@@ -45,7 +45,7 @@ func TestLive_Returns200Alive(t *testing.T) {
 }
 
 func TestReady_ServiceTrue_Returns200Ready(t *testing.T) {
-	svc := service.NewHealthService()
+	svc := service.NewHealthService(nil)
 	svc.SetDatabaseOKForTest(true)
 	router := setupHealthRouter(svc)
 
@@ -70,7 +70,7 @@ func TestReady_ServiceTrue_Returns200Ready(t *testing.T) {
 }
 
 func TestReady_ServiceFalse_Returns503Unavailable(t *testing.T) {
-	svc := service.NewHealthService()
+	svc := service.NewHealthService(nil)
 	// NewHealthService defaults to false
 	router := setupHealthRouter(svc)
 

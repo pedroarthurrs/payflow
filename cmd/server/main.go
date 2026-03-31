@@ -48,8 +48,8 @@ func run() error {
 		}
 	}()
 
-	healthSvc := service.NewHealthService()
-	healthSvc.Start(db)
+	healthSvc := service.NewHealthService(db)
+	healthSvc.Start()
 
 	r := router.NewRouter(cfg, logger, db, healthSvc)
 

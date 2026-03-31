@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewHealthService_DatabaseOK_DefaultsFalse(t *testing.T) {
-	s := NewHealthService()
+	s := NewHealthService(nil)
 	if s.DatabaseOK() {
 		t.Fatal("expected DatabaseOK() to be false for a new HealthService")
 	}
@@ -19,7 +19,7 @@ func TestNewHealthService_DatabaseOK_DefaultsFalse(t *testing.T) {
 // DatabaseOK() must equal the last value in the sequence.
 func TestProperty_HealthServiceStateReflectsLastPingOutcome(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		s := NewHealthService()
+		s := NewHealthService(nil)
 		outcomes := rapid.SliceOfN(rapid.Bool(), 1, 50).Draw(t, "outcomes")
 		for _, ok := range outcomes {
 			s.setDatabaseOK(ok)
@@ -36,7 +36,7 @@ func TestProperty_HealthServiceStateReflectsLastPingOutcome(t *testing.T) {
 // without data races or panics.
 func TestProperty_ConcurrentReadsDataRaceFree(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		s := NewHealthService()
+		s := NewHealthService(nil)
 		numReaders := rapid.IntRange(2, 20).Draw(t, "numReaders")
 		numWrites := rapid.IntRange(1, 50).Draw(t, "numWrites")
 

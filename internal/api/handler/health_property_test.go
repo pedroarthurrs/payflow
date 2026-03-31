@@ -19,7 +19,7 @@ import (
 func TestProperty_ReadinessResponseDeterministicFromState(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ok := rapid.Bool().Draw(t, "databaseOK")
-		svc := service.NewHealthService()
+		svc := service.NewHealthService(nil)
 		svc.SetDatabaseOKForTest(ok)
 
 		gin.SetMode(gin.TestMode)

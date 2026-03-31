@@ -5,9 +5,12 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"i9pay/internal/database"
 )
+
+// Pinger is the minimal interface required by HealthService to check database connectivity.
+type Pinger interface {
+	PingContext(ctx context.Context) error
+}
 
 const pingInterval = 15 * time.Second
 
@@ -15,11 +18,12 @@ const pingInterval = 15 * time.Second
 type HealthService struct {
 	mu         sync.RWMutex
 	databaseOK bool
+	db         Pinger
 }
 
-// NewHealthService creates a HealthService with databaseOK initialized to false.
-func NewHealthService() *HealthService {
-	return &HealthService{}
+// NewHealthService creates a HealthService with the given Pinger dependency.
+func NewHealthService(db Pinger) *HealthService {
+	return &HealthService{db: db}
 }
 
 // DatabaseOK returns the cached database health state (read-lock protected).
@@ -37,26 +41,26 @@ func (s *HealthService) setDatabaseOK(ok bool) {
 }
 
 // Start performs an immediate ping, then launches a background goroutine
-// that pings the database every 15 seconds.
-func (s *HealthService) Start(db *database.DB) {
-	s.ping(db)
+// that pings the database every pingInterval.
+func (s *HealthService) Start() {
+	s.ping()
 
 	go func() {
 		ticker := time.NewTicker(pingInterval)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			s.ping(db)
+			s.ping()
 		}
 	}()
 }
 
 // ping executes a single database ping with a 2-second timeout.
-func (s *HealthService) ping(db *database.DB) {
+func (s *HealthService) ping() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := s.db.PingContext(ctx); err != nil {
 		slog.Warn("health service: database ping failed", "error", err)
 		s.setDatabaseOK(false)
 		return
