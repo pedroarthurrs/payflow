@@ -25,18 +25,18 @@ import (
 
 // mockQuerier implements dbgen.Querier for handler tests.
 type mockQuerier struct {
-	createAddressFn           func(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error)
-	deleteAddressFn           func(ctx context.Context, arg dbgen.DeleteAddressParams) error
-	getAddressByIDFn          func(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error)
-	listAddressesByCustomerFn func(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error)
-	updateAddressFn           func(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error)
-	getCustomerByIDFn         func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
-	createCustomerFn          func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
-	getOrganizationFn               func(ctx context.Context, id uuid.UUID) (dbgen.Organization, error)
-	listCustomersByOrganizationFn   func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error)
-	softDeleteCustomerFn      func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
-	updateCustomerFn          func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
-	hardDeleteCustomerFn      func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
+	createAddressFn               func(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error)
+	deleteAddressFn               func(ctx context.Context, arg dbgen.DeleteAddressParams) error
+	getAddressByIDFn              func(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error)
+	listAddressesByCustomerFn     func(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error)
+	updateAddressFn               func(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error)
+	getCustomerByIDFn             func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
+	createCustomerFn              func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
+	getOrganizationFn             func(ctx context.Context, id uuid.UUID) (dbgen.Organization, error)
+	listCustomersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error)
+	softDeleteCustomerFn          func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
+	updateCustomerFn              func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
+	hardDeleteCustomerFn          func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
 }
 
 func (m *mockQuerier) CreateAddress(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {

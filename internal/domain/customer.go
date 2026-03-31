@@ -12,14 +12,14 @@ type Customer struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	Name           string
-	Email        string
-	Phone        *string
-	Document     string
-	DocumentType string
-	Status       string
-	Metadata     json.RawMessage
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	Email          string
+	Phone          *string
+	Document       string
+	DocumentType   string
+	Status         string
+	Metadata       json.RawMessage
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // CreateCustomerInput represents the input for creating a new customer.

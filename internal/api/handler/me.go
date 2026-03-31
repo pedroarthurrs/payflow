@@ -32,8 +32,8 @@ func (h *MeHandler) Get(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"organization_id":  claims.OrganizationID,
-		"issued_at":  claims.IssuedAt,
-		"expires_at": claims.ExpiresAt,
+		"organization_id": claims.OrganizationID,
+		"issued_at":       claims.IssuedAt,
+		"expires_at":      claims.ExpiresAt,
 	})
 }

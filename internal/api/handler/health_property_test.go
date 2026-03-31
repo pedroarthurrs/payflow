@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,10 @@ func TestProperty_ReadinessResponseDeterministicFromState(t *testing.T) {
 		h.RegisterRoutes(&r.RouterGroup)
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/ready", http.NoBody)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/ready", http.NoBody)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
 		r.ServeHTTP(w, req)
 
 		var resp map[string]string

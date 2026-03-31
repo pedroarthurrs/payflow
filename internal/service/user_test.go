@@ -19,12 +19,12 @@ import (
 // ============================================================
 
 type userMockQuerier struct {
-	getUserByEmailFn    func(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error)
-	getUserByIDFn       func(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error)
+	getUserByEmailFn          func(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error)
+	getUserByIDFn             func(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error)
 	listUsersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error)
-	createUserFn        func(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error)
-	softDeleteUserFn    func(ctx context.Context, arg dbgen.SoftDeleteUserParams) error
-	updateUserFn        func(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error)
+	createUserFn              func(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error)
+	softDeleteUserFn          func(ctx context.Context, arg dbgen.SoftDeleteUserParams) error
+	updateUserFn              func(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error)
 }
 
 func (m *userMockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
@@ -140,22 +140,22 @@ func TestProperty_UserMultiOrganizationIsolation(t *testing.T) {
 		usersA := make([]dbgen.User, countA)
 		for i := range usersA {
 			usersA[i] = dbgen.User{
-				ID:       uuid.New(),
+				ID:             uuid.New(),
 				OrganizationID: organizationA,
-				Email:    rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "emailA"),
-				Name:     "User A",
-				Role:     "member",
+				Email:          rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "emailA"),
+				Name:           "User A",
+				Role:           "member",
 			}
 		}
 
 		usersB := make([]dbgen.User, countB)
 		for i := range usersB {
 			usersB[i] = dbgen.User{
-				ID:       uuid.New(),
+				ID:             uuid.New(),
 				OrganizationID: organizationB,
-				Email:    rapid.StringMatching(`[a-z]{4,8}@other\.com`).Draw(t, "emailB"),
-				Name:     "User B",
-				Role:     "member",
+				Email:          rapid.StringMatching(`[a-z]{4,8}@other\.com`).Draw(t, "emailB"),
+				Name:           "User B",
+				Role:           "member",
 			}
 		}
 
@@ -204,12 +204,12 @@ func TestProperty_UserListNoPassword(t *testing.T) {
 		dbUsers := make([]dbgen.User, count)
 		for i := range dbUsers {
 			dbUsers[i] = dbgen.User{
-				ID:       uuid.New(),
+				ID:             uuid.New(),
 				OrganizationID: organizationID,
-				Email:    rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "email"),
-				Name:     rapid.StringMatching(`[A-Za-z ]{3,20}`).Draw(t, "name"),
-				Password: string(fixedHash),
-				Role:     "member",
+				Email:          rapid.StringMatching(`[a-z]{4,8}@example\.com`).Draw(t, "email"),
+				Name:           rapid.StringMatching(`[A-Za-z ]{3,20}`).Draw(t, "name"),
+				Password:       string(fixedHash),
+				Role:           "member",
 			}
 		}
 
@@ -270,12 +270,12 @@ func TestProperty_UserCreationRoundTrip(t *testing.T) {
 					return dbgen.User{}, errors.New("invalid bcrypt hash in CreateUser call")
 				}
 				return dbgen.User{
-					ID:       newUserID,
+					ID:             newUserID,
 					OrganizationID: arg.OrganizationID,
-					Email:    arg.Email,
-					Name:     arg.Name,
-					Password: arg.Password,
-					Role:     arg.Role,
+					Email:          arg.Email,
+					Name:           arg.Name,
+					Password:       arg.Password,
+					Role:           arg.Role,
 				}, nil
 			},
 		}

@@ -7,7 +7,7 @@ DOCKER_COMPOSE_DEV = docker/dev/docker-compose.yml
 MIGRATIONS_PATH = migrations
 DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?sslmode=disable
 
-.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test help
+.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test lint vet fmt check setup-hooks help
 
 # --- DOCKER COMMANDS ---
 
@@ -49,6 +49,10 @@ lint:
 vet:
 	go vet -v ./...
 
+## fmt: Formata o código com gofmt
+fmt:
+	gofmt -w .
+
 # --- MIGRATIONS COMMANDS ---
 
 ## migrate-up: Aplica todas as migrations no banco de dados
@@ -62,6 +66,21 @@ migrate-down:
 ## migrate-create name=exemplo: Cria um novo par de arquivos de migration
 migrate-create:
 	migrate create -ext sql -dir $(MIGRATIONS_PATH) -seq $(name)
+
+# --- QUALITY COMMANDS ---
+
+## check: Roda fmt, tidy, vet, lint e test em sequência
+check:
+	$(MAKE) fmt
+	$(MAKE) tidy
+	$(MAKE) vet
+	$(MAKE) lint
+	$(MAKE) test
+
+## setup-hooks: Configura o Git para usar os hooks do projeto
+setup-hooks:
+	git config core.hooksPath .githooks
+	@echo "Git hooks configurados (.githooks/)"
 
 # --- HELP ---
 

@@ -136,20 +136,20 @@ func customerExistsMock() func(ctx context.Context, arg dbgen.GetCustomerByIDPar
 func buildDBAddress(id, organizationID, customerID uuid.UUID, arg dbgen.CreateAddressParams) dbgen.Address {
 	now := time.Now().Truncate(time.Second)
 	return dbgen.Address{
-		ID:           id,
-		OrganizationID:     organizationID,
-		CustomerID:   customerID,
-		Type:         arg.Type,
-		PostalCode:   arg.PostalCode,
-		Street:       arg.Street,
-		Number:       arg.Number,
-		Complement:   arg.Complement,
-		Neighborhood: arg.Neighborhood,
-		City:         arg.City,
-		State:        arg.State,
-		Country:      arg.Country,
-		IsMain:       arg.IsMain,
-		CreatedAt:    sql.NullTime{Time: now, Valid: true},
+		ID:             id,
+		OrganizationID: organizationID,
+		CustomerID:     customerID,
+		Type:           arg.Type,
+		PostalCode:     arg.PostalCode,
+		Street:         arg.Street,
+		Number:         arg.Number,
+		Complement:     arg.Complement,
+		Neighborhood:   arg.Neighborhood,
+		City:           arg.City,
+		State:          arg.State,
+		Country:        arg.Country,
+		IsMain:         arg.IsMain,
+		CreatedAt:      sql.NullTime{Time: now, Valid: true},
 	}
 }
 

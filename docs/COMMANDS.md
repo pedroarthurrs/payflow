@@ -91,6 +91,50 @@ make test
 # Equivalente a: go test -v ./...
 ```
 
+### `make lint`
+Roda o golangci-lint no projeto.
+
+```bash
+make lint
+# Equivalente a: golangci-lint run ./...
+```
+
+### `make vet`
+Roda o go vet no projeto.
+
+```bash
+make vet
+# Equivalente a: go vet -v ./...
+```
+
+### `make fmt`
+Roda o gofmt no projeto.
+
+```bash
+make fmt
+# Equivalente a: gofmt -w .
+```
+
+---
+
+## Quality
+
+### `make check`
+Roda fmt, tidy, vet, lint e test em sequência. Útil antes de commits.
+
+```bash
+make check
+```
+
+### `make setup-hooks`
+Configura o Git para usar os hooks do projeto (`.githooks/`).
+
+```bash
+make setup-hooks
+```
+
+Execute uma vez após clonar o repositório.
+
 ---
 
 ## Database Migrations
@@ -208,17 +252,14 @@ make sqlc
 
 # 7. Implemente service e handler
 
-# 8. Teste
-make test
+# 8. Rode quality checks (fmt, tidy, vet, lint, test)
+make check
 
-# 9. Format
-go fmt ./...
-
-# 10. Se tudo ok, commit
+# 9. Se tudo ok, commit
 git add .
 git commit -m "feat: add products feature"
 
-# 11. Limpe antes de parar
+# 10. Limpe antes de parar
 make remove
 ```
 

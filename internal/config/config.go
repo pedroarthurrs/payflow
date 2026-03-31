@@ -57,10 +57,10 @@ func Load() *Config {
 		DbPort:     os.Getenv("DB_PORT"),
 		DbName:     os.Getenv("DB_NAME"),
 
-		RateLimitWindowSeconds:       envInt("RATE_LIMIT_WINDOW_SECONDS", 60),
-		RateLimitMaxRequests:         envInt("RATE_LIMIT_MAX_REQUESTS", 100),
-		RateLimitLoginWindowSeconds:  envInt("RATE_LIMIT_LOGIN_WINDOW_SECONDS", 300),
-		RateLimitLoginMaxRequests:    envInt("RATE_LIMIT_LOGIN_MAX_REQUESTS", 5),
+		RateLimitWindowSeconds:             envInt("RATE_LIMIT_WINDOW_SECONDS", 60),
+		RateLimitMaxRequests:               envInt("RATE_LIMIT_MAX_REQUESTS", 100),
+		RateLimitLoginWindowSeconds:        envInt("RATE_LIMIT_LOGIN_WINDOW_SECONDS", 300),
+		RateLimitLoginMaxRequests:          envInt("RATE_LIMIT_LOGIN_MAX_REQUESTS", 5),
 		RateLimitOrganizationWindowSeconds: envInt("RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS", 60),
 		RateLimitOrganizationMaxRequests:   envInt("RATE_LIMIT_ORGANIZATION_MAX_REQUESTS", 200),
 	}

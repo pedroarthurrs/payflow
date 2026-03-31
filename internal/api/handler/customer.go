@@ -38,12 +38,12 @@ func (h *CustomerHandler) RegisterRoutes(rg *gin.RouterGroup) {
 // customerRequest is the shared DTO for creating and updating a customer.
 // Both operations require the same fields and validations.
 type customerRequest struct {
-	Name         string                   `json:"name"          binding:"required"`
-	Email        string                   `json:"email"         binding:"required,email"`
-	Phone        *string                  `json:"phone"         binding:"omitempty,max=20"`
-	Document     string                   `json:"document"      binding:"required,min=1,max=20"`
-	DocumentType string                   `json:"document_type" binding:"required,min=1,max=20"`
-	Metadata     json.RawMessage          `json:"metadata"      binding:"omitempty"`
+	Name         string                    `json:"name"          binding:"required"`
+	Email        string                    `json:"email"         binding:"required,email"`
+	Phone        *string                   `json:"phone"         binding:"omitempty,max=20"`
+	Document     string                    `json:"document"      binding:"required,min=1,max=20"`
+	DocumentType string                    `json:"document_type" binding:"required,min=1,max=20"`
+	Metadata     json.RawMessage           `json:"metadata"      binding:"omitempty"`
 	Address      *dto.CreateAddressRequest `json:"address"       binding:"omitempty"`
 }
 

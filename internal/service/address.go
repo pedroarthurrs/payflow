@@ -35,17 +35,17 @@ func (s *AddressService) Create(ctx context.Context, organizationID, customerID 
 
 	row, dbErr := s.db.Queries.CreateAddress(ctx, dbgen.CreateAddressParams{
 		OrganizationID: organizationID,
-		CustomerID:   customerID,
-		Type:         toNullAddressType(input.Type),
-		PostalCode:   input.PostalCode,
-		Street:       input.Street,
-		Number:       toNullString(input.Number),
-		Complement:   toNullString(input.Complement),
-		Neighborhood: toNullString(input.Neighborhood),
-		City:         input.City,
-		State:        input.State,
-		Country:      toNullString(input.Country),
-		IsMain:       toNullBool(input.IsMain),
+		CustomerID:     customerID,
+		Type:           toNullAddressType(input.Type),
+		PostalCode:     input.PostalCode,
+		Street:         input.Street,
+		Number:         toNullString(input.Number),
+		Complement:     toNullString(input.Complement),
+		Neighborhood:   toNullString(input.Neighborhood),
+		City:           input.City,
+		State:          input.State,
+		Country:        toNullString(input.Country),
+		IsMain:         toNullBool(input.IsMain),
 	})
 	if dbErr != nil {
 		slog.Error("failed to create address", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
@@ -64,17 +64,17 @@ func (s *AddressService) CreateWithTx(ctx context.Context, tx *sql.Tx, organizat
 
 	row, dbErr := qtx.CreateAddress(ctx, dbgen.CreateAddressParams{
 		OrganizationID: organizationID,
-		CustomerID:   customerID,
-		Type:         toNullAddressType(input.Type),
-		PostalCode:   input.PostalCode,
-		Street:       input.Street,
-		Number:       toNullString(input.Number),
-		Complement:   toNullString(input.Complement),
-		Neighborhood: toNullString(input.Neighborhood),
-		City:         input.City,
-		State:        input.State,
-		Country:      toNullString(input.Country),
-		IsMain:       toNullBool(input.IsMain),
+		CustomerID:     customerID,
+		Type:           toNullAddressType(input.Type),
+		PostalCode:     input.PostalCode,
+		Street:         input.Street,
+		Number:         toNullString(input.Number),
+		Complement:     toNullString(input.Complement),
+		Neighborhood:   toNullString(input.Neighborhood),
+		City:           input.City,
+		State:          input.State,
+		Country:        toNullString(input.Country),
+		IsMain:         toNullBool(input.IsMain),
 	})
 	if dbErr != nil {
 		slog.Error("failed to create address in tx", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
@@ -92,7 +92,7 @@ func (s *AddressService) List(ctx context.Context, organizationID, customerID uu
 	}
 
 	rows, dbErr := s.db.Queries.ListAddressesByCustomer(ctx, dbgen.ListAddressesByCustomerParams{
-		CustomerID: customerID,
+		CustomerID:     customerID,
 		OrganizationID: organizationID,
 	})
 	if dbErr != nil {
@@ -114,8 +114,8 @@ func (s *AddressService) GetByID(ctx context.Context, organizationID, customerID
 	}
 
 	row, dbErr := s.db.Queries.GetAddressByID(ctx, dbgen.GetAddressByIDParams{
-		ID:         addressID,
-		CustomerID: customerID,
+		ID:             addressID,
+		CustomerID:     customerID,
 		OrganizationID: organizationID,
 	})
 	if dbErr != nil {
@@ -137,19 +137,19 @@ func (s *AddressService) Update(ctx context.Context, organizationID, customerID,
 	}
 
 	row, dbErr := s.db.Queries.UpdateAddress(ctx, dbgen.UpdateAddressParams{
-		ID:           addressID,
-		CustomerID:   customerID,
+		ID:             addressID,
+		CustomerID:     customerID,
 		OrganizationID: organizationID,
-		Type:         toNullAddressType(input.Type),
-		PostalCode:   input.PostalCode,
-		Street:       input.Street,
-		Number:       toNullString(input.Number),
-		Complement:   toNullString(input.Complement),
-		Neighborhood: toNullString(input.Neighborhood),
-		City:         input.City,
-		State:        input.State,
-		Country:      toNullString(input.Country),
-		IsMain:       toNullBool(input.IsMain),
+		Type:           toNullAddressType(input.Type),
+		PostalCode:     input.PostalCode,
+		Street:         input.Street,
+		Number:         toNullString(input.Number),
+		Complement:     toNullString(input.Complement),
+		Neighborhood:   toNullString(input.Neighborhood),
+		City:           input.City,
+		State:          input.State,
+		Country:        toNullString(input.Country),
+		IsMain:         toNullBool(input.IsMain),
 	})
 	if dbErr != nil {
 		if errors.Is(dbErr, sql.ErrNoRows) {
@@ -171,8 +171,8 @@ func (s *AddressService) Delete(ctx context.Context, organizationID, customerID,
 
 	// Verify address exists first (DeleteAddress is :exec and won't return sql.ErrNoRows)
 	_, getErr := s.db.Queries.GetAddressByID(ctx, dbgen.GetAddressByIDParams{
-		ID:         addressID,
-		CustomerID: customerID,
+		ID:             addressID,
+		CustomerID:     customerID,
 		OrganizationID: organizationID,
 	})
 	if getErr != nil {
@@ -184,8 +184,8 @@ func (s *AddressService) Delete(ctx context.Context, organizationID, customerID,
 	}
 
 	if dbErr := s.db.Queries.DeleteAddress(ctx, dbgen.DeleteAddressParams{
-		ID:         addressID,
-		CustomerID: customerID,
+		ID:             addressID,
+		CustomerID:     customerID,
 		OrganizationID: organizationID,
 	}); dbErr != nil {
 		slog.Error("failed to delete address", "organization_id", organizationID, "address_id", addressID, "error", dbErr)
@@ -198,7 +198,7 @@ func (s *AddressService) Delete(ctx context.Context, organizationID, customerID,
 // ensureCustomerExists checks that the customer exists for the given organization.
 func (s *AddressService) ensureCustomerExists(ctx context.Context, organizationID, customerID uuid.UUID) error {
 	_, dbErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
-		ID:       customerID,
+		ID:             customerID,
 		OrganizationID: organizationID,
 	})
 	if dbErr != nil {
@@ -214,13 +214,13 @@ func (s *AddressService) ensureCustomerExists(ctx context.Context, organizationI
 // toDomainAddress converts a dbgen.Address to a domain.Address.
 func toDomainAddress(row dbgen.Address) domain.Address {
 	a := domain.Address{
-		ID:         row.ID,
+		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
-		CustomerID: row.CustomerID,
-		PostalCode: row.PostalCode,
-		Street:     row.Street,
-		City:       row.City,
-		State:      row.State,
+		CustomerID:     row.CustomerID,
+		PostalCode:     row.PostalCode,
+		Street:         row.Street,
+		City:           row.City,
+		State:          row.State,
 	}
 
 	if row.Type.Valid {

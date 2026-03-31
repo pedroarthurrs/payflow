@@ -64,7 +64,7 @@ func (s *AuthService) loginByAPIKey(ctx context.Context, apiKey string) (*token.
 
 	pair, err := s.tokenSvc.NewPairWithClaims(token.ClaimsInput{
 		OrganizationID: key.OrganizationID.String(),
-		AuthType: domain.AuthTypeSystem,
+		AuthType:       domain.AuthTypeSystem,
 	})
 	if err != nil {
 		return nil, err
@@ -85,9 +85,9 @@ func (s *AuthService) loginByUser(ctx context.Context, email, password string) (
 
 	pair, err := s.tokenSvc.NewPairWithClaims(token.ClaimsInput{
 		OrganizationID: user.OrganizationID.String(),
-		UserID:   user.ID.String(),
-		Role:     domain.Role(user.Role),
-		AuthType: domain.AuthTypeUser,
+		UserID:         user.ID.String(),
+		Role:           domain.Role(user.Role),
+		AuthType:       domain.AuthTypeUser,
 	})
 	if err != nil {
 		return nil, err

@@ -55,7 +55,7 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 
 	// Check email uniqueness within organization
 	_, err = s.db.Queries.GetUserByEmailAndOrganization(ctx, dbgen.GetUserByEmailAndOrganizationParams{
-		Email:    req.Email,
+		Email:          req.Email,
 		OrganizationID: tid,
 	})
 	if err == nil {
@@ -84,10 +84,10 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 
 	row, err := s.db.Queries.CreateUser(ctx, dbgen.CreateUserParams{
 		OrganizationID: tid,
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: string(hash),
-		Role:     string(req.Role),
+		Name:           req.Name,
+		Email:          req.Email,
+		Password:       string(hash),
+		Role:           string(req.Role),
 	})
 	if err != nil {
 		return nil, err
@@ -128,9 +128,9 @@ func (s *UserService) Update(ctx context.Context, organizationID, userID string,
 	}
 
 	row, err := s.db.Queries.UpdateUser(ctx, dbgen.UpdateUserParams{
-		Name:     req.Name,
-		Role:     string(req.Role),
-		ID:       uid,
+		Name:           req.Name,
+		Role:           string(req.Role),
+		ID:             uid,
 		OrganizationID: tid,
 	})
 	if err != nil {
@@ -157,7 +157,7 @@ func (s *UserService) Delete(ctx context.Context, organizationID, userID string)
 
 	// Check existence before soft-deleting
 	_, err = s.db.Queries.GetUserByID(ctx, dbgen.GetUserByIDParams{
-		ID:       uid,
+		ID:             uid,
 		OrganizationID: tid,
 	})
 	if err != nil {
@@ -168,7 +168,7 @@ func (s *UserService) Delete(ctx context.Context, organizationID, userID string)
 	}
 
 	return s.db.Queries.SoftDeleteUser(ctx, dbgen.SoftDeleteUserParams{
-		ID:       uid,
+		ID:             uid,
 		OrganizationID: tid,
 	})
 }
@@ -176,10 +176,10 @@ func (s *UserService) Delete(ctx context.Context, organizationID, userID string)
 // mapUser converts a dbgen.User to a domain.User (no password field).
 func mapUser(u dbgen.User) *domain.User {
 	return &domain.User{
-		ID:       u.ID.String(),
+		ID:             u.ID.String(),
 		OrganizationID: u.OrganizationID.String(),
-		Email:    u.Email,
-		Name:     u.Name,
-		Role:     domain.Role(u.Role),
+		Email:          u.Email,
+		Name:           u.Name,
+		Role:           domain.Role(u.Role),
 	}
 }

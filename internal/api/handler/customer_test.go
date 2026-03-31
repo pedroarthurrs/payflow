@@ -259,16 +259,16 @@ func TestCustomerDelete_Success_Returns204(t *testing.T) {
 		getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
 			if arg.ID == customerID {
 				return dbgen.Customer{
-					ID:           customerID,
-					OrganizationID:     organizationID,
-					Name:         "Alice",
-					Email:        "alice@example.com",
-					Document:     "12345",
-					DocumentType: "cpf",
-					Status:       sql.NullString{String: "active", Valid: true},
-					Metadata:     pqtype.NullRawMessage{Valid: false},
-					CreatedAt:    sql.NullTime{Time: now, Valid: true},
-					UpdatedAt:    sql.NullTime{Time: now, Valid: true},
+					ID:             customerID,
+					OrganizationID: organizationID,
+					Name:           "Alice",
+					Email:          "alice@example.com",
+					Document:       "12345",
+					DocumentType:   "cpf",
+					Status:         sql.NullString{String: "active", Valid: true},
+					Metadata:       pqtype.NullRawMessage{Valid: false},
+					CreatedAt:      sql.NullTime{Time: now, Valid: true},
+					UpdatedAt:      sql.NullTime{Time: now, Valid: true},
 				}, nil
 			}
 			return dbgen.Customer{}, sql.ErrNoRows
@@ -751,17 +751,17 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 				id := uuid.New()
 				c := dbgen.Customer{
-					ID:           id,
-					OrganizationID:     arg.OrganizationID,
-					Name:         arg.Name,
-					Email:        arg.Email,
-					Phone:        arg.Phone,
-					Document:     arg.Document,
-					DocumentType: arg.DocumentType,
-					Status:       sql.NullString{String: "active", Valid: true},
-					Metadata:     arg.Metadata,
-					CreatedAt:    sql.NullTime{Time: now, Valid: true},
-					UpdatedAt:    sql.NullTime{Time: now, Valid: true},
+					ID:             id,
+					OrganizationID: arg.OrganizationID,
+					Name:           arg.Name,
+					Email:          arg.Email,
+					Phone:          arg.Phone,
+					Document:       arg.Document,
+					DocumentType:   arg.DocumentType,
+					Status:         sql.NullString{String: "active", Valid: true},
+					Metadata:       arg.Metadata,
+					CreatedAt:      sql.NullTime{Time: now, Valid: true},
+					UpdatedAt:      sql.NullTime{Time: now, Valid: true},
 				}
 				store[id] = &storedCustomer{customer: c}
 				return c, nil
@@ -973,17 +973,17 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
 				id := uuid.New()
 				c := dbgen.Customer{
-					ID:           id,
-					OrganizationID:     arg.OrganizationID,
-					Name:         arg.Name,
-					Email:        arg.Email,
-					Phone:        arg.Phone,
-					Document:     arg.Document,
-					DocumentType: arg.DocumentType,
-					Status:       sql.NullString{String: "active", Valid: true},
-					Metadata:     arg.Metadata,
-					CreatedAt:    sql.NullTime{Time: createTime, Valid: true},
-					UpdatedAt:    sql.NullTime{Time: createTime, Valid: true},
+					ID:             id,
+					OrganizationID: arg.OrganizationID,
+					Name:           arg.Name,
+					Email:          arg.Email,
+					Phone:          arg.Phone,
+					Document:       arg.Document,
+					DocumentType:   arg.DocumentType,
+					Status:         sql.NullString{String: "active", Valid: true},
+					Metadata:       arg.Metadata,
+					CreatedAt:      sql.NullTime{Time: createTime, Valid: true},
+					UpdatedAt:      sql.NullTime{Time: createTime, Valid: true},
 				}
 				store[id] = c
 				return c, nil
@@ -1174,17 +1174,17 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 				ts := baseTime.Add(time.Duration(createCounter) * time.Minute)
 				createCounter++
 				c := dbgen.Customer{
-					ID:           id,
-					OrganizationID:     arg.OrganizationID,
-					Name:         arg.Name,
-					Email:        arg.Email,
-					Phone:        arg.Phone,
-					Document:     arg.Document,
-					DocumentType: arg.DocumentType,
-					Status:       sql.NullString{String: "active", Valid: true},
-					Metadata:     arg.Metadata,
-					CreatedAt:    sql.NullTime{Time: ts, Valid: true},
-					UpdatedAt:    sql.NullTime{Time: ts, Valid: true},
+					ID:             id,
+					OrganizationID: arg.OrganizationID,
+					Name:           arg.Name,
+					Email:          arg.Email,
+					Phone:          arg.Phone,
+					Document:       arg.Document,
+					DocumentType:   arg.DocumentType,
+					Status:         sql.NullString{String: "active", Valid: true},
+					Metadata:       arg.Metadata,
+					CreatedAt:      sql.NullTime{Time: ts, Valid: true},
+					UpdatedAt:      sql.NullTime{Time: ts, Valid: true},
 				}
 				store[id] = storedCustomer{dbCustomer: c}
 				createdOrder = append(createdOrder, id)

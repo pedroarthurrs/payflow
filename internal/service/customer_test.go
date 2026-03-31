@@ -28,15 +28,15 @@ import (
 // ============================================================
 
 type mockQuerier struct {
-	createCustomerFn        func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
-	getCustomerByIDFn       func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
+	createCustomerFn              func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
+	getCustomerByIDFn             func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
 	getOrganizationFn             func(ctx context.Context, id uuid.UUID) (dbgen.Organization, error)
 	listCustomersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error)
 	listOrganizationsFn           func(ctx context.Context) ([]dbgen.Organization, error)
-	softDeleteCustomerFn    func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
-	updateCustomerFn        func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
-	hardDeleteCustomerFn    func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
-	createAddressFn         func(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error)
+	softDeleteCustomerFn          func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
+	updateCustomerFn              func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
+	hardDeleteCustomerFn          func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
+	createAddressFn               func(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error)
 }
 
 func (m *mockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
@@ -245,41 +245,41 @@ func newTestServiceWithTx() *CustomerService {
 func makeCustomerRow(id, organizationID uuid.UUID, name, email, document, documentType string) []driver.Value {
 	now := time.Now().Truncate(time.Second)
 	return []driver.Value{
-		id.String(),       // id
+		id.String(),             // id
 		organizationID.String(), // organization_id
-		name,              // name
-		email,             // email
-		nil,               // phone (NULL)
-		document,          // document
-		documentType,      // document_type
-		nil,               // external_reference (NULL)
-		"active",          // status
-		nil,               // metadata (NULL)
-		now,               // created_at
-		now,               // updated_at
-		nil,               // deleted_at (NULL)
+		name,                    // name
+		email,                   // email
+		nil,                     // phone (NULL)
+		document,                // document
+		documentType,            // document_type
+		nil,                     // external_reference (NULL)
+		"active",                // status
+		nil,                     // metadata (NULL)
+		now,                     // created_at
+		now,                     // updated_at
+		nil,                     // deleted_at (NULL)
 	}
 }
 
 func makeAddressRow(addrID, organizationID, customerID uuid.UUID) []driver.Value {
 	now := time.Now().Truncate(time.Second)
 	return []driver.Value{
-		addrID.String(),     // id
-		organizationID.String(),   // organization_id
-		customerID.String(), // customer_id
-		"billing",           // type
-		"12345-678",         // postal_code
-		"Main St",           // street
-		nil,                 // number (NULL)
-		nil,                 // complement (NULL)
-		nil,                 // neighborhood (NULL)
-		"Springfield",       // city
-		"IL",                // state
-		"BR",                // country
-		true,                // is_main
-		now,                 // created_at
-		now,                 // updated_at
-		nil,                 // deleted_at (NULL)
+		addrID.String(),         // id
+		organizationID.String(), // organization_id
+		customerID.String(),     // customer_id
+		"billing",               // type
+		"12345-678",             // postal_code
+		"Main St",               // street
+		nil,                     // number (NULL)
+		nil,                     // complement (NULL)
+		nil,                     // neighborhood (NULL)
+		"Springfield",           // city
+		"IL",                    // state
+		"BR",                    // country
+		true,                    // is_main
+		now,                     // created_at
+		now,                     // updated_at
+		nil,                     // deleted_at (NULL)
 	}
 }
 
@@ -792,6 +792,7 @@ func TestUpdate_WithoutAddress_OnlyCustomerUpdated(t *testing.T) {
 	}
 	if cust == nil {
 		t.Fatal("expected customer")
+		return
 	}
 	if addr != nil {
 		t.Fatalf("expected nil address, got %v", addr)

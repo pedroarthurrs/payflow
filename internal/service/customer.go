@@ -34,12 +34,12 @@ func (s *CustomerService) Create(ctx context.Context, organizationID uuid.UUID, 
 	if input.Address == nil {
 		row, dbErr := s.db.Queries.CreateCustomer(ctx, dbgen.CreateCustomerParams{
 			OrganizationID: organizationID,
-			Name:         input.Name,
-			Email:        input.Email,
-			Phone:        toNullString(input.Phone),
-			Document:     input.Document,
-			DocumentType: input.DocumentType,
-			Metadata:     toNullRawMessage(input.Metadata),
+			Name:           input.Name,
+			Email:          input.Email,
+			Phone:          toNullString(input.Phone),
+			Document:       input.Document,
+			DocumentType:   input.DocumentType,
+			Metadata:       toNullRawMessage(input.Metadata),
 		})
 		if dbErr != nil {
 			return nil, nil, s.handleWriteError(dbErr)
@@ -59,12 +59,12 @@ func (s *CustomerService) Create(ctx context.Context, organizationID uuid.UUID, 
 
 	row, dbErr := qtx.CreateCustomer(ctx, dbgen.CreateCustomerParams{
 		OrganizationID: organizationID,
-		Name:         input.Name,
-		Email:        input.Email,
-		Phone:        toNullString(input.Phone),
-		Document:     input.Document,
-		DocumentType: input.DocumentType,
-		Metadata:     toNullRawMessage(input.Metadata),
+		Name:           input.Name,
+		Email:          input.Email,
+		Phone:          toNullString(input.Phone),
+		Document:       input.Document,
+		DocumentType:   input.DocumentType,
+		Metadata:       toNullRawMessage(input.Metadata),
 	})
 	if dbErr != nil {
 		return nil, nil, s.handleWriteError(dbErr)
@@ -103,7 +103,7 @@ func (s *CustomerService) List(ctx context.Context, organizationID uuid.UUID) ([
 // GetByID returns a single customer by ID for the given organization.
 func (s *CustomerService) GetByID(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.Customer, error) {
 	row, dbErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
-		ID:       customerID,
+		ID:             customerID,
 		OrganizationID: organizationID,
 	})
 	if dbErr != nil {
@@ -123,14 +123,14 @@ func (s *CustomerService) GetByID(ctx context.Context, organizationID, customerI
 func (s *CustomerService) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
 	if input.Address == nil {
 		row, dbErr := s.db.Queries.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
-			ID:           customerID,
+			ID:             customerID,
 			OrganizationID: organizationID,
-			Name:         input.Name,
-			Email:        input.Email,
-			Phone:        toNullString(input.Phone),
-			Document:     input.Document,
-			DocumentType: input.DocumentType,
-			Metadata:     toNullRawMessage(input.Metadata),
+			Name:           input.Name,
+			Email:          input.Email,
+			Phone:          toNullString(input.Phone),
+			Document:       input.Document,
+			DocumentType:   input.DocumentType,
+			Metadata:       toNullRawMessage(input.Metadata),
 		})
 		if dbErr != nil {
 			if errors.Is(dbErr, sql.ErrNoRows) {
@@ -152,14 +152,14 @@ func (s *CustomerService) Update(ctx context.Context, organizationID, customerID
 	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
 
 	row, dbErr := qtx.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
-		ID:           customerID,
+		ID:             customerID,
 		OrganizationID: organizationID,
-		Name:         input.Name,
-		Email:        input.Email,
-		Phone:        toNullString(input.Phone),
-		Document:     input.Document,
-		DocumentType: input.DocumentType,
-		Metadata:     toNullRawMessage(input.Metadata),
+		Name:           input.Name,
+		Email:          input.Email,
+		Phone:          toNullString(input.Phone),
+		Document:       input.Document,
+		DocumentType:   input.DocumentType,
+		Metadata:       toNullRawMessage(input.Metadata),
 	})
 	if dbErr != nil {
 		if errors.Is(dbErr, sql.ErrNoRows) {
@@ -187,7 +187,7 @@ func (s *CustomerService) Update(ctx context.Context, organizationID, customerID
 func (s *CustomerService) Delete(ctx context.Context, organizationID, customerID uuid.UUID) error {
 	// First verify the customer exists (SoftDeleteCustomer is :exec and won't return sql.ErrNoRows)
 	_, getErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
-		ID:       customerID,
+		ID:             customerID,
 		OrganizationID: organizationID,
 	})
 	if getErr != nil {
@@ -199,7 +199,7 @@ func (s *CustomerService) Delete(ctx context.Context, organizationID, customerID
 	}
 
 	if dbErr := s.db.Queries.SoftDeleteCustomer(ctx, dbgen.SoftDeleteCustomerParams{
-		ID:       customerID,
+		ID:             customerID,
 		OrganizationID: organizationID,
 	}); dbErr != nil {
 		slog.Error("failed to soft delete customer", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
@@ -227,12 +227,12 @@ func (s *CustomerService) handleWriteError(dbErr error) error {
 // toDomainCustomer converts a dbgen.Customer to a domain.Customer.
 func toDomainCustomer(row dbgen.Customer) domain.Customer {
 	c := domain.Customer{
-		ID:           row.ID,
+		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
-		Name:         row.Name,
-		Email:        row.Email,
-		Document:     row.Document,
-		DocumentType: row.DocumentType,
+		Name:           row.Name,
+		Email:          row.Email,
+		Document:       row.Document,
+		DocumentType:   row.DocumentType,
 	}
 
 	if row.Phone.Valid {
@@ -292,7 +292,7 @@ func toNullRawMessage(data json.RawMessage) pqtype.NullRawMessage {
 //	}
 func (s *CustomerService) HardDelete(ctx context.Context, organizationID, customerID uuid.UUID) error {
 	if dbErr := s.db.Queries.HardDeleteCustomer(ctx, dbgen.HardDeleteCustomerParams{
-		ID:       customerID,
+		ID:             customerID,
 		OrganizationID: organizationID,
 	}); dbErr != nil {
 		slog.Error("failed to hard delete customer", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)

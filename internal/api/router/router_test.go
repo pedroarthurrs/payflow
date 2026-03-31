@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -91,7 +92,7 @@ func TestRootRouteOutsideVersionGroup(t *testing.T) {
 	r := buildTestEngine()
 
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", http.NoBody)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -128,7 +129,7 @@ func TestPublicRoutesAccessibleWithoutAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, _ := http.NewRequest(tt.method, tt.path, strings.NewReader("{}"))
+			req, _ := http.NewRequestWithContext(context.Background(), tt.method, tt.path, strings.NewReader("{}"))
 			req.Header.Set("Content-Type", "application/json")
 			r.ServeHTTP(w, req)
 
@@ -161,7 +162,7 @@ func TestProtectedRoutesRequireAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, _ := http.NewRequest(tt.method, tt.path, nil)
+			req, _ := http.NewRequestWithContext(context.Background(), tt.method, tt.path, http.NoBody)
 			r.ServeHTTP(w, req)
 
 			if w.Code != http.StatusUnauthorized {
@@ -212,7 +213,7 @@ func TestAddressRoutesNestedUnderCustomers(t *testing.T) {
 	for _, tt := range addressTests {
 		t.Run("protected_"+tt.method+" "+tt.path, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, _ := http.NewRequest(tt.method, tt.path, nil)
+			req, _ := http.NewRequestWithContext(context.Background(), tt.method, tt.path, http.NoBody)
 			r.ServeHTTP(w, req)
 
 			if w.Code != http.StatusUnauthorized {
@@ -262,7 +263,7 @@ func TestProperty_PublicProtectedSeparation(t *testing.T) {
 		pr := protectedRoutes[pi]
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest(pr.method, pr.path, nil)
+		req, _ := http.NewRequestWithContext(context.Background(), pr.method, pr.path, http.NoBody)
 		r.ServeHTTP(w, req)
 
 		if w.Code != http.StatusUnauthorized {
@@ -274,7 +275,7 @@ func TestProperty_PublicProtectedSeparation(t *testing.T) {
 		pu := publicRoutes[pui]
 
 		w2 := httptest.NewRecorder()
-		req2, _ := http.NewRequest(pu.method, pu.path, strings.NewReader("{}"))
+		req2, _ := http.NewRequestWithContext(context.Background(), pu.method, pu.path, strings.NewReader("{}"))
 		req2.Header.Set("Content-Type", "application/json")
 		r.ServeHTTP(w2, req2)
 
@@ -301,9 +302,9 @@ func buildRBACTestEngine() *gin.Engine {
 		}
 		claims := &token.Claims{
 			OrganizationID: uuid.New().String(),
-			UserID:   uuid.New().String(),
-			Role:     role,
-			AuthType: domain.AuthTypeUser,
+			UserID:         uuid.New().String(),
+			Role:           role,
+			AuthType:       domain.AuthTypeUser,
 		}
 		c.Set(middleware.ClaimsKey, claims)
 		c.Next()
@@ -346,7 +347,7 @@ func TestProperty_RBACUserRoutes(t *testing.T) {
 		role := rapid.SampledFrom(allRoles).Draw(t, "role")
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest(route.method, route.path, nil)
+		req, _ := http.NewRequestWithContext(context.Background(), route.method, route.path, http.NoBody)
 		req.Header.Set("X-Test-Role", string(role))
 		r.ServeHTTP(w, req)
 
@@ -383,7 +384,7 @@ func TestProperty_RateLimitLogin(t *testing.T) {
 
 		for i := 1; i <= totalRequests; i++ {
 			w := httptest.NewRecorder()
-			req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader("{}"))
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/login", strings.NewReader("{}"))
 			req.Header.Set("Content-Type", "application/json")
 			r.ServeHTTP(w, req)
 
@@ -423,7 +424,7 @@ func TestProperty_APIv1Prefix(t *testing.T) {
 
 		// Accessible under /api/v1
 		w1 := httptest.NewRecorder()
-		req1, _ := http.NewRequest(vr.method, "/api/v1"+vr.apiPath, strings.NewReader("{}"))
+		req1, _ := http.NewRequestWithContext(context.Background(), vr.method, "/api/v1"+vr.apiPath, strings.NewReader("{}"))
 		req1.Header.Set("Content-Type", "application/json")
 		r.ServeHTTP(w1, req1)
 
@@ -433,7 +434,7 @@ func TestProperty_APIv1Prefix(t *testing.T) {
 
 		// NOT accessible under old /v1 prefix
 		w2 := httptest.NewRecorder()
-		req2, _ := http.NewRequest(vr.method, "/v1"+vr.apiPath, strings.NewReader("{}"))
+		req2, _ := http.NewRequestWithContext(context.Background(), vr.method, "/v1"+vr.apiPath, strings.NewReader("{}"))
 		req2.Header.Set("Content-Type", "application/json")
 		r.ServeHTTP(w2, req2)
 
@@ -503,7 +504,7 @@ func TestProperty_GlobalMiddlewareRequestID(t *testing.T) {
 		rt := allRoutes[ri]
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest(rt.method, rt.path, strings.NewReader("{}"))
+		req, _ := http.NewRequestWithContext(context.Background(), rt.method, rt.path, strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
 		r.ServeHTTP(w, req)
 

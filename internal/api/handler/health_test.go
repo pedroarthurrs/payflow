@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,10 @@ func TestLive_Returns200Alive(t *testing.T) {
 	router := setupHealthRouter(svc)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/live", http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/live", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -46,7 +50,10 @@ func TestReady_ServiceTrue_Returns200Ready(t *testing.T) {
 	router := setupHealthRouter(svc)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/ready", http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/ready", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -68,7 +75,10 @@ func TestReady_ServiceFalse_Returns503Unavailable(t *testing.T) {
 	router := setupHealthRouter(svc)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/ready", http.NoBody)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/ready", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusServiceUnavailable {

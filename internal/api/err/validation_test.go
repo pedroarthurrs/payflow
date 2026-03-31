@@ -42,6 +42,7 @@ func TestTranslateValidationErrors_RequiredTag(t *testing.T) {
 	emailErr := findByField(result, "email")
 	if emailErr == nil {
 		t.Fatal("expected error for email field")
+		return
 	}
 	if emailErr.Message != "email is required" {
 		t.Fatalf("expected message %q, got %q", "email is required", emailErr.Message)
@@ -55,6 +56,7 @@ func TestTranslateValidationErrors_EmailTag(t *testing.T) {
 	emailErr := findByField(result, "email")
 	if emailErr == nil {
 		t.Fatal("expected error for email field")
+		return
 	}
 	if emailErr.Message != "email must be a valid email" {
 		t.Fatalf("expected message %q, got %q", "email must be a valid email", emailErr.Message)
@@ -68,6 +70,7 @@ func TestTranslateValidationErrors_MinTag(t *testing.T) {
 	pwErr := findByField(result, "password")
 	if pwErr == nil {
 		t.Fatal("expected error for password field")
+		return
 	}
 	if pwErr.Message != "password must be at least 8" {
 		t.Fatalf("expected message %q, got %q", "password must be at least 8", pwErr.Message)
@@ -88,6 +91,7 @@ func TestTranslateValidationErrors_MaxTag(t *testing.T) {
 	nameErr := findByField(result, "name")
 	if nameErr == nil {
 		t.Fatal("expected error for name field")
+		return
 	}
 	if nameErr.Message != "name must be at most 3" {
 		t.Fatalf("expected message %q, got %q", "name must be at most 3", nameErr.Message)
@@ -113,6 +117,7 @@ func TestTranslateValidationErrors_RejectedValueCaptured(t *testing.T) {
 	emailErr := findByField(result, "email")
 	if emailErr == nil {
 		t.Fatal("expected error for email field")
+		return
 	}
 	if emailErr.RejectedValue != "bad-email" {
 		t.Fatalf("expected rejected value %q, got %v", "bad-email", emailErr.RejectedValue)
@@ -121,6 +126,7 @@ func TestTranslateValidationErrors_RejectedValueCaptured(t *testing.T) {
 	pwErr := findByField(result, "password")
 	if pwErr == nil {
 		t.Fatal("expected error for password field")
+		return
 	}
 	if pwErr.RejectedValue != "short" {
 		t.Fatalf("expected rejected value %q, got %v", "short", pwErr.RejectedValue)
