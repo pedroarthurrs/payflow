@@ -12,11 +12,14 @@ type Config struct {
 	ServerPort string
 
 	// Database connection
+	DbDriver   string
+	DbDSN      string
 	DbUser     string
 	DbPassword string
 	DbHost     string
 	DbPort     string
 	DbName     string
+	DbSSLMode  string
 
 	// Rate limiting — IP (public routes)
 	RateLimitWindowSeconds int
@@ -51,11 +54,14 @@ func Load() *Config {
 		GoEnv:      os.Getenv("GO_ENV"),
 		ServerPort: os.Getenv("SERVER_PORT"),
 		JwtSecret:  os.Getenv("JWT_SECRET"),
+		DbDriver:   os.Getenv("DB_DRIVER"),
+		DbDSN:      os.Getenv("DB_DSN"),
 		DbUser:     os.Getenv("DB_USER"),
 		DbPassword: os.Getenv("DB_PASSWORD"),
 		DbHost:     os.Getenv("DB_HOST"),
 		DbPort:     os.Getenv("DB_PORT"),
 		DbName:     os.Getenv("DB_NAME"),
+		DbSSLMode:  os.Getenv("DB_SSLMODE"),
 
 		RateLimitWindowSeconds:             envInt("RATE_LIMIT_WINDOW_SECONDS", 60),
 		RateLimitMaxRequests:               envInt("RATE_LIMIT_MAX_REQUESTS", 100),

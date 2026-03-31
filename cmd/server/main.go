@@ -37,18 +37,16 @@ func run() error {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	db, err := database.NewConnection(database.DBConfig{
-		User:     cfg.DbUser,
-		Password: cfg.DbPassword,
-		Host:     cfg.DbHost,
-		Port:     cfg.DbPort,
-		Name:     cfg.DbName,
-	})
+	db, err := database.New(cfg)
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err)
 		return err
 	}
-	defer func() { _ = db.Close() }()
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Warn("failed to close database connection", "error", err)
+		}
+	}()
 
 	healthSvc := service.NewHealthService()
 	healthSvc.Start(db)
