@@ -179,19 +179,19 @@ func (p *Product) IsValid() error {
 
 ```sql
 -- name: CreateProduct :one
-INSERT INTO products (id, tenant_id, name, price, created_at)
+INSERT INTO products (id, organization_id, name, price, created_at)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, tenant_id, name, price, created_at;
+RETURNING id, organization_id, name, price, created_at;
 
 -- name: GetProduct :one
-SELECT id, tenant_id, name, price, created_at
+SELECT id, organization_id, name, price, created_at
 FROM products
-WHERE id = $1 AND tenant_id = $2;
+WHERE id = $1 AND organization_id = $2;
 
 -- name: ListProducts :many
-SELECT id, tenant_id, name, price, created_at
+SELECT id, organization_id, name, price, created_at
 FROM products
-WHERE tenant_id = $1
+WHERE organization_id = $1
 ORDER BY created_at DESC;
 ```
 
@@ -271,7 +271,7 @@ Mensagens são traduzidas automaticamente em `internal/api/err/validation.go`.
 ### Naming
 
 - **Packages**: lowercase, sem underscore (`internal/api/handler`)
-- **Funcs/Methods**: camelCase (`createProduct`, `fecthTenantById`)
+- **Funcs/Methods**: camelCase (`createProduct`, `fetchOrganizationById`)
 - **Consts**: UPPER_SNAKE_CASE (`DEFAULT_TTL`, `MAX_RETRY`)
 - **Vars**: camelCase (`productID`, `isValid`)
 
@@ -354,14 +354,14 @@ Cria arquivo: `migrations/000004_add_products_table.up.sql`
 ```sql
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     price INTEGER NOT NULL CHECK (price > 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_products_tenant_id ON products(tenant_id);
+CREATE INDEX idx_products_organization_id ON products(organization_id);
 ```
 
 ### Aplicar

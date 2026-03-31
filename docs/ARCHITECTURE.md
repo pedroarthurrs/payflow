@@ -55,21 +55,21 @@ Response JSON
 
 **DTOs** (`api/dto/`)
 - Data Transfer Objects compartilhados entre handlers
-- `context.go`: Extração de IDs do contexto Gin (TenantID, CustomerID)
+- `context.go`: Extração de IDs do contexto Gin (OrganizationID, CustomerID)
 - `request.go`: Structs de request compartilhadas
 - `response.go`: Structs de response compartilhadas
 - Retornam respostas JSON
 
 **DTOs** (`api/dto/`)
 - Data Transfer Objects compartilhados entre handlers
-- `context.go`: Extração de IDs do contexto Gin (TenantID, CustomerID)
+- `context.go`: Extração de IDs do contexto Gin (OrganizationID, CustomerID)
 - `request.go`: Structs de request compartilhadas
 - `response.go`: Structs de response compartilhadas
 
 **Middleware** (`api/middleware/`)
 - `auth.go`: Valida JWT e extrai claims
 - `errors.go`: Transforma erros de domínio em respostas HTTP
-- `ratelimit.go`: Rate limiting por IP e tenant
+- `ratelimit.go`: Rate limiting por IP e organization
 - `requestid.go`: Gera/propaga UUID v4 por requisição
 - `logger.go`: Structured logging com slog
 
@@ -90,8 +90,8 @@ Response JSON
 - Gerenciamento completo de clientes (CRUD)
 - Soft delete padrão (marca `deleted_at`)
 - Hard delete para conformidade legal (LGPD/GDPR)
-- Validação de unicidade (email, documento por tenant)
-- Isolamento multi-tenant
+- Validação de unicidade (email, documento por organization)
+- Isolamento multi-organization
 
 Futura expansão:
 - `user_service.go` - Gerenciamento de usuários
@@ -101,7 +101,7 @@ Futura expansão:
 ### 3. Domain Layer (`domain/`)
 
 **Models**
-- `tenant.go`: Estruturas de dados puras (Credentials, etc.)
+- `organization.go`: Estruturas de dados puras (Credentials, etc.)
 - `errors.go`: Erros tipados de domínio
 
 Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
@@ -150,7 +150,7 @@ A ordem de middleware é crítica para segurança e observabilidade:
 4. Errors()                — Serializa erros para JSON
 5. RateLimitByIP()         — Limita por IP (v1 group)
 6. Auth()                  — Valida JWT (protected group)
-7. RateLimitByTenant()     — Limita por tenant (protected group)
+7. RateLimitByOrganization()     — Limita por organization (protected group)
 ```
 
 Cada middleware é responsável por uma preocupação específica:
@@ -167,7 +167,7 @@ Implementado com 3 tiers independentes:
 
 1. **IP-Based** — Proteção geral contra abuso (100 req/min por IP)
 2. **Login-Specific** — Mitigação de força bruta (5 tentativas/5min por IP)
-3. **Tenant-Based** — Isolamento de recursos (200 req/min por tenant)
+3. **Organization-Based** — Isolamento de recursos (200 req/min por organization)
 
 Cada tier usa uma `RateLimiterStore` separada com `sync.Mutex` e `map[string]*visitor`. Sem limpeza ativa (lazy cleanup).
 
@@ -330,14 +330,14 @@ O `CustomerService` implementa o método `HardDelete()` para atender requisitos 
 **Implementação:**
 ```go
 // Uso interno apenas - não exposto via HTTP
-err := customerSvc.HardDelete(ctx, tenantID, customerID)
+err := customerSvc.HardDelete(ctx, organizationID, customerID)
 ```
 
 **Características:**
 - Operação irreversível (DELETE físico no banco)
 - Requer verificação de existência prévia
 - Log de auditoria automático (nível WARN)
-- Isolamento por tenant (segurança multi-tenant)
+- Isolamento por organization (segurança multi-organization)
 
 **Diferença entre Delete e HardDelete:**
 - `Delete()`: Soft delete (marca `deleted_at`, dados preservados)

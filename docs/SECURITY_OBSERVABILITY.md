@@ -19,7 +19,7 @@ A feature **API Security & Observability** adiciona três capacidades transversa
 Proteger a API contra:
 - Ataques de força bruta em login
 - Abuso de recursos por IP
-- Consumo excessivo por tenant autenticado
+- Consumo excessivo por organization autenticado
 
 ### Tiers
 
@@ -79,19 +79,19 @@ curl -X POST http://localhost:8080/v1/auth/login \
 }
 ```
 
-#### 3. Tenant-Based (Rotas Protegidas)
+#### 3. Organization-Based (Rotas Protegidas)
 
-Limita requisições por tenant autenticado para evitar consumo excessivo de recursos.
+Limita requisições por organization autenticado para evitar consumo excessivo de recursos.
 
 **Configuração:**
 ```env
-RATE_LIMIT_TENANT_WINDOW_SECONDS=60     # Janela de tempo (padrão: 60s)
-RATE_LIMIT_TENANT_MAX_REQUESTS=200      # Máximo de requisições (padrão: 200)
+RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS=60     # Janela de tempo (padrão: 60s)
+RATE_LIMIT_ORGANIZATION_MAX_REQUESTS=200      # Máximo de requisições (padrão: 200)
 ```
 
 **Exemplo:**
 ```bash
-# Máximo 200 requisições por minuto por tenant
+# Máximo 200 requisições por minuto por organization
 curl http://localhost:8080/v1/me \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
@@ -104,12 +104,12 @@ curl http://localhost:8080/v1/me \
 
 - `RateLimiterStore` — In-memory store com `sync.Mutex` e `map[string]*visitor`
 - `RateLimitByIP()` — Middleware para limitar por IP
-- `RateLimitByTenant()` — Middleware para limitar por tenant
+- `RateLimitByOrganization()` — Middleware para limitar por organization
 
 **Algoritmo:**
 
 ```
-1. Extrair chave (IP ou tenant_id)
+1. Extrair chave (IP ou organization_id)
 2. Verificar se visitor existe e não expirou
 3. Se expirado ou não existe: criar novo com count=1
 4. Se existe: incrementar count
@@ -163,7 +163,7 @@ Cada log contém:
 | `status` | int | HTTP status code (200, 401, 429, etc.) |
 | `latency_ms` | float64 | Tempo de processamento em ms |
 | `client_ip` | string | IP remoto do cliente |
-| `user_id` | string | tenant_id do JWT (vazio se não autenticado) |
+| `user_id` | string | organization_id do JWT (vazio se não autenticado) |
 
 ### Níveis de Log
 
@@ -177,7 +177,7 @@ Cada log contém:
 
 **Desenvolvimento (texto):**
 ```
-time=2026-03-13T10:15:30.123Z level=INFO msg="GET /v1/me" request_id=550e8400-e29b-41d4-a716-446655440000 method=GET path=/v1/me status=200 latency_ms=5.2 client_ip=127.0.0.1 user_id=tenant-123
+time=2026-03-13T10:15:30.123Z level=INFO msg="GET /v1/me" request_id=550e8400-e29b-41d4-a716-446655440000 method=GET path=/v1/me status=200 latency_ms=5.2 client_ip=127.0.0.1 user_id=organization-123
 ```
 
 **Produção (JSON):**
@@ -192,7 +192,7 @@ time=2026-03-13T10:15:30.123Z level=INFO msg="GET /v1/me" request_id=550e8400-e2
   "status": 200,
   "latency_ms": 5.2,
   "client_ip": "127.0.0.1",
-  "user_id": "tenant-123"
+  "user_id": "organization-123"
 }
 ```
 
@@ -333,7 +333,7 @@ A ordem de middleware é crítica:
 4. Errors()                — Serializa erros para JSON
 5. RateLimitByIP()         — Limita por IP (v1 group)
 6. Auth()                  — Valida JWT (protected group)
-7. RateLimitByTenant()     — Limita por tenant (protected group)
+7. RateLimitByOrganization()     — Limita por organization (protected group)
 ```
 
 **Diagrama:**
@@ -355,7 +355,7 @@ Handler
     ↓
 Auth (validate JWT)
     ↓
-RateLimitByTenant (check limit)
+RateLimitByOrganization (check limit)
     ↓
 Handler Logic
     ↓
@@ -379,9 +379,9 @@ RATE_LIMIT_MAX_REQUESTS=100
 RATE_LIMIT_LOGIN_WINDOW_SECONDS=300
 RATE_LIMIT_LOGIN_MAX_REQUESTS=5
 
-# Rate Limiting — Tenant (protected routes)
-RATE_LIMIT_TENANT_WINDOW_SECONDS=60
-RATE_LIMIT_TENANT_MAX_REQUESTS=200
+# Rate Limiting — Organization (protected routes)
+RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS=60
+RATE_LIMIT_ORGANIZATION_MAX_REQUESTS=200
 ```
 
 ---
@@ -433,7 +433,7 @@ go test ./... -v
 ### Rate Limiter
 
 - **Complexidade:** O(1) por requisição
-- **Memória:** O(n) onde n = número de chaves únicas (IPs ou tenants)
+- **Memória:** O(n) onde n = número de chaves únicas (IPs ou organizations)
 - **Limpeza:** Lazy (ao acessar chave expirada)
 
 ### Structured Logger

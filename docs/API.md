@@ -68,12 +68,12 @@ Health check da aplicação e dependências.
 
 ### POST /v1/auth/login
 
-Autentica um tenant e emite um par de tokens.
+Autentica uma organization e emite um par de tokens.
 
 **Request:**
 ```json
 {
-  "email": "tenant@example.com",
+  "email": "organization@example.com",
   "password": "senha123"
 }
 ```
@@ -147,7 +147,7 @@ Todas as rotas abaixo requerem `Authorization: Bearer <access_token>`.
 
 ### GET /v1/me
 
-Retorna informações do tenant autenticado extraídas do JWT.
+Retorna informações da organization autenticada extraídas do JWT.
 
 **Request Headers:**
 ```
@@ -157,7 +157,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 **Response (200 OK):**
 ```json
 {
-  "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
   "issued_at": "2026-03-13T10:00:00Z",
   "expires_at": "2026-03-13T10:15:00Z"
 }
@@ -181,7 +181,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### POST /v1/customers
 
-Cria um novo cliente para o tenant autenticado. Opcionalmente cria um endereço junto.
+Cria um novo cliente para a organization autenticada. Opcionalmente cria um endereço junto.
 
 **Request:**
 ```json
@@ -244,14 +244,14 @@ Cria um novo cliente para o tenant autenticado. Opcionalmente cria um endereço 
 
 **Response (409 Conflict):**
 ```json
-{ "error": "email already exists for this tenant" }
+{ "error": "email already exists for this organization" }
 ```
 
 ---
 
 ### GET /v1/customers
 
-Lista todos os clientes do tenant autenticado.
+Lista todos os clientes da organization autenticada.
 
 **Response (200 OK):**
 ```json
@@ -499,7 +499,7 @@ curl http://localhost:8080/v1/health
 curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "tenant@example.com",
+    "email": "organization@example.com",
     "password": "senha123"
   }'
 ```
@@ -524,7 +524,7 @@ curl -X POST http://localhost:8080/v1/auth/refresh \
 # Login e salva tokens em variáveis
 RESPONSE=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "tenant@example.com", "password": "senha123"}')
+  -d '{"email": "organization@example.com", "password": "senha123"}')
 
 ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.access_token')
 REFRESH_TOKEN=$(echo $RESPONSE | jq -r '.refresh_token')
@@ -590,8 +590,8 @@ A API implementa rate limiting em 3 tiers para proteção contra abuso e força 
 - Limite: 5 tentativas por 300 segundos (5 minutos) por IP
 - Aplica-se apenas a `POST /v1/auth/login`
 
-**3. Tenant-Based (Rotas Protegidas)**
-- Limite: 200 requisições por 60 segundos por tenant
+**3. Organization-Based (Rotas Protegidas)**
+- Limite: 200 requisições por 60 segundos por organization
 - Aplica-se a todas as rotas protegidas
 
 ### Headers de Resposta
