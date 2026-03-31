@@ -26,9 +26,9 @@ type Config struct {
 	RateLimitLoginWindowSeconds int
 	RateLimitLoginMaxRequests   int
 
-	// Rate limiting — Tenant (protected routes)
-	RateLimitTenantWindowSeconds int
-	RateLimitTenantMaxRequests   int
+	// Rate limiting — Organization (protected routes)
+	RateLimitOrganizationWindowSeconds int
+	RateLimitOrganizationMaxRequests   int
 }
 
 // envInt reads an environment variable and converts it to int.
@@ -61,7 +61,7 @@ func Load() *Config {
 		RateLimitMaxRequests:         envInt("RATE_LIMIT_MAX_REQUESTS", 100),
 		RateLimitLoginWindowSeconds:  envInt("RATE_LIMIT_LOGIN_WINDOW_SECONDS", 300),
 		RateLimitLoginMaxRequests:    envInt("RATE_LIMIT_LOGIN_MAX_REQUESTS", 5),
-		RateLimitTenantWindowSeconds: envInt("RATE_LIMIT_TENANT_WINDOW_SECONDS", 60),
-		RateLimitTenantMaxRequests:   envInt("RATE_LIMIT_TENANT_MAX_REQUESTS", 200),
+		RateLimitOrganizationWindowSeconds: envInt("RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS", 60),
+		RateLimitOrganizationMaxRequests:   envInt("RATE_LIMIT_ORGANIZATION_MAX_REQUESTS", 200),
 	}
 }
