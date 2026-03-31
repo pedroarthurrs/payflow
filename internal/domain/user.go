@@ -1,9 +1,9 @@
 package domain
 
-// Role represents a user's role within a tenant.
+// Role represents a user's role within an organization.
 type Role string
 
-// Roles available within a tenant.
+// Roles available within an organization.
 const (
 	RoleOwner  Role = "owner"
 	RoleAdmin  Role = "admin"
@@ -33,18 +33,18 @@ const (
 	AuthTypeSystem AuthType = "system"
 )
 
-// User represents a human user with access to a tenant's panel.
+// User represents a human user with access to an organization's panel.
 type User struct {
-	ID       string
-	TenantID string
-	Email    string
-	Name     string
-	Role     Role
+	ID             string
+	OrganizationID string
+	Email          string
+	Name           string
+	Role           Role
 }
 
 // LoginRequest represents the dynamic login payload.
 // Exactly one mode must be populated:
-//   - User mode: Email + Password (tenant resolved from user record)
+//   - User mode: Email + Password (organization resolved from user record)
 //   - System mode: APIKey
 type LoginRequest struct {
 	Email    string

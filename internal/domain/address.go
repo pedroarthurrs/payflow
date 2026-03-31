@@ -8,9 +8,9 @@ import (
 
 // Address represents an address entity in the domain layer.
 type Address struct {
-	ID           uuid.UUID
-	TenantID     uuid.UUID
-	CustomerID   uuid.UUID
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	CustomerID     uuid.UUID
 	Type         string
 	PostalCode   string
 	Street       string

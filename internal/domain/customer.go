@@ -9,9 +9,9 @@ import (
 
 // Customer represents a customer entity in the domain layer.
 type Customer struct {
-	ID           uuid.UUID
-	TenantID     uuid.UUID
-	Name         string
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
 	Email        string
 	Phone        *string
 	Document     string
