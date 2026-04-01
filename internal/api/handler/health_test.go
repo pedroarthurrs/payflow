@@ -7,12 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"i9pay/internal/service"
+	"i9pay/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
 
-func setupHealthRouter(svc *service.HealthService) *gin.Engine {
+func setupHealthRouter(svc *database.HealthChecker) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	h := NewHealthHandler(svc)
 	r := gin.New()
@@ -21,7 +21,7 @@ func setupHealthRouter(svc *service.HealthService) *gin.Engine {
 }
 
 func TestLive_Returns200Alive(t *testing.T) {
-	svc := service.NewHealthService(nil)
+	svc := database.NewHealthChecker(nil)
 	router := setupHealthRouter(svc)
 
 	w := httptest.NewRecorder()
@@ -45,7 +45,7 @@ func TestLive_Returns200Alive(t *testing.T) {
 }
 
 func TestReady_ServiceTrue_Returns200Ready(t *testing.T) {
-	svc := service.NewHealthService(nil)
+	svc := database.NewHealthChecker(nil)
 	svc.SetDatabaseOKForTest(true)
 	router := setupHealthRouter(svc)
 
@@ -70,8 +70,8 @@ func TestReady_ServiceTrue_Returns200Ready(t *testing.T) {
 }
 
 func TestReady_ServiceFalse_Returns503Unavailable(t *testing.T) {
-	svc := service.NewHealthService(nil)
-	// NewHealthService defaults to false
+	svc := database.NewHealthChecker(nil)
+	// NewHealthChecker defaults to false
 	router := setupHealthRouter(svc)
 
 	w := httptest.NewRecorder()

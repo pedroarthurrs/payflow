@@ -3,18 +3,18 @@ package handler
 import (
 	"net/http"
 
-	"i9pay/internal/service"
+	"i9pay/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
 
 // HealthHandler serves liveness and readiness probes.
 type HealthHandler struct {
-	healthSvc *service.HealthService
+	healthSvc *database.HealthChecker
 }
 
-// NewHealthHandler creates a HealthHandler backed by a HealthService.
-func NewHealthHandler(healthSvc *service.HealthService) *HealthHandler {
+// NewHealthHandler creates a HealthHandler backed by a HealthChecker.
+func NewHealthHandler(healthSvc *database.HealthChecker) *HealthHandler {
 	return &HealthHandler{healthSvc: healthSvc}
 }
 

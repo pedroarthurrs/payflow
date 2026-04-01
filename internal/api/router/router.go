@@ -18,7 +18,7 @@ const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
-func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthSvc *service.HealthService) *gin.Engine {
+func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recovery())
 	r.Use(middleware.RequestID())
@@ -48,7 +48,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthS
 	// Handlers
 	rootHandler := handler.NewRootHandler()
 	authHandler := handler.NewAuthHandler(authSvc, loginRL)
-	healthHandler := handler.NewHealthHandler(healthSvc)
+	healthHandler := handler.NewHealthHandler(healthCheck)
 	meHandler := handler.NewMeHandler()
 	customerHandler := handler.NewCustomerHandler(customerSvc)
 	addressHandler := handler.NewAddressHandler(addressSvc)
@@ -57,8 +57,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthS
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
 
-	// Grupo de versão /api/v1
-	v1 := r.Group("/api/v1")
+	// Grupo de versão /v1
+	v1 := r.Group("/v1")
 	v1.Use(middleware.RateLimitByIP(ipStore, cfg.RateLimitMaxRequests, ipWindow, "too many requests, try again later"))
 
 	// Rotas públicas

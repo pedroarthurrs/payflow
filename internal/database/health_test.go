@@ -1,4 +1,4 @@
-package service
+package database
 
 import (
 	"sync"
@@ -7,22 +7,22 @@ import (
 	"pgregory.net/rapid"
 )
 
-func TestNewHealthService_DatabaseOK_DefaultsFalse(t *testing.T) {
-	s := NewHealthService(nil)
+func TestNewHealthChecker_DatabaseOK_DefaultsFalse(t *testing.T) {
+	s := NewHealthChecker(nil)
 	if s.DatabaseOK() {
-		t.Fatal("expected DatabaseOK() to be false for a new HealthService")
+		t.Fatal("expected DatabaseOK() to be false for a new HealthChecker")
 	}
 }
 
-// Property 1: HealthService state reflects last ping outcome.
-// For any sequence of boolean outcomes applied via setDatabaseOK,
+// Property 1: HealthChecker state reflects last ping outcome.
+// For any sequence of boolean outcomes applied via updateDBStatus,
 // DatabaseOK() must equal the last value in the sequence.
-func TestProperty_HealthServiceStateReflectsLastPingOutcome(t *testing.T) {
+func TestProperty_HealthCheckerStateReflectsLastPingOutcome(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		s := NewHealthService(nil)
+		s := NewHealthChecker(nil)
 		outcomes := rapid.SliceOfN(rapid.Bool(), 1, 50).Draw(t, "outcomes")
 		for _, ok := range outcomes {
-			s.setDatabaseOK(ok)
+			s.updateDBStatus(ok)
 		}
 		last := outcomes[len(outcomes)-1]
 		if s.DatabaseOK() != last {
@@ -36,7 +36,7 @@ func TestProperty_HealthServiceStateReflectsLastPingOutcome(t *testing.T) {
 // without data races or panics.
 func TestProperty_ConcurrentReadsDataRaceFree(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		s := NewHealthService(nil)
+		s := NewHealthChecker(nil)
 		numReaders := rapid.IntRange(2, 20).Draw(t, "numReaders")
 		numWrites := rapid.IntRange(1, 50).Draw(t, "numWrites")
 
@@ -46,7 +46,7 @@ func TestProperty_ConcurrentReadsDataRaceFree(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < numWrites; i++ {
-				s.setDatabaseOK(i%2 == 0)
+				s.updateDBStatus(i%2 == 0)
 			}
 		}()
 
