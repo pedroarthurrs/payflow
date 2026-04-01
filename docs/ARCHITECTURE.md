@@ -1,195 +1,194 @@
 # Arquitetura
 
-## Visão Geral da Arquitetura
+## Visão Geral
 
-A arquitetura segue o padrão **Modular com Camadas Lógicas**, sem usar Clean Architecture, DDD ou Hexagonal. É pragmática e escalável:
+A arquitetura segue o padrão modular com camadas lógicas. Não utiliza Clean Architecture, DDD ou Hexagonal — é pragmática e orientada à escalabilidade incremental.
 
 ```
 ┌─────────────────────────────────────────────┐
-│   HTTP Layer (router + middleware)          │
+│   Camada HTTP (router + middleware)         │
 ├─────────────────────────────────────────────┤
-│   HTTP Handlers (handler/ — consolidado)    │
+│   Handlers (api/handler/)                   │
 ├─────────────────────────────────────────────┤
-│   Business Logic (services/)                │
+│   Lógica de Negócio (service/)              │
 ├─────────────────────────────────────────────┤
-│   Domain Models (domain/)                   │
+│   Modelos de Domínio (domain/)              │
 ├─────────────────────────────────────────────┤
-│   Database Access (database/)               │
+│   Acesso a Dados (database/)                │
 └─────────────────────────────────────────────┘
 ```
 
 ## Fluxo de Dados
 
 ```
-HTTP Request
+Requisição HTTP
     ↓
-Router + Middleware (Auth, Errors)
+Router + Middleware (Auth, Errors, RateLimit, Logger)
     ↓
-Handler (recebe payload HTTP)
+Handler (recebe e valida payload)
     ↓
 Service (lógica de negócio)
     ↓
-Domain (validações e modelos)
+Domain (modelos e validações)
     ↓
-Database (SQLC queries)
+Database (queries SQLC)
     ↓
-Response JSON
+Resposta JSON
 ```
+
+---
 
 ## Camadas
 
-### 1. HTTP Layer (`api/`)
+### Camada HTTP (`api/`)
 
 **Router** (`api/router/router.go`)
 - Definição de todas as rotas
 - Injeção de dependências (services, handlers)
-- Configuração de middleware
+- Configuração da cadeia de middleware
 
 **Handlers** (`api/handler/`)
-- Consolidados em um único pacote (um arquivo por recurso)
-- Tipos qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, `UserHandler`, etc.
-- Recebem requisições HTTP
-- Validam payload
+- Um arquivo por recurso, todos no mesmo pacote
+- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, `UserHandler`
+- Responsáveis por receber requisições HTTP e validar payload
 
 **DTOs** (`api/dto/`)
-- Data Transfer Objects compartilhados entre handlers
-- `context.go`: Extração de IDs do contexto Gin (OrganizationID, CustomerID)
-- `request.go`: Structs de request compartilhadas
-- `response.go`: Structs de response compartilhadas
+- Structs compartilhadas entre handlers
+- `context.go`: extração de IDs do contexto Gin (`OrganizationID`, `CustomerID`)
+- `request.go`: structs de requisição compartilhadas
+- `response.go`: structs de resposta compartilhadas
 
 **Middleware** (`api/middleware/`)
-- `auth.go`: Valida JWT e extrai claims
-- `errors.go`: Transforma erros de domínio em respostas HTTP
-- `ratelimit.go`: Rate limiting por IP e organization
-- `requestid.go`: Gera/propaga UUID v4 por requisição
-- `logger.go`: Structured logging com slog
+- `auth.go`: valida JWT e extrai claims
+- `errors.go`: transforma erros de domínio em respostas HTTP
+- `ratelimit.go`: rate limiting por IP e organization
+- `requestid.go`: gera e propaga UUID v4 por requisição
+- `logger.go`: logging estruturado com slog
 
-**Error Handling** (`api/err/`)
-- `apierr.go`: Tipos de erro customizados (BadRequest, Unauthorized, etc.)
-- `validation.go`: Tradução de erros de validação em mensagens legíveis
+**Tratamento de Erros** (`api/err/`)
+- `apierr.go`: tipos de erro customizados (`BadRequest`, `Unauthorized`, etc.)
+- `validation.go`: tradução de erros de validação em mensagens legíveis
 - Mapeamento para status HTTP
 
-### 2. Service Layer (`service/`)
+---
+
+### Camada de Serviço (`service/`)
 
 **AuthService** (`service/auth.go`)
-- Orquestra fluxo de autenticação
-- Valida credentials contra database
-- Coordena token service
-- Lógica de negócio isolada de HTTP
+- Orquestra o fluxo de autenticação
+- Valida credenciais contra o banco de dados
+- Coordena o token service
+- Lógica de negócio isolada da camada HTTP
 
 **CustomerService** (`service/customer.go`)
-- Gerenciamento completo de clientes (CRUD)
+- CRUD completo de clientes
 - Soft delete padrão (marca `deleted_at`)
 - Hard delete para conformidade legal (LGPD/GDPR)
 - Validação de unicidade (email, documento por organization)
 - Isolamento multi-organization
 
-Futura expansão:
-- `subscription_service.go` - Lógica de assinaturas
-- `invoice_service.go` - Geração de faturas
+Expansões planejadas:
+- `subscription.go` — lógica de assinaturas
+- `invoice.go` — geração de faturas
 
-### 3. Domain Layer (`domain/`)
+---
 
-**Models**
-- `organization.go`: Estruturas de dados puras (Credentials, etc.)
-- `errors.go`: Erros tipados de domínio
+### Camada de Domínio (`domain/`)
 
-Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
+Modelos de dados puros e erros tipados. Sem dependências de HTTP ou banco de dados.
 
-### 4. Database Layer (`database/`)
+- `organization.go`: estruturas de dados (Credentials, etc.)
+- `errors.go`: erros de domínio tipados
+
+---
+
+### Camada de Banco de Dados (`database/`)
 
 **Conexão** (`database/connection.go`)
 - Gerencia conexão com PostgreSQL
 - Expõe interface para queries via SQLC
 
-**SQLC Generated** (`database/dbgen/`)
-- `db.go`: Configuração do DB
-- `models.go`: Structs geradas do schema
-- `queries.sql.go`: Implementação type-safe das queries
+**Código gerado pelo SQLC** (`database/dbgen/`)
+- `db.go`: configuração do banco
+- `models.go`: structs geradas a partir do schema
+- `queries.sql.go`: implementação type-safe das queries
 
 **SQL** (`database/queries.sql`)
 - Queries neste arquivo geram código Go via `make sqlc`
-- Versionadas com migrations
+- Versionadas junto com as migrations
 
-### 5. Health Monitor (`database/health.go`)
+---
 
-**HealthChecker** (`database/health.go`)
-- Background goroutine pinga o banco a cada 15 segundos
-- Cacheia resultado no campo `dbStatus` com `sync.RWMutex` para leituras concorrentes seguras
-- Expõe `DatabaseOK() bool` consumido pelo `HealthHandler`
-- Estado interno atualizado via `updateDBStatus(bool)` (write-lock protegido)
+### Health Monitor (`database/health.go`)
+
+- Goroutine em background faz ping no banco a cada 15 segundos
+- Cacheia o resultado em `dbStatus` com `sync.RWMutex` para leituras concorrentes seguras
+- Expõe `DatabaseOK() bool`, consumido pelo `HealthHandler`
 - Separa liveness (processo vivo) de readiness (banco acessível)
 
-### 6. Token Service (`auth/token/`)
+---
 
-**JWT Service** (`auth/token/token.go`)
-- Criação de tokens (access + refresh)
+### Token Service (`auth/token/`)
+
+- Criação de tokens (access e refresh)
 - Validação e parsing de JWT
-- Suporta claims estendidos (organization_id, role, token_type)
+- Suporta claims estendidos (`organization_id`, `role`, `token_type`)
 - Isolado da lógica HTTP
 
-### 8. Config (`config/`)
+---
 
-**Configuration** (`config/config.go`)
+### Configuração (`config/`)
+
 - Carrega variáveis de ambiente
-- Validações de valores obrigatórios
-- Suporte a múltiplos ambientes (dev/staging/prod)
+- Valida valores obrigatórios
+- Suporte a múltiplos ambientes (development, staging, production)
+
+---
 
 ## Padrões e Decisões
 
-### Middleware Chain
+### Cadeia de Middleware
 
 A ordem de middleware é crítica para segurança e observabilidade:
 
 ```
-1. Recovery()              — Captura panics
-2. RequestID()             — Gera/propaga X-Request-ID (UUID v4)
-3. StructuredLogger()      — Registra requisição com slog
-4. Errors()                — Serializa erros para JSON
-5. RateLimitByIP()         — Limita por IP (v1 group)
-6. Auth()                  — Valida JWT (protected group)
-7. RateLimitByOrganization()     — Limita por organization (protected group)
+1. Recovery()                    — captura panics
+2. RequestID()                   — gera/propaga X-Request-ID (UUID v4)
+3. StructuredLogger()            — registra requisição com slog
+4. Errors()                      — serializa erros para JSON
+5. RateLimitByIP()               — limita por IP (grupo v1)
+6. Auth()                        — valida JWT (grupo protegido)
+7. RateLimitByOrganization()     — limita por organization (grupo protegido)
 ```
-
-Cada middleware é responsável por uma preocupação específica:
-- **Recovery**: Evita crashes
-- **RequestID**: Rastreabilidade
-- **StructuredLogger**: Observabilidade
-- **Errors**: Serialização consistente
-- **RateLimit**: Proteção contra abuso
-- **Auth**: Segurança
 
 ### Rate Limiting
 
 Implementado com 3 tiers independentes:
 
-1. **IP-Based** — Proteção geral contra abuso (100 req/min por IP)
-2. **Login-Specific** — Mitigação de força bruta (5 tentativas/5min por IP)
-3. **Organization-Based** — Isolamento de recursos (200 req/min por organization)
+1. Por IP — proteção geral contra abuso (100 req/min por IP)
+2. Por login — mitigação de força bruta (5 tentativas/5min por IP)
+3. Por organization — isolamento de recursos (200 req/min por organization)
 
-Cada tier usa uma `RateLimiterStore` separada com `sync.Mutex` e `map[string]*visitor`. Sem limpeza ativa (lazy cleanup).
+Cada tier usa uma `RateLimiterStore` separada com `sync.Mutex` e `map[string]*visitor`. Limpeza lazy (ao acessar chave expirada).
 
-### Structured Logging
+### Logging Estruturado
 
 Usa `log/slog` nativo do Go (1.21+):
-- **Produção**: JSON handler (machine-readable)
-- **Desenvolvimento**: Text handler (human-readable)
+- Produção: JSON handler (legível por máquina)
+- Desenvolvimento: Text handler (legível por humano)
 
 Cada log contém: `request_id`, `method`, `path`, `status`, `latency_ms`, `client_ip`, `user_id`.
 
-### Validation Translation
+### Tradução de Erros de Validação
 
 Converte erros brutos do `go-playground/validator` em mensagens legíveis:
 - `required` → `{field} is required`
 - `email` → `{field} must be a valid email`
 - Resposta estruturada com `field`, `rejected_value`, `message`
 
-### Handler Pattern
+### Padrão de Handler
 
 Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos:
-- Uma struct `{Recurso}Handler` com dependências
-- Uma função `New{Recurso}Handler()` para construção
-- Métodos para cada ação HTTP
 
 ```go
 package handler
@@ -205,7 +204,7 @@ func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 func (h *AuthHandler) Login(c *gin.Context) { /* ... */ }
 ```
 
-Sem usar framework DI. Dependências são passadas explicitamente no `router.go`:
+Sem framework de injeção de dependências. Dependências são passadas explicitamente no `router.go`:
 
 ```go
 tokenSvc := token.NewService(secret, ttl1, ttl2)
@@ -230,110 +229,87 @@ if err != nil {
 // {"error": "invalid credentials"}
 ```
 
-### Adicionar Nova Feature
+---
 
-1. Crie arquivo em `internal/api/handler/{feature}.go`
-2. Implemente handlers com dependências
-3. Se necessário, crie service em `internal/service/`
-4. Use domain models em `internal/domain/`
+## Adicionando Nova Feature
 
-Exemplo: Feature de Produtos
+### Estrutura de arquivos
 
 ```
 internal/
-├── api/handler/product.go          # HTTP API
-├── service/product.go              # Business logic
-└── domain/product.go               # Models
+├── api/handler/{feature}.go    — camada HTTP
+├── service/{feature}.go        — lógica de negócio
+└── domain/{feature}.go         — modelos (se necessário)
 ```
 
-### Usar Queries Geradas pelo SQLC
+### Usando queries geradas pelo SQLC
 
-1. Escreva query em `queries.sql`:
+1. Escreva a query em `internal/database/queries.sql`:
 ```sql
 -- name: GetProduct :one
 SELECT id, name, price FROM products WHERE id = $1;
 ```
 
-2. Gere código: `make sqlc`
+2. Gere o código:
+```bash
+make sqlc
+```
 
-3. Use em service:
+3. Use no service:
 ```go
 product, err := s.db.Queries.GetProduct(ctx, productID)
 ```
 
-## Testing Strategy
+4. Registre as rotas em `internal/api/router/router.go`.
 
-**Unittests**
-- Services: mock dependency (database)
-- Handlers: mock service
-- Domain: sem dependências, 100% testável
-
-**Integration Tests**
-- API endpoints com test database
-- Database transactions com rollback
-
-    h := handler.NewAuthHandler(mockAuthSvc)
-
-```go
-func TestLoginHandler(t *testing.T) {
-    // Mock service
-    mockAuthSvc := &mockAuthService{}
-    h := handler.NewAuthHandler(mockAuthSvc)
-    
-    // Test
-    c := &gin.Context{...}
-    h.Login(c)
-    
-    // Assert
-    assert.Equal(t, http.StatusOK, c.Writer.Status())
-}
-```
+---
 
 ## Segurança
 
-- **JWT Signing**: HMAC SHA-256
-- **Token TTLs**: Access curto (15min), Refresh longo (7dias)
-- **Password**: Placeholder, deve usar bcrypt em produção
-- **Headers**: Authorization obrigatório em rotas protegidas
-- **Middleware Recovery**: Captura panics
+- Assinatura JWT com HMAC SHA-256
+- TTLs curtos para access token (15min) e longos para refresh (7 dias)
+- Header `Authorization` obrigatório em rotas protegidas
+- Middleware `Recovery` captura panics
+
+---
 
 ## Conformidade Legal (LGPD/GDPR)
 
-### Hard Delete para Direito ao Esquecimento
+O `CustomerService` implementa `HardDelete()` para atender requisitos de remoção permanente de dados.
 
-O `CustomerService` implementa o método `HardDelete()` para atender requisitos legais de remoção permanente de dados:
-
-**Casos de Uso:**
+**Casos de uso:**
 - LGPD Art. 18 (Direito ao Esquecimento)
 - GDPR Art. 17 (Right to Erasure)
 - Ordens judiciais
 - Políticas de retenção de dados
 
-**Implementação:**
-```go
-// Uso interno apenas - não exposto via HTTP
-err := customerSvc.HardDelete(ctx, organizationID, customerID)
-```
-
-**Características:**
-- Operação irreversível (DELETE físico no banco)
-- Requer verificação de existência prévia
-- Log de auditoria automático (nível WARN)
-- Isolamento por organization (segurança multi-organization)
-
-**Diferença entre Delete e HardDelete:**
-- `Delete()`: Soft delete (marca `deleted_at`, dados preservados)
-- `HardDelete()`: Remoção física permanente (conformidade legal)
+**Diferença entre os métodos:**
+- `Delete()`: soft delete (marca `deleted_at`, dados preservados)
+- `HardDelete()`: remoção física permanente (conformidade legal)
 
 **Recomendações:**
 - Use `Delete()` para operações normais
 - Use `HardDelete()` apenas para requisições legais documentadas
-- Implemente processo de aprovação antes de executar
 - Mantenha logs de auditoria das operações de hard delete
+
+---
+
+## Estratégia de Testes
+
+**Testes unitários:**
+- Services: mock de dependências (banco de dados)
+- Handlers: mock de services
+- Domain: sem dependências, 100% testável
+
+**Testes de integração (planejados):**
+- Endpoints da API com banco de dados de teste
+- Transações com rollback
+
+---
 
 ## Performance
 
-- SQLC compila queries em build-time (zero runtime cost)
-- Middleware Recovery evita crashes
-- Short-lived access tokens reduzem exposição
-- Connection pooling via database/sql padrão
+- SQLC compila queries em build-time (zero custo em runtime)
+- Rate limiter com complexidade O(1) por requisição
+- Logging estruturado com overhead de ~1-2ms por requisição
+- Connection pooling via `database/sql` padrão

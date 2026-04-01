@@ -4,37 +4,41 @@ API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-ten
 
 ## Visão Geral
 
-i9pay é uma plataforma backend desenvolvida em **Go 1.26.1** com **Gin Framework**, projetada para gerenciar tenants, clientes, assinaturas, faturas e transações. A arquitetura é **modular** e pragmática.
+i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular e pragmática.
 
-**Stack:**
-- Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Docker
+Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Docker
 
-## Quick Start
+## Início Rápido
 
 ```bash
-# 1. Clone
+# 1. Clone o repositório
 git clone <repository-url>
 cd i9pay
 
-# 2. Suba o stack completo
-make build-dev
+# 2. Configure os Git hooks do projeto
+make setup-hooks
 
-# 3. Teste
-curl http://localhost:8080/v1/health
+# 3. Suba o stack completo
+make build-dev
 ```
 
-Pronto! API rodando em `http://localhost:8080`.
+A API estará disponível em `http://localhost:8080`.
+
+```bash
+# Verifique se está rodando
+curl http://localhost:8080/v1/live
+```
 
 ---
 
 ## Documentação
 
-- **[SETUP.md](/docs/SETUP.md)** — Como instalar e configurar localmente com Docker
-- **[API.md](/docs/API.md)** — Documentação completa de endpoints e exemplos cURL
-- **[ARCHITECTURE.md](/docs/ARCHITECTURE.md)** — Padrões e decisões de arquitetura
-- **[SECURITY_OBSERVABILITY.md](/docs/SECURITY_OBSERVABILITY.md)** — Rate Limiting, Structured Logging e Validação
-- **[DEVELOPMENT.md](/docs/DEVELOPMENT.md)** — Como contribuir e adicionar features
-- **[COMMANDS.md](/docs/COMMANDS.md)** — Referência de comandos disponíveis
+- [SETUP.md](docs/SETUP.md) — instalação e configuração local com Docker
+- [API.md](docs/API.md) — endpoints, exemplos e referência completa
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — padrões e decisões de arquitetura
+- [SECURITY_OBSERVABILITY.md](docs/SECURITY_OBSERVABILITY.md) — rate limiting, logging e validação
+- [DEVELOPMENT.md](docs/DEVELOPMENT.md) — guia de contribuição e adição de features
+- [COMMANDS.md](docs/COMMANDS.md) — referência de comandos disponíveis
 
 ---
 
@@ -42,55 +46,51 @@ Pronto! API rodando em `http://localhost:8080`.
 
 ```
 i9pay/
-├── cmd/server/               # Ponto de entrada (main.go)
-├── docker/                   # Dockerfiles (dev/prod)
-├── docs/                     # Documentação
+├── cmd/server/               — ponto de entrada (main.go)
+├── docker/                   — Dockerfiles (dev/prod)
+├── docs/                     — documentação
 ├── internal/
-│   ├── api/                  # Camada HTTP
-│   │   ├── handler/          # Handlers consolidados (um arquivo por recurso)
-│   │   ├── middleware/       # Auth, logging, rate limiting, errors
-│   │   ├── dto/              # Data Transfer Objects compartilhados
-│   │   ├── err/              # Error handling e tradução
-│   │   └── router/           # Router e testes de rotas
-│   ├── auth/                 # Autenticação
-│   │   └── token/            # JWT service
-│   ├── service/              # Lógica de negócio
-│   ├── domain/               # Modelos e validações
-│   ├── config/               # Configurações
-│   └── database/             # Conexão e queries (SQLC)
-├── migrations/               # SQL migrations versionadas
-├── Makefile                  # Comandos úteis
-├── go.mod / go.sum           # Dependências
-└── sqlc.yml                  # Configuração SQLC
+│   ├── api/
+│   │   ├── handler/          — handlers consolidados (um arquivo por recurso)
+│   │   ├── middleware/       — auth, logging, rate limiting, errors
+│   │   ├── dto/              — Data Transfer Objects compartilhados
+│   │   ├── err/              — tipos de erro e tradução de validação
+│   │   └── router/           — roteador e inicialização
+│   ├── auth/token/           — JWT service
+│   ├── service/              — lógica de negócio
+│   ├── domain/               — modelos e validações
+│   ├── config/               — configurações
+│   └── database/             — conexão e queries (SQLC)
+├── migrations/               — SQL migrations versionadas
+├── Makefile                  — comandos de build e desenvolvimento
+├── go.mod / go.sum           — dependências
+└── sqlc.yml                  — configuração SQLC
 ```
 
+---
 
+## Funcionalidades
+
+- Autenticação JWT com access e refresh tokens
+- Arquitetura multi-tenant com isolamento de dados
+- Health check com status de dependências
+- Rate limiting com 3 tiers (IP, login, organization)
+- Logging estruturado com slog (JSON em produção, texto em desenvolvimento)
+- Validação de entrada com mensagens traduzidas
+- Queries type-safe geradas pelo SQLC
+- Migrations versionadas com golang-migrate
+- Docker para desenvolvimento e produção
 
 ---
 
-## Features
+## Referências
 
-* Autenticação JWT com access e refresh tokens
-* Multi-tenant com isolamento de data
-* Health check com status de dependências
-* Rate Limiting com 3 tiers (IP, Login, Tenant)
-* Structured Logging com slog (JSON/Texto)
-* Validação de Input com mensagens traduzidas
-* Arquitetura modular e escalável
-* Migrations versionadas com Go Migrate
-* Type-safe queries com SQLC
-* Docker para dev e produção
+Novo no projeto:
+1. Leia [SETUP.md](docs/SETUP.md) para configurar o ambiente local
+2. Teste os endpoints com os exemplos em [API.md](docs/API.md)
+3. Explore a arquitetura em [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
----
-
-## Próximos Steps
-
-**Novo no projeto?**
-1. Leia [SETUP.md](/docs/SETUP.md) para setup local
-2. Teste com `curl` os exemplos em [API.md](/docs/API.md)
-3. Explore a arquitetura em [ARCHITECTURE.md](/docs/ARCHITECTURE.md)
-
-**Quer contribuir?**
-1. Veja [DEVELOPMENT.md](/docs/DEVELOPMENT.md) para adicionar features
-2. Consulte [COMMANDS.md](/docs/COMMANDS.md) para todos os comandos
-3. Execute `make help` para lista rápida
+Para contribuir:
+1. Veja [DEVELOPMENT.md](docs/DEVELOPMENT.md) para adicionar features
+2. Consulte [COMMANDS.md](docs/COMMANDS.md) para todos os comandos disponíveis
+3. Execute `make help` para a lista rápida de comandos

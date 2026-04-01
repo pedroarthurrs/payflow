@@ -1,181 +1,173 @@
-# Development Guide
+# Guia de Desenvolvimento
 
 ## Estrutura de Pastas
 
 ```
 i9pay/
-├── cmd/                      # Aplicações executáveis
-│   └── server/               # Servidor HTTP principal
-├── internal/                 # Código privado (não importável)
-│   ├── api/                  # Camada HTTP
-│   │   ├── router/           # Roteador e inicialização
-│   │   ├── middleware/       # Middlewares (auth, errors, etc)
-│   │   ├── handler/          # Handlers consolidados (um arquivo por recurso)
-│   │   ├── dto/              # Data Transfer Objects (requests/responses compartilhados)
-│   │   └── err/              # Tipos de erro customizados
-│   ├── service/              # Lógica de negócio
-│   ├── domain/               # Modelos e validações
-│   ├── config/               # Configurações
-│   ├── database/             # Conexão e queries (SQLC)
-│   └── token/                # JWT service
-├── migrations/               # SQL migrations
-├── docker/                   # Dockerfiles e compose
-│   ├── dev/                  # Development environment
-│   └── prod/                 # Production environment
-├── docs/					  # Documentação
-├── go.mod / go.sum           # Dependências
-├── sqlc.yml                  # Configuração SQLC
-└── Makefile                  # Comandos úteis
+├── cmd/
+│   └── server/               — servidor HTTP principal
+├── internal/
+│   ├── api/
+│   │   ├── router/           — roteador e inicialização
+│   │   ├── middleware/       — middlewares (auth, errors, logger, etc.)
+│   │   ├── handler/          — handlers consolidados (um arquivo por recurso)
+│   │   ├── dto/              — Data Transfer Objects compartilhados
+│   │   └── err/              — tipos de erro customizados
+│   ├── service/              — lógica de negócio
+│   ├── domain/               — modelos e validações
+│   ├── config/               — configurações
+│   ├── database/             — conexão e queries (SQLC)
+│   └── auth/token/           — JWT service
+├── migrations/               — SQL migrations
+├── docker/
+│   ├── dev/                  — ambiente de desenvolvimento
+│   └── prod/                 — ambiente de produção
+├── docs/                     — documentação
+├── go.mod / go.sum           — dependências
+├── sqlc.yml                  — configuração SQLC
+└── Makefile                  — comandos de build e desenvolvimento
 ```
 
-**Nota**: Handlers ficam consolidados em `internal/api/handler/` (um arquivo por recurso). DTOs compartilhados ficam em `internal/api/dto/`.
+Handlers ficam consolidados em `internal/api/handler/` (um arquivo por recurso). DTOs compartilhados ficam em `internal/api/dto/`.
+
+---
 
 ## Adicionando Nova Feature
 
-Exemplo: Implementar CRUD de Produtos.
+Exemplo: implementar CRUD de Produtos.
 
-### 1. Estrutura
-
-```bash
-touch internal/api/handler/product.go
-mkdir -p internal/service
-```
-
-### 2. Handler (`internal/api/handler/product.go`)
+### 1. Handler (`internal/api/handler/product.go`)
 
 ```go
 package handler
 
 import (
-	"i9pay/internal/api/err"
-	"i9pay/internal/service"
-	"net/http"
+    "net/http"
 
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+    "github.com/gin-gonic/gin"
+    "github.com/google/uuid"
+
+    apierr "i9pay/internal/api/err"
+    "i9pay/internal/service"
 )
 
 type ProductHandler struct {
-	productSvc *service.ProductService
+    productSvc *service.ProductService
 }
 
 func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
-	return &ProductHandler{productSvc: productSvc}
+    return &ProductHandler{productSvc: productSvc}
 }
 
-type CreateRequest struct {
-	Name  string `json:"name" binding:"required"`
-	Price int64  `json:"price" binding:"required,min=0"`
+type createProductRequest struct {
+    Name  string `json:"name" binding:"required"`
+    Price int64  `json:"price" binding:"required,min=0"`
 }
 
 func (h *ProductHandler) Create(c *gin.Context) {
-	var req CreateRequest
-	if e := c.ShouldBindJSON(&req); e != nil {
-		_ = c.Error(err.BadRequest(e.Error()))
-		return
-	}
+    var req createProductRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        _ = c.Error(apierr.BadRequest(err.Error()))
+        return
+    }
 
-	product, e := h.productSvc.Create(c.Request.Context(), req.Name, req.Price)
-	if e != nil {
-		_ = c.Error(err.Internal(e.Error()))
-		return
-	}
+    product, err := h.productSvc.Create(c.Request.Context(), req.Name, req.Price)
+    if err != nil {
+        _ = c.Error(apierr.Internal(err.Error()))
+        return
+    }
 
-	c.JSON(http.StatusCreated, product)
+    c.JSON(http.StatusCreated, product)
 }
 
 func (h *ProductHandler) Get(c *gin.Context) {
-	id, e := uuid.Parse(c.Param("id"))
-	if e != nil {
-		_ = c.Error(err.BadRequest("invalid product id"))
-		return
-	}
+    id, err := uuid.Parse(c.Param("id"))
+    if err != nil {
+        _ = c.Error(apierr.BadRequest("invalid product id"))
+        return
+    }
 
-	product, e := h.productSvc.Get(c.Request.Context(), id)
-	if e != nil {
-		_ = c.Error(err.NotFound("product not found"))
-		return
-	}
+    product, err := h.productSvc.Get(c.Request.Context(), id)
+    if err != nil {
+        _ = c.Error(apierr.NotFound("product not found"))
+        return
+    }
 
-	c.JSON(http.StatusOK, product)
+    c.JSON(http.StatusOK, product)
 }
 ```
 
-### 3. Service (`internal/service/product.go`)
+### 2. Service (`internal/service/product.go`)
 
 ```go
 package service
 
 import (
-	"context"
-	"i9pay/internal/database"
-	"time"
+    "context"
+    "time"
 
-	"github.com/google/uuid"
+    "github.com/google/uuid"
+
+    "i9pay/internal/database"
 )
 
 type Product struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Price     int64     `json:"price"`
-	CreatedAt time.Time `json:"created_at"`
+    ID        uuid.UUID `json:"id"`
+    Name      string    `json:"name"`
+    Price     int64     `json:"price"`
+    CreatedAt time.Time `json:"created_at"`
 }
 
 type ProductService struct {
-	db *database.DB
+    db *database.DB
 }
 
 func NewProductService(db *database.DB) *ProductService {
-	return &ProductService{db: db}
+    return &ProductService{db: db}
 }
 
 func (s *ProductService) Create(ctx context.Context, name string, price int64) (*Product, error) {
-	// TODO: Usar s.db.Queries.CreateProduct() com query gerada pelo SQLC
-	p := &Product{
-		ID:        uuid.New(),
-		Name:      name,
-		Price:     price,
-		CreatedAt: time.Now(),
-	}
-	return p, nil
+    // Use s.db.Queries.CreateProduct() com query gerada pelo SQLC
+    return &Product{
+        ID:        uuid.New(),
+        Name:      name,
+        Price:     price,
+        CreatedAt: time.Now(),
+    }, nil
 }
 
 func (s *ProductService) Get(ctx context.Context, id uuid.UUID) (*Product, error) {
-	// TODO: Usar s.db.Queries.GetProduct(ctx, id) com query gerada pelo SQLC
-	return nil, nil
+    // Use s.db.Queries.GetProduct(ctx, id) com query gerada pelo SQLC
+    return nil, nil
 }
 ```
 
-### 4. Domain (`internal/domain/product.go`) - Opcional
+### 3. Domain (`internal/domain/product.go`)
 
-Se tiver validação complexa ou modelos compartilhados:
+Opcional. Use quando houver validação complexa ou modelos compartilhados entre camadas.
 
 ```go
 package domain
 
-import (
-	"errors"
-
-	"github.com/google/uuid"
-)
+import "errors"
 
 var ErrInvalidPrice = errors.New("price must be positive")
 
 type Product struct {
-	ID    uuid.UUID
-	Name  string
-	Price int64
+    ID    string
+    Name  string
+    Price int64
 }
 
-func (p *Product) IsValid() error {
-	if p.Price <= 0 {
-		return ErrInvalidPrice
-	}
-	return nil
+func (p *Product) Validate() error {
+    if p.Price <= 0 {
+        return ErrInvalidPrice
+    }
+    return nil
 }
 ```
 
-### 5. SQL Queries (`internal/database/queries.sql`)
+### 4. SQL Queries (`internal/database/queries.sql`)
 
 ```sql
 -- name: CreateProduct :one
@@ -200,25 +192,20 @@ Gere o código:
 make sqlc
 ```
 
-### 6. Registrar no Router (`internal/api/router/router.go`)
+### 5. Registrar no Router (`internal/api/router/router.go`)
 
 ```go
-// No setup de handlers
 productSvc := service.NewProductService(db)
 productHandler := handler.NewProductHandler(productSvc)
 
-// Adicione rotas
 protected := v1.Group("/")
 protected.Use(middleware.Auth(tokenSvc))
 {
-	protected.GET("/me", meHandler.Get)
-	
-	// Novo: Produtos
-	productGroup := protected.Group("/products")
-	{
-		productGroup.POST("", productHandler.Create)
-		productGroup.GET("/:id", productHandler.Get)
-	}
+    productGroup := protected.Group("/products")
+    {
+        productGroup.POST("", productHandler.Create)
+        productGroup.GET("/:id", productHandler.Get)
+    }
 }
 ```
 
@@ -228,22 +215,18 @@ protected.Use(middleware.Auth(tokenSvc))
 
 ### Middleware
 
-Ao adicionar novo middleware, siga a ordem de execução:
+Ao adicionar novo middleware, respeite a ordem de execução:
 
 ```go
-// No router.go
 r := gin.New()
-r.Use(middleware.Recovery())           // 1. Captura panics
-r.Use(middleware.RequestID())          // 2. Gera UUID por requisição
-r.Use(middleware.StructuredLogger(logger))  // 3. Registra requisição
-r.Use(middleware.Errors())             // 4. Serializa erros
-// Rate limiters aplicados por grupo
-// Auth aplicado em rotas protegidas
+r.Use(middleware.Recovery())
+r.Use(middleware.RequestID())
+r.Use(middleware.StructuredLogger(logger))
+r.Use(middleware.Errors())
 ```
 
 Cada middleware deve:
-- Ser independente e testável
-- Não modificar o comportamento de outros
+- Ser independente e testável isoladamente
 - Registrar erros via `c.Error(err)` em vez de responder diretamente
 - Chamar `c.Next()` para passar para o próximo middleware
 
@@ -252,127 +235,95 @@ Cada middleware deve:
 Use `go-playground/validator` com tags estruturadas:
 
 ```go
-type CreateRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8,max=64"`
-	Name     string `json:"name" validate:"required,max=100"`
-}
-
-// No handler
-validate := validator.New()
-if err := validate.Struct(req); err != nil {
-	_ = c.Error(err)  // Middleware Errors() traduz automaticamente
-	return
+type createRequest struct {
+    Email    string `json:"email"    binding:"required,email"`
+    Password string `json:"password" binding:"required,min=8,max=64"`
+    Name     string `json:"name"     binding:"required,max=100"`
 }
 ```
 
 Mensagens são traduzidas automaticamente em `internal/api/err/validation.go`.
 
-### Naming
+### Nomenclatura
 
-- **Packages**: lowercase, sem underscore (`internal/api/handler`)
-- **Funcs/Methods**: camelCase (`createProduct`, `fetchOrganizationById`)
-- **Consts**: UPPER_SNAKE_CASE (`DEFAULT_TTL`, `MAX_RETRY`)
-- **Vars**: camelCase (`productID`, `isValid`)
+- Pacotes: lowercase sem underscore (`internal/api/handler`)
+- Funções e métodos: camelCase (`createProduct`, `fetchByID`)
+- Constantes: UPPER_SNAKE_CASE (`DEFAULT_TTL`, `MAX_RETRY`)
+- Variáveis: camelCase (`productID`, `isValid`)
 
-### Error Handling
+### Tratamento de Erros
 
-❌ **Evite:**
+Sempre envolva erros com contexto:
+
 ```go
+// Evite
 if err != nil {
-	return err  // Erro sem contexto
+    return err
 }
-```
 
-✅ **Prefira:**
-```go
+// Prefira
 if err != nil {
-	return fmt.Errorf("fetch product: %w", err)  // Wrapped com contexto
+    return fmt.Errorf("fetch product: %w", err)
 }
 ```
 
-### Dependency Injection
+### Injeção de Dependências
 
-Sempre explícita no constructor:
+Sempre explícita no construtor:
 
 ```go
-// ✅ Bom
-func NewProductService(db *database.DB, logger Logger) *ProductService {
-	return &ProductService{db, logger}
+// Correto
+func NewProductService(db *database.DB) *ProductService {
+    return &ProductService{db: db}
 }
 
-// ❌ Evite
-var globalDB *database.DB  // Global state
-func NewProductService() *ProductService {
-	return &ProductService{globalDB}
-}
+// Evite estado global
+var globalDB *database.DB
 ```
 
-### Tests
+### Organização de Testes
 
-Organize em `*_test.go` próximo ao código:
+Arquivos `*_test.go` colocados junto ao código:
 
 ```
 internal/
 ├── service/
 │   ├── product.go
-│   └── product_test.go      # Tests aqui
+│   └── product_test.go
 ├── api/handler/
 │   ├── product.go
-│   └── product_test.go      # Tests aqui
-```
-
-Exemplo test:
-
-```go
-func TestProductServiceCreate(t *testing.T) {
-	db := setupTestDB(t)
-	svc := service.NewProductService(db)
-
-	product, err := svc.Create(context.Background(), "Widget", 1000)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "Widget", product.Name)
-	assert.Equal(t, int64(1000), product.Price)
-}
+│   └── product_test.go
 ```
 
 ---
 
 ## Migrations
 
-### Criar Migration
+### Criar migration
 
 ```bash
 make migrate-create name=add_products_table
 ```
 
-Cria arquivo: `migrations/000004_add_products_table.up.sql`
-
 ### Escrever SQL
 
 ```sql
 CREATE TABLE IF NOT EXISTS products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    price INTEGER NOT NULL CHECK (price > 0),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE
+    name            VARCHAR(255) NOT NULL,
+    price           INTEGER NOT NULL CHECK (price > 0),
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at      TIMESTAMP WITH TIME ZONE
 );
 
 CREATE INDEX idx_products_organization_id ON products(organization_id);
 ```
 
-### Aplicar
+### Aplicar e reverter
 
 ```bash
 make migrate-up
-```
-
-### Reverter
-
-```bash
 make migrate-down
 ```
 
@@ -380,104 +331,84 @@ make migrate-down
 
 ## Testes
 
-### Rodar Testes
+### Executar testes
 
 ```bash
-# Todos
+# Todos os testes
 go test ./...
 
 # Pacote específico
 go test ./internal/service/...
 
-# Verbose
-go test -v ./...
-
-# Com coverage
+# Com cobertura
 go test -cover ./...
 
-# Coverage report
+# Relatório de cobertura
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-### Mock de Dependências
+### Mock de dependências
 
 Use [testify/mock](https://pkg.go.dev/github.com/stretchr/testify/mock):
-
-```bash
-go get github.com/stretchr/testify
-```
-
-Exemplo:
 
 ```go
 import "github.com/stretchr/testify/mock"
 
-type MockDB struct {
-	mock.Mock
+type mockDB struct {
+    mock.Mock
 }
 
-func (m *MockDB) GetProduct(ctx context.Context, id uuid.UUID) (Product, error) {
-	args := m.Called(ctx, id)
-	return args.Get(0).(Product), args.Error(1)
+func (m *mockDB) GetProduct(ctx context.Context, id uuid.UUID) (Product, error) {
+    args := m.Called(ctx, id)
+    return args.Get(0).(Product), args.Error(1)
 }
 
 func TestServiceGetProduct(t *testing.T) {
-	mockDB := &MockDB{}
-	mockDB.On("GetProduct", mock.Anything, mock.Anything).Return(Product{...}, nil)
+    db := &mockDB{}
+    db.On("GetProduct", mock.Anything, mock.Anything).Return(Product{Name: "Widget"}, nil)
 
-	svc := NewProductService(mockDB)
-	product, err := svc.Get(context.Background(), uuid.New())
+    svc := NewProductService(db)
+    product, err := svc.Get(context.Background(), uuid.New())
 
-	assert.NoError(t, err)
-	assert.Equal(t, "Widget", product.Name)
+    assert.NoError(t, err)
+    assert.Equal(t, "Widget", product.Name)
 }
 ```
 
 ---
 
-## Code Quality
+## Qualidade de Código
 
-### Formatting
+### Formatação
 
 ```bash
-# Format all
 go fmt ./...
+```
 
-# Automático no save (VSCode)
-# Addione ao .vscode/settings.json:
+Configuração recomendada para VSCode (`.vscode/settings.json`):
+```json
 "[go]": {
-	"editor.formatOnSave": true,
-	"editor.codeActionsOnSave": {
-	"source.organizeImports": "always"
-	}
-},
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "always"
+    }
+}
 ```
 
-### Linting
+### Lint e vet
 
 ```bash
-# Instale
-golangci-lint run
-
-# No Makefile:
 make lint
-```
-
-### Vet
-
-```bash
-go vet ./...
+make vet
 ```
 
 ---
 
-## Committing
-
-### Commit Message Format
+## Convenção de Commits
 
 ```
-feature: add product CRUD endpoints
+feat: add product CRUD endpoints
 
 - Create product with POST /v1/products
 - Get product with GET /v1/products/{id}
@@ -486,7 +417,7 @@ feature: add product CRUD endpoints
 
 ---
 
-## Recursos Úteis
+## Referências
 
 - [Effective Go](https://golang.org/doc/effective_go)
 - [Gin Framework](https://gin-gonic.com/)

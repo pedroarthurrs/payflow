@@ -5,7 +5,7 @@ export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"
 
 echo "Running pre-commit checks..."
 
-echo "→ make fmt"
+echo "make fmt"
 make fmt
 
 # Check if any Go files were modified by fmt
@@ -14,7 +14,7 @@ if ! git diff --quiet -- '*.go' 2>/dev/null; then
   exit 1
 fi
 
-echo "→ make tidy"
+echo "make tidy"
 make tidy
 
 # Check if go.mod or go.sum were modified by tidy
@@ -23,13 +23,13 @@ if ! git diff --quiet go.mod go.sum 2>/dev/null; then
   exit 1
 fi
 
-echo "→ make vet"
+echo "make vet"
 make vet
 
-echo "→ make lint"
+echo "make lint"
 make lint
 
-echo "→ make test"
+echo "make test"
 make test
 
 echo "All checks passed."

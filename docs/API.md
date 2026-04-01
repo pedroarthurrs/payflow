@@ -1,40 +1,40 @@
-# API Documentation
+# API
 
-## Base URL
+## URL Base
 
 ```
 http://localhost:8080
 ```
 
-## Authentication
+## Autenticação
 
-Rotas protegidas requerem um header `Authorization`:
+Rotas protegidas requerem o header `Authorization`:
 
 ```
 Authorization: Bearer <access_token>
 ```
 
-Onde `access_token` é obtido via `/v1/auth/login` ou `/v1/auth/refresh`.
+O `access_token` é obtido via `POST /v1/auth/login` ou `POST /v1/auth/refresh`.
 
-## Response Format
+## Formato de Resposta
 
 Todas as respostas são JSON. Erros seguem o formato:
 
 ```json
 {
-  "error": "mensagem de erro descritivo"
+  "error": "mensagem de erro descritiva"
 }
 ```
 
 ---
 
-## Public Endpoints
+## Rotas Públicas
 
 ### GET /
 
 Informações básicas sobre a API.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "name": "i9pay"
@@ -47,7 +47,7 @@ Informações básicas sobre a API.
 
 Liveness probe — indica que o processo está rodando.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "status": "alive"
@@ -62,14 +62,14 @@ Readiness probe — indica que a aplicação está pronta para receber tráfego 
 
 Um `HealthMonitor` em background faz ping no banco a cada 15 segundos e cacheia o resultado. A resposta reflete o último estado conhecido.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "status": "ready"
 }
 ```
 
-**Response (503 Service Unavailable):**
+**Resposta (503 Service Unavailable):**
 ```json
 {
   "status": "unavailable"
@@ -82,7 +82,7 @@ Um `HealthMonitor` em background faz ping no banco a cada 15 segundos e cacheia 
 
 Autentica uma organization e emite um par de tokens.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "email": "organization@example.com",
@@ -90,7 +90,7 @@ Autentica uma organization e emite um par de tokens.
 }
 ```
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -100,14 +100,14 @@ Autentica uma organization e emite um par de tokens.
 }
 ```
 
-**Response (400 Bad Request):**
+**Resposta (400 Bad Request):**
 ```json
 {
   "error": "email and password are required"
 }
 ```
 
-**Response (401 Unauthorized):**
+**Resposta (401 Unauthorized):**
 ```json
 {
   "error": "invalid credentials"
@@ -120,14 +120,14 @@ Autentica uma organization e emite um par de tokens.
 
 Emite um novo par de tokens usando um refresh token válido.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -137,14 +137,14 @@ Emite um novo par de tokens usando um refresh token válido.
 }
 ```
 
-**Response (400 Bad Request):**
+**Resposta (400 Bad Request):**
 ```json
 {
   "error": "refresh_token is required"
 }
 ```
 
-**Response (401 Unauthorized):**
+**Resposta (401 Unauthorized):**
 ```json
 {
   "error": "invalid or expired refresh token"
@@ -153,7 +153,7 @@ Emite um novo par de tokens usando um refresh token válido.
 
 ---
 
-## Protected Endpoints
+## Rotas Protegidas
 
 Todas as rotas abaixo requerem `Authorization: Bearer <access_token>`.
 
@@ -161,12 +161,7 @@ Todas as rotas abaixo requerem `Authorization: Bearer <access_token>`.
 
 Retorna informações da organization autenticada extraídas do JWT.
 
-**Request Headers:**
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "organization_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -175,17 +170,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-**Response (401 Unauthorized):**
+**Resposta (401 Unauthorized):**
 ```json
 {
   "error": "authorization header required"
-}
-```
-
-**Response (401 Unauthorized):**
-```json
-{
-  "error": "invalid or expired token"
 }
 ```
 
@@ -195,7 +183,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 Cria um novo cliente para a organization autenticada. Opcionalmente cria um endereço junto.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "name": "João Silva",
@@ -219,9 +207,9 @@ Cria um novo cliente para a organization autenticada. Opcionalmente cria um ende
 }
 ```
 
-> Os campos `phone`, `metadata` e `address` são opcionais.
+Os campos `phone`, `metadata` e `address` são opcionais.
 
-**Response (201 Created):**
+**Resposta (201 Created):**
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440001",
@@ -252,11 +240,13 @@ Cria um novo cliente para a organization autenticada. Opcionalmente cria um ende
 }
 ```
 
-> O campo `address` só aparece na resposta se foi enviado na requisição.
+O campo `address` só aparece na resposta se foi enviado na requisição.
 
-**Response (409 Conflict):**
+**Resposta (409 Conflict):**
 ```json
-{ "error": "email already exists for this organization" }
+{
+  "error": "email already exists for this organization"
+}
 ```
 
 ---
@@ -265,7 +255,7 @@ Cria um novo cliente para a organization autenticada. Opcionalmente cria um ende
 
 Lista todos os clientes da organization autenticada.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 [
   {
@@ -287,7 +277,7 @@ Lista todos os clientes da organization autenticada.
 
 Retorna um cliente pelo ID.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440001",
@@ -302,9 +292,11 @@ Retorna um cliente pelo ID.
 }
 ```
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "customer not found" }
+{
+  "error": "customer not found"
+}
 ```
 
 ---
@@ -313,7 +305,7 @@ Retorna um cliente pelo ID.
 
 Atualiza um cliente. Todos os campos obrigatórios devem ser enviados.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "name": "João Silva Atualizado",
@@ -323,30 +315,34 @@ Atualiza um cliente. Todos os campos obrigatórios devem ser enviados.
 }
 ```
 
-**Response (200 OK):** mesmo formato do `GET /v1/customers/:customer_id`.
+**Resposta (200 OK):** mesmo formato do `GET /v1/customers/:customer_id`.
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "customer not found" }
+{
+  "error": "customer not found"
+}
 ```
 
 ---
 
 ### DELETE /v1/customers/:customer_id
 
-Remove um cliente (soft delete por padrão). Para hard delete (conformidade LGPD/GDPR), use o query param `?hard=true`.
+Remove um cliente. Por padrão realiza soft delete. Para remoção permanente (conformidade LGPD/GDPR), use o parâmetro `?hard=true`.
 
-**Query Parameters:**
+**Parâmetros de query:**
 
-| Param | Tipo | Descrição |
-|-------|------|-----------|
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
 | `hard` | bool | Se `true`, remove permanentemente os dados |
 
-**Response (204 No Content):** sem body.
+**Resposta (204 No Content):** sem body.
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "customer not found" }
+{
+  "error": "customer not found"
+}
 ```
 
 ---
@@ -355,7 +351,7 @@ Remove um cliente (soft delete por padrão). Para hard delete (conformidade LGPD
 
 Adiciona um endereço a um cliente.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "type": "shipping",
@@ -369,9 +365,9 @@ Adiciona um endereço a um cliente.
 }
 ```
 
-> `type` deve ser um de: `billing`, `shipping`, `home`. Os campos `number`, `complement`, `neighborhood` e `country` são opcionais.
+`type` deve ser um de: `billing`, `shipping`, `home`. Os campos `number`, `complement`, `neighborhood` e `country` são opcionais.
 
-**Response (201 Created):**
+**Resposta (201 Created):**
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440003",
@@ -394,7 +390,7 @@ Adiciona um endereço a um cliente.
 
 Lista todos os endereços de um cliente.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 [
   {
@@ -418,11 +414,13 @@ Lista todos os endereços de um cliente.
 
 Retorna um endereço específico.
 
-**Response (200 OK):** mesmo formato de um item da listagem acima.
+**Resposta (200 OK):** mesmo formato de um item da listagem acima.
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "address not found" }
+{
+  "error": "address not found"
+}
 ```
 
 ---
@@ -431,9 +429,9 @@ Retorna um endereço específico.
 
 Atualiza um endereço.
 
-**Request:** mesmo formato do `POST /v1/customers/:customer_id/addresses`.
+**Requisição:** mesmo formato do `POST /v1/customers/:customer_id/addresses`.
 
-**Response (200 OK):** mesmo formato do `GET /v1/customers/:customer_id/addresses/:id`.
+**Resposta (200 OK):** mesmo formato do `GET /v1/customers/:customer_id/addresses/:id`.
 
 ---
 
@@ -441,11 +439,13 @@ Atualiza um endereço.
 
 Remove um endereço.
 
-**Response (204 No Content):** sem body.
+**Resposta (204 No Content):** sem body.
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "address not found" }
+{
+  "error": "address not found"
+}
 ```
 
 ---
@@ -454,7 +454,7 @@ Remove um endereço.
 
 Cria um novo usuário na organization. Requer role `owner`.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "name": "Alice",
@@ -464,9 +464,9 @@ Cria um novo usuário na organization. Requer role `owner`.
 }
 ```
 
-> `role` deve ser um de: `owner`, `admin`, `operator`.
+`role` deve ser um de: `owner`, `admin`, `operator`.
 
-**Response (201 Created):**
+**Resposta (201 Created):**
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440010",
@@ -477,9 +477,11 @@ Cria um novo usuário na organization. Requer role `owner`.
 }
 ```
 
-**Response (409 Conflict):**
+**Resposta (409 Conflict):**
 ```json
-{ "error": "email already exists for this organization" }
+{
+  "error": "email already exists for this organization"
+}
 ```
 
 ---
@@ -488,7 +490,7 @@ Cria um novo usuário na organization. Requer role `owner`.
 
 Lista todos os usuários da organization. Requer role `admin` ou superior.
 
-**Response (200 OK):**
+**Resposta (200 OK):**
 ```json
 [
   {
@@ -507,7 +509,7 @@ Lista todos os usuários da organization. Requer role `admin` ou superior.
 
 Atualiza nome e role de um usuário. Requer role `owner`.
 
-**Request:**
+**Requisição:**
 ```json
 {
   "name": "Alice",
@@ -515,11 +517,13 @@ Atualiza nome e role de um usuário. Requer role `owner`.
 }
 ```
 
-**Response (200 OK):** mesmo formato do item da listagem acima.
+**Resposta (200 OK):** mesmo formato do item da listagem acima.
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "user not found" }
+{
+  "error": "user not found"
+}
 ```
 
 ---
@@ -528,37 +532,42 @@ Atualiza nome e role de um usuário. Requer role `owner`.
 
 Remove um usuário da organization. Requer role `owner`.
 
-**Response (204 No Content):** sem body.
+**Resposta (204 No Content):** sem body.
 
-**Response (404 Not Found):**
+**Resposta (404 Not Found):**
 ```json
-{ "error": "user not found" }
+{
+  "error": "user not found"
+}
 ```
 
 ---
 
-## HTTP Status Codes
+## Códigos de Status HTTP
 
-| Code | Meaning | Exemplo |
-|------|---------|---------|
+| Código | Significado | Exemplo |
+|--------|-------------|---------|
 | 200 | OK | Requisição bem-sucedida |
+| 201 | Created | Recurso criado com sucesso |
+| 204 | No Content | Operação bem-sucedida sem retorno |
 | 400 | Bad Request | Validação falhou (payload inválido) |
 | 401 | Unauthorized | Token ausente ou inválido |
 | 403 | Forbidden | Acesso proibido |
 | 404 | Not Found | Recurso não encontrado |
 | 409 | Conflict | Conflito (ex: email já existe) |
-| 500 | Internal Server Error | Erro não esperado |
-| 503 | Service Unavailable | Dependência indisponível (ex: DB) |
+| 429 | Too Many Requests | Limite de requisições excedido |
+| 500 | Internal Server Error | Erro inesperado |
+| 503 | Service Unavailable | Dependência indisponível (ex: banco de dados) |
 
 ---
 
-## JWT Token Details
+## Tokens JWT
 
 ### Access Token
 
-- **Tipo**: JWT (HS256)
-- **TTL**: 15 minutos
-- **Claims**:
+- Algoritmo: HS256
+- TTL: 15 minutos
+- Claims:
   ```json
   {
     "sub": "550e8400-e29b-41d4-a716-446655440000",
@@ -571,9 +580,9 @@ Remove um usuário da organization. Requer role `owner`.
 
 ### Refresh Token
 
-- **Tipo**: JWT (HS256)
-- **TTL**: 7 dias
-- **Claims**:
+- Algoritmo: HS256
+- TTL: 7 dias
+- Claims:
   ```json
   {
     "sub": "550e8400-e29b-41d4-a716-446655440000",
@@ -586,132 +595,36 @@ Remove um usuário da organization. Requer role `owner`.
 
 ---
 
-## cURL Examples
-
-### Liveness Probe
-```bash
-curl http://localhost:8080/v1/live
-```
-
-### Readiness Probe
-```bash
-curl http://localhost:8080/v1/ready
-```
-
-### Login
-```bash
-curl -X POST http://localhost:8080/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "organization@example.com",
-    "password": "senha123"
-  }'
-```
-
-### Get Current User
-```bash
-curl http://localhost:8080/v1/me \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### Refresh Token
-```bash
-curl -X POST http://localhost:8080/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token": "YOUR_REFRESH_TOKEN"
-  }'
-```
-
-### Using jq to Extract Tokens
-```bash
-# Login e salva tokens em variáveis
-RESPONSE=$(curl -s -X POST http://localhost:8080/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "organization@example.com", "password": "senha123"}')
-
-ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.access_token')
-REFRESH_TOKEN=$(echo $RESPONSE | jq -r '.refresh_token')
-
-# Use o token
-curl http://localhost:8080/v1/me \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
-```
-
----
-
-## API Collections
-
-Você pode importar as rotas em ferramentas como **Postman**, **Insomnia** ou **Thunder Client**.
-
-### Postman Collection (manual)
-
-1. Crie nova Collection "i9pay"
-2. Adicione requests POST e GET com os URLs acima
-3. Configure headers de autenticação
-4. Use environment variables para armazenar tokens
-
-### Example com curl (script)
-
-```bash
-#!/bin/bash
-
-API_BASE="http://localhost:8080"
-
-# 1. Health Probes
-echo "=== Liveness ==="
-curl $API_BASE/v1/live
-echo "\n=== Readiness ==="
-curl $API_BASE/v1/ready
-
-# 2. Login
-echo "\n=== Login ==="
-TOKENS=$(curl -s -X POST "$API_BASE/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "test123"}')
-
-echo "$TOKENS" | jq .
-
-ACCESS_TOKEN=$(echo "$TOKENS" | jq -r '.access_token')
-
-# 3. Get Current User
-echo "\n=== Get Current User ==="
-curl "$API_BASE/v1/me" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq .
-```
-
----
-
 ## Rate Limiting
 
 A API implementa rate limiting em 3 tiers para proteção contra abuso e força bruta.
 
 ### Tiers
 
-**1. IP-Based (Rotas Públicas)**
+**1. Por IP (rotas públicas)**
 - Limite: 100 requisições por 60 segundos por IP
 - Aplica-se a todas as rotas públicas
 
-**2. Login-Specific**
+**2. Por login**
 - Limite: 5 tentativas por 300 segundos (5 minutos) por IP
 - Aplica-se apenas a `POST /v1/auth/login`
 
-**3. Organization-Based (Rotas Protegidas)**
+**3. Por organization (rotas protegidas)**
 - Limite: 200 requisições por 60 segundos por organization
 - Aplica-se a todas as rotas protegidas
 
 ### Headers de Resposta
 
-Todas as respostas incluem headers de rate limit:
-
 ```
-X-RateLimit-Limit: 100              # Limite máximo
-X-RateLimit-Remaining: 95           # Requisições restantes
-X-RateLimit-Reset: 1678800000       # Unix timestamp do reset
-Retry-After: 45                      # Segundos até reset (apenas em 429)
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1678800000
+Retry-After: 45
 ```
 
-### Resposta ao Exceder Limite (429)
+`Retry-After` é incluído apenas em respostas 429.
+
+### Resposta ao Exceder o Limite (429)
 
 ```json
 {
@@ -719,7 +632,7 @@ Retry-After: 45                      # Segundos até reset (apenas em 429)
 }
 ```
 
-Ou para login:
+Para login:
 
 ```json
 {
@@ -727,15 +640,15 @@ Ou para login:
 }
 ```
 
-### Configuração
+Veja [SECURITY_OBSERVABILITY.md](SECURITY_OBSERVABILITY.md#rate-limiting) para configuração via variáveis de ambiente.
 
-Veja [SECURITY_OBSERVABILITY.md](/docs/SECURITY_OBSERVABILITY.md#rate-limiting) para detalhes de configuração via variáveis de ambiente.
+---
 
-## Validation Errors
+## Erros de Validação
 
 Quando a validação de entrada falha, a API retorna um array estruturado de erros:
 
-**Response (400 Bad Request):**
+**Resposta (400 Bad Request):**
 ```json
 {
   "errors": [
@@ -753,13 +666,60 @@ Quando a validação de entrada falha, a API retorna um array estruturado de err
 }
 ```
 
-### Mensagens Traduzidas
+### Mensagens por Tag de Validação
 
-| Validação | Mensagem |
-|-----------|----------|
+| Tag | Mensagem |
+|-----|----------|
 | `required` | `{field} is required` |
 | `email` | `{field} must be a valid email` |
 | `min` | `{field} must be at least {param}` |
 | `max` | `{field} must be at most {param}` |
 
-Veja [SECURITY_OBSERVABILITY.md](/docs/SECURITY_OBSERVABILITY.md#input-validation-translation) para mais detalhes.
+Veja [SECURITY_OBSERVABILITY.md](SECURITY_OBSERVABILITY.md#tradução-de-erros-de-validação) para mais detalhes.
+
+---
+
+## Exemplos com cURL
+
+### Liveness probe
+```bash
+curl http://localhost:8080/v1/live
+```
+
+### Readiness probe
+```bash
+curl http://localhost:8080/v1/ready
+```
+
+### Login
+```bash
+curl -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "organization@example.com", "password": "senha123"}'
+```
+
+### Dados do usuário autenticado
+```bash
+curl http://localhost:8080/v1/me \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+### Refresh de token
+```bash
+curl -X POST http://localhost:8080/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "$REFRESH_TOKEN"}'
+```
+
+### Extraindo tokens com jq
+```bash
+RESPONSE=$(curl -s -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "organization@example.com", "password": "senha123"}')
+
+ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.access_token')
+REFRESH_TOKEN=$(echo $RESPONSE | jq -r '.refresh_token')
+
+curl http://localhost:8080/v1/me \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```

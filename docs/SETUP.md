@@ -2,16 +2,17 @@
 
 ## Pré-requisitos
 
-- **Go 1.26.1+** ([download](https://go.dev/dl/))
-- **Docker & Docker Compose** ([install](https://docs.docker.com/get-docker/))
-- **Make** (opcional, facilita comandos)
-  - Linux/Mac: `brew install make`
-  - Windows: Use WSL2 ou `choco install make`
+- Go 1.26.1+ ([download](https://go.dev/dl/))
+- Docker e Docker Compose ([instalação](https://docs.docker.com/get-docker/))
+- Make
+  - Linux: `sudo apt install make`
+  - macOS: `brew install make`
+  - Windows: use WSL2 ou `choco install make`
 
-## Quick Start (Docker)
+## Início Rápido
 
 ```bash
-# 1. Clone
+# 1. Clone o repositório
 git clone <repository-url>
 cd i9pay
 
@@ -20,47 +21,45 @@ make setup-hooks
 
 # 3. Suba o stack completo
 make build-dev
-
-# Pronto! API rodando em http://localhost:8080
 ```
+
+A API estará disponível em `http://localhost:8080`.
 
 ---
 
-## Setup Detalhado
+## Configuração Detalhada
 
-### 1. Variáveis de Ambiente
+### Variáveis de Ambiente
 
-O arquivo `.env` existe no repositório e é único para todos os ambientes. As variáveis **não utilizam sufixos** por ambiente — o controle de ambiente é feito apenas pela variável `GO_ENV`.
+O arquivo `.env` é único para todos os ambientes. O controle de ambiente é feito pela variável `GO_ENV`.
 
-**Para executar em diferentes ambientes, defina:**
-- `GO_ENV=development`
-- `GO_ENV=staging`
-- `GO_ENV=production`
+**Valores possíveis para `GO_ENV`:**
+- `development`
+- `staging`
+- `production`
 
-Em produção, as variáveis devem vir via sistema de secrets do orquestrador (K8s, ECS, etc.) em vez do arquivo `.env`.
+Em produção, as variáveis devem vir via sistema de secrets do orquestrador (Kubernetes, ECS, etc.) em vez do arquivo `.env`.
 
-### 2. Rodando com Docker
+### Executando com Docker
 
-**Importante:** A execução local deve ser sempre feita com Docker para padronizar o ambiente.
+A execução local deve ser sempre feita com Docker para padronizar o ambiente.
 
-#### Build e Execução
+**Build e execução:**
 ```bash
 make build-dev
 ```
 
-Este comando:
-- Contrói as imagens Docker
-- Sobe os containers (API + PostgreSQL)
-- Aplica as migrations automaticamente
+Este comando constrói as imagens Docker, sobe os containers (API + PostgreSQL) e aplica as migrations automaticamente.
 
-A API estará em `http://localhost:8080` e o DB em `localhost:5433`.
+- API: `http://localhost:8080`
+- Banco de dados: `localhost:5433`
 
-#### Parar os containers
+**Parar os containers:**
 ```bash
 make down
 ```
 
-#### Remover containers e volumes
+**Remover containers e volumes:**
 ```bash
 make remove
 ```
@@ -69,14 +68,9 @@ Use quando quiser limpar completamente e recomeçar do zero.
 
 ---
 
-## Verificar se está Rodando
+## Verificando o Ambiente
 
 ### Health Check
-
-O serviço expõe duas rotas de health:
-
-- **Liveness** (`/live`): indica que o processo está rodando.
-- **Readiness** (`/ready`): indica que o serviço está pronto para receber tráfego (banco de dados disponível).
 
 ```bash
 # Liveness probe
@@ -88,7 +82,8 @@ curl http://localhost:8080/v1/ready
 # Resposta: {"status": "ready"} ou 503 {"status": "unavailable"}
 ```
 
-### Test Login
+### Teste de Login
+
 ```bash
 curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
@@ -97,58 +92,11 @@ curl -X POST http://localhost:8080/v1/auth/login \
 
 ---
 
-## Troubleshooting
-
-### Porta 5433 já em uso
-
-```bash
-# Verifique qual processo está usando
-lsof -i :5433
-
-# Ou, mude a porta em docker-compose.yml
-# Altere: "5433:5432" para "5434:5432"
-```
-
-### Database connection refused
-
-```bash
-# Verifique se o container está rodando
-docker ps
-
-# Se não aparecer, rode:
-make dev
-
-# Verifique logs
-docker logs $(docker ps -q --filter "ancestor=postgres:15")
-```
-
-### JWT_SECRET não configurada
-
-Certifique-se que `.env` existe e tem a variável de secret:
-```bash
-JWT_SECRET=your-secret-key-change-me
-```
-
-Mude para um valor seguro. Em produção, as variáveis devem vir via sistema de secrets do orquestrador (K8s, ECS, etc).
-
-### Containers não iniciam
-
-```bash
-# Verifique logs
-docker compose -f docker/dev/docker-compose.yml logs
-
-# Limpe e tente novamente
-make remove
-make build-dev
-```
-
----
-
-## Ambiente de Desenvolvimento
+## Ferramentas de Desenvolvimento
 
 ### Git Hooks
 
-Configure os hooks do projeto para garantir que convenções de commit e verificações sejam aplicadas localmente:
+Configure os hooks do projeto para garantir que verificações sejam aplicadas localmente:
 
 ```bash
 make setup-hooks
@@ -156,7 +104,7 @@ make setup-hooks
 
 Isso configura o Git para usar os hooks em `.githooks/`.
 
-### Verificar o Projeto
+### Verificação do Projeto
 
 Para rodar formatação, tidy, vet, lint e testes em sequência:
 
@@ -164,51 +112,48 @@ Para rodar formatação, tidy, vet, lint e testes em sequência:
 make check
 ```
 
-### Adicione tools úteis
+### Ferramentas Recomendadas
 
-**air** - Hot reload:
+**air** — hot reload:
 ```bash
 go install github.com/air-verse/air@latest
-air
 ```
 
-**golangci-lint** - Linter (multichecker estático):
+**golangci-lint** — linter estático:
 ```bash
 curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-golangci-lint run
 ```
 
-> O projeto inclui `.golangci.yml` com regras configuradas. Execute `make lint` para rodar.
+O projeto inclui `.golangci.yml` com regras configuradas. Execute `make lint` para rodar.
 
-**sqlc** - Geração de código a partir de SQL:
+**sqlc** — geração de código a partir de SQL:
 ```bash
 go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 ```
 
-**golang-migrate** - Migrations de banco:
+**golang-migrate** — migrations de banco:
 ```bash
 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
 
-**mockery** - Geração de mocks para testes:
+**mockery** — geração de mocks para testes:
 ```bash
 go install github.com/vektra/mockery/v2@latest
-mockery --all --output internal/mocks
 ```
 
-**delve** - Debugger:
+**delve** — debugger:
 ```bash
 go install github.com/go-delve/delve/cmd/dlv@latest
 ```
 
-**gopls** - Language Server (configure em seu editor):
+**gopls** — language server:
 ```bash
 go install golang.org/x/tools/gopls@latest
 ```
 
-### VSCode Integration
+### Integração com VSCode
 
-Instale as extensões recomendadas (ou aceite quando o VSCode sugerir via `.vscode/extensions.json`):
+Extensões recomendadas:
 
 | Extensão | ID | Propósito |
 |----------|----|-----------|
@@ -220,18 +165,62 @@ Instale as extensões recomendadas (ou aceite quando o VSCode sugerir via `.vsco
 | Database Client | `cweijan.vscode-database-client2` | Explorar o PostgreSQL local |
 | DotENV | `mikestead.dotenv` | Syntax highlight em arquivos `.env` |
 
-Configurações recomendadas em `.vscode/settings.json` (já incluídas no repo):
+Configurações recomendadas em `.vscode/settings.json`:
 - `go.lintTool: "golangci-lint"` — integra o linter ao editor
 - `go.formatTool: "goimports"` — formata e organiza imports ao salvar
 
+---
+
+## Troubleshooting
+
+### Porta 5433 já em uso
+
+```bash
+# Verifique qual processo está usando a porta
+lsof -i :5433
+```
+
+Ou altere a porta em `docker/dev/docker-compose.yml`: `"5433:5432"` para `"5434:5432"`.
+
+### Database connection refused
+
+```bash
+# Verifique se o container está rodando
+docker ps
+
+# Se não aparecer, suba o stack
+make dev
+
+# Verifique os logs
+docker logs $(docker ps -q --filter "ancestor=postgres:15")
+```
+
+### JWT_SECRET não configurada
+
+Certifique-se que `.env` existe e contém a variável:
+```env
+JWT_SECRET=your-secret-key-change-me
+```
+
+Em produção, use um valor gerado de forma segura e armazene via sistema de secrets.
+
+### Containers não iniciam
+
+```bash
+# Verifique os logs
+docker compose -f docker/dev/docker-compose.yml logs
+
+# Limpe e tente novamente
+make remove
+make build-dev
+```
 
 ---
 
 ## Integração com CI/CD
 
-### Bitbucket Pipelines
+Exemplo para Bitbucket Pipelines:
 
-Arquivo `bitbucket-pipelines.yml`:
 ```yaml
 image: golang:1.26.1
 
@@ -245,8 +234,6 @@ pipelines:
           - go test -v ./...
         services:
           - postgres
-        artifacts:
-          - build/**
 
 services:
   postgres:
@@ -260,17 +247,7 @@ services:
 
 ## Deploy em Produção
 
-### Build
-
-```bash
-make build-dev
-```
-
-O Makefile já contém os targets para build automatizado.
-
 ### Variáveis de Produção
-
-Em produção, sempre use um sistema de gerenciamento de secrets:
 
 **Kubernetes:**
 ```bash
@@ -280,16 +257,13 @@ kubectl create secret generic i9pay-secrets \
   --from-literal=JWT_SECRET=$(openssl rand -base64 32)
 ```
 
-**ECS/Fargate:**
-Use AWS Secrets Manager para armazenar `DB_PASSWORD` e `JWT_SECRET`.
+**ECS/Fargate:** use AWS Secrets Manager para armazenar `DB_PASSWORD` e `JWT_SECRET`.
 
-**Docker Compose (Produção):**
-Use `docker-compose.prod.yml` com variáveis carregadas via `.env.production` ou arquivo separado.
+### Migrations em Produção
 
-### Database Migrations em Produção
+Execute antes do deploy:
 
 ```bash
-# Rode antes de deploy
 docker run --rm \
   -v "$(pwd)/migrations:/migrations" \
   migrate/migrate \
@@ -300,11 +274,9 @@ docker run --rm \
 
 ---
 
-## Próximas Steps
+## Referências
 
-Após setup bem-sucedido:
-
-1. Leia [API.md](API.md) para documentação de endpoints
-2. Leia [ARCHITECTURE.md](ARCHITECTURE.md) para entender a estrutura
-3. Leia [DEVELOPMENT.md](DEVELOPMENT.md) para contribuir
-4. Veja mais comandos em [COMMANDS.md](COMMANDS.md)
+- [API.md](API.md) — documentação de endpoints
+- [ARCHITECTURE.md](ARCHITECTURE.md) — estrutura e fluxo
+- [DEVELOPMENT.md](DEVELOPMENT.md) — guia de contribuição
+- [COMMANDS.md](COMMANDS.md) — referência de comandos

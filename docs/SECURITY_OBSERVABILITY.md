@@ -1,14 +1,14 @@
-# Security & Observability
+# Segurança e Observabilidade
 
 Documentação das capacidades de segurança e observabilidade implementadas na API i9pay.
 
 ## Visão Geral
 
-A feature **API Security & Observability** adiciona três capacidades transversais à API:
+Três capacidades transversais são aplicadas via middleware:
 
-1. **Rate Limiting** — Proteção contra abuso e força bruta com 3 tiers configuráveis
-2. **Structured Logging** — Logs estruturados com `log/slog` (JSON em produção, texto em desenvolvimento)
-3. **Input Validation Translation** — Mensagens de erro legíveis para validação de entrada
+1. Rate Limiting — proteção contra abuso e força bruta com 3 tiers configuráveis
+2. Logging Estruturado — logs com `log/slog` (JSON em produção, texto em desenvolvimento)
+3. Tradução de Erros de Validação — mensagens legíveis para erros de entrada
 
 ---
 
@@ -19,27 +19,21 @@ A feature **API Security & Observability** adiciona três capacidades transversa
 Proteger a API contra:
 - Ataques de força bruta em login
 - Abuso de recursos por IP
-- Consumo excessivo por organization autenticado
+- Consumo excessivo por organization autenticada
 
 ### Tiers
 
-#### 1. IP-Based (Rotas Públicas)
+#### 1. Por IP (rotas públicas)
 
-Limita requisições por endereço IP remoto em todas as rotas públicas.
+Limita requisições por endereço IP em todas as rotas públicas.
 
 **Configuração:**
 ```env
-RATE_LIMIT_WINDOW_SECONDS=60        # Janela de tempo (padrão: 60s)
-RATE_LIMIT_MAX_REQUESTS=100         # Máximo de requisições (padrão: 100)
+RATE_LIMIT_WINDOW_SECONDS=60
+RATE_LIMIT_MAX_REQUESTS=100
 ```
 
-**Exemplo:**
-```bash
-# 100 requisições por minuto por IP
-curl http://localhost:8080/v1/live
-```
-
-**Resposta ao exceder limite (429):**
+**Resposta ao exceder o limite (429):**
 ```json
 {
   "error": "too many requests, try again later"
@@ -54,46 +48,31 @@ X-RateLimit-Reset: 1678800000
 Retry-After: 45
 ```
 
-#### 2. Login-Specific (POST /v1/auth/login)
+#### 2. Por login (`POST /v1/auth/login`)
 
 Limite mais restritivo para mitigar força bruta em credenciais.
 
 **Configuração:**
 ```env
-RATE_LIMIT_LOGIN_WINDOW_SECONDS=300     # Janela de tempo (padrão: 300s = 5min)
-RATE_LIMIT_LOGIN_MAX_REQUESTS=5         # Máximo de requisições (padrão: 5)
+RATE_LIMIT_LOGIN_WINDOW_SECONDS=300
+RATE_LIMIT_LOGIN_MAX_REQUESTS=5
 ```
 
-**Exemplo:**
-```bash
-# Máximo 5 tentativas de login a cada 5 minutos por IP
-curl -X POST http://localhost:8080/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "wrong"}'
-```
-
-**Resposta ao exceder limite (429):**
+**Resposta ao exceder o limite (429):**
 ```json
 {
   "error": "too many login attempts, try again later"
 }
 ```
 
-#### 3. Organization-Based (Rotas Protegidas)
+#### 3. Por organization (rotas protegidas)
 
-Limita requisições por organization autenticado para evitar consumo excessivo de recursos.
+Limita requisições por organization autenticada para evitar consumo excessivo de recursos.
 
 **Configuração:**
 ```env
-RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS=60     # Janela de tempo (padrão: 60s)
-RATE_LIMIT_ORGANIZATION_MAX_REQUESTS=200      # Máximo de requisições (padrão: 200)
-```
-
-**Exemplo:**
-```bash
-# Máximo 200 requisições por minuto por organization
-curl http://localhost:8080/v1/me \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
+RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS=60
+RATE_LIMIT_ORGANIZATION_MAX_REQUESTS=200
 ```
 
 ### Implementação
@@ -101,31 +80,25 @@ curl http://localhost:8080/v1/me \
 **Arquivo:** `internal/api/middleware/ratelimit.go`
 
 **Componentes:**
-
-- `RateLimiterStore` — In-memory store com `sync.Mutex` e `map[string]*visitor`
-- `RateLimitByIP()` — Middleware para limitar por IP
-- `RateLimitByOrganization()` — Middleware para limitar por organization
+- `RateLimiterStore` — store in-memory com `sync.Mutex` e `map[string]*visitor`
+- `RateLimitByIP()` — middleware para limitar por IP
+- `RateLimitByOrganization()` — middleware para limitar por organization
 
 **Algoritmo:**
-
 ```
 1. Extrair chave (IP ou organization_id)
-2. Verificar se visitor existe e não expirou
-3. Se expirado ou não existe: criar novo com count=1
+2. Verificar se o visitor existe e não expirou
+3. Se expirado ou inexistente: criar novo com count=1
 4. Se existe: incrementar count
 5. Se count > maxRequests: rejeitar com 429
 6. Caso contrário: permitir e retornar remaining
 ```
 
-**Janelas de tempo:**
-
-- Cada visitor tem `expiresAt` que marca o fim da janela
-- Quando a janela expira, o contador é resetado
-- Sem limpeza ativa (lazy cleanup ao acessar)
+Cada visitor tem `expiresAt` que marca o fim da janela. Quando a janela expira, o contador é resetado. Limpeza lazy (ao acessar chave expirada).
 
 ---
 
-## Structured Logging
+## Logging Estruturado
 
 ### Propósito
 
@@ -139,39 +112,35 @@ Registrar cada requisição HTTP com contexto estruturado para:
 
 **Arquivo:** `cmd/server/main.go`
 
-**Função:** `SetupLogger(env string) *slog.Logger`
-
 ```go
-// Produção: JSON (machine-readable)
+// Produção: JSON (legível por máquina)
 if env == "production" {
     return slog.New(slog.NewJSONHandler(os.Stdout, nil))
 }
 
-// Desenvolvimento: Texto (human-readable)
+// Desenvolvimento: texto (legível por humano)
 return slog.New(slog.NewTextHandler(os.Stdout, nil))
 ```
 
 ### Campos Registrados
 
-Cada log contém:
-
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
 | `request_id` | string | UUID v4 único por requisição |
-| `method` | string | HTTP method (GET, POST, etc.) |
-| `path` | string | URL path (/v1/me, /v1/auth/login, etc.) |
-| `status` | int | HTTP status code (200, 401, 429, etc.) |
+| `method` | string | Método HTTP (GET, POST, etc.) |
+| `path` | string | Caminho da URL (/v1/me, /v1/auth/login, etc.) |
+| `status` | int | Código de status HTTP |
 | `latency_ms` | float64 | Tempo de processamento em ms |
 | `client_ip` | string | IP remoto do cliente |
-| `user_id` | string | organization_id do JWT (vazio se não autenticado) |
+| `user_id` | string | `organization_id` do JWT (vazio se não autenticado) |
 
 ### Níveis de Log
 
-| Status | Nível | Exemplo |
-|--------|-------|---------|
-| 2xx, 3xx | INFO | `GET /v1/me` |
-| 4xx | WARN | `POST /v1/auth/login` (401) |
-| 5xx | ERROR | `GET /v1/ready` (500) |
+| Status | Nível |
+|--------|-------|
+| 2xx, 3xx | INFO |
+| 4xx | WARN |
+| 5xx | ERROR |
 
 ### Exemplos
 
@@ -202,28 +171,20 @@ time=2026-03-13T10:15:30.123Z level=INFO msg="GET /v1/me" request_id=550e8400-e2
 
 Cada requisição recebe um UUID v4 único:
 
-1. Se header `X-Request-ID` existe → reutiliza
-2. Caso contrário → gera novo UUID v4
-3. Armazena em contexto Gin
-4. Retorna em header `X-Request-ID`
-
-**Exemplo:**
-```bash
-curl http://localhost:8080/v1/live -v
-
-# Response headers:
-# X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
-```
+1. Se o header `X-Request-ID` existe, reutiliza o valor
+2. Caso contrário, gera um novo UUID v4
+3. Armazena no contexto Gin
+4. Retorna no header `X-Request-ID` da resposta
 
 ---
 
-## Input Validation Translation
+## Tradução de Erros de Validação
 
 ### Propósito
 
 Converter erros brutos do `go-playground/validator` em mensagens legíveis e estruturadas.
 
-### Antes vs Depois
+### Antes e Depois
 
 **Antes (erro bruto):**
 ```json
@@ -247,19 +208,17 @@ Converter erros brutos do `go-playground/validator` em mensagens legíveis e est
 
 ### Tags Suportadas
 
-| Tag | Mensagem | Exemplo |
-|-----|----------|---------|
-| `required` | `{field} is required` | "email is required" |
-| `email` | `{field} must be a valid email` | "email must be a valid email" |
-| `min` | `{field} must be at least {param}` | "password must be at least 8" |
-| `max` | `{field} must be at most {param}` | "name must be at most 50" |
-| outros | `{field} failed {tag} validation` | "age failed numeric validation" |
+| Tag | Mensagem |
+|-----|----------|
+| `required` | `{field} is required` |
+| `email` | `{field} must be a valid email` |
+| `min` | `{field} must be at least {param}` |
+| `max` | `{field} must be at most {param}` |
+| outros | `{field} failed {tag} validation` |
 
 ### Implementação
 
 **Arquivo:** `internal/api/err/validation.go`
-
-**Função:** `TranslateValidationErrors(err error) []ValidationFieldError`
 
 ```go
 type ValidationFieldError struct {
@@ -270,108 +229,33 @@ type ValidationFieldError struct {
 ```
 
 **Fluxo:**
-
 1. Handler recebe payload JSON
 2. Valida com `validator.Struct()`
 3. Se erro: passa para `TranslateValidationErrors()`
 4. Middleware `Errors()` serializa para JSON com status 400
 
-### Exemplo de Uso
-
-**Handler:**
-```go
-type LoginRequest struct {
-    Email    string `json:"email" validate:"required,email"`
-    Password string `json:"password" validate:"required,min=8"`
-}
-
-func (h *Handler) Login(c *gin.Context) {
-    var req LoginRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        _ = c.Error(err)
-        return
-    }
-    
-    validate := validator.New()
-    if err := validate.Struct(req); err != nil {
-        _ = c.Error(err)
-        return
-    }
-    
-    // ... lógica de login
-}
-```
-
-**Resposta (400 Bad Request):**
-```json
-{
-  "errors": [
-    {
-      "field": "email",
-      "rejected_value": "invalid-email",
-      "message": "email must be a valid email"
-    },
-    {
-      "field": "password",
-      "rejected_value": "short",
-      "message": "password must be at least 8"
-    }
-  ]
-}
-```
-
 ---
 
-## Middleware Chain
+## Cadeia de Middleware
 
-A ordem de middleware é crítica:
-
-```
-1. Recovery()              — Captura panics
-2. RequestID()             — Gera/propaga X-Request-ID
-3. StructuredLogger()      — Registra requisição
-4. Errors()                — Serializa erros para JSON
-5. RateLimitByIP()         — Limita por IP (v1 group)
-6. Auth()                  — Valida JWT (protected group)
-7. RateLimitByOrganization()     — Limita por organization (protected group)
-```
-
-**Diagrama:**
+A ordem de middleware é crítica para segurança e observabilidade:
 
 ```
-HTTP Request
-    ↓
-Recovery (catch panics)
-    ↓
-RequestID (generate UUID)
-    ↓
-StructuredLogger (log start)
-    ↓
-Errors (catch errors)
-    ↓
-RateLimitByIP (check limit)
-    ↓
-Handler
-    ↓
-Auth (validate JWT)
-    ↓
-RateLimitByOrganization (check limit)
-    ↓
-Handler Logic
-    ↓
-StructuredLogger (log end)
-    ↓
-HTTP Response
+1. Recovery()                    — captura panics
+2. RequestID()                   — gera/propaga X-Request-ID
+3. StructuredLogger()            — registra requisição
+4. Errors()                      — serializa erros para JSON
+5. RateLimitByIP()               — limita por IP (grupo v1)
+6. Auth()                        — valida JWT (grupo protegido)
+7. RateLimitByOrganization()     — limita por organization (grupo protegido)
 ```
 
 ---
 
 ## Configuração Completa
 
-**Arquivo:** `.env.example`
-
 ```env
-# Rate Limiting — IP (public routes)
+# Rate Limiting — IP (rotas públicas)
 RATE_LIMIT_WINDOW_SECONDS=60
 RATE_LIMIT_MAX_REQUESTS=100
 
@@ -379,51 +263,39 @@ RATE_LIMIT_MAX_REQUESTS=100
 RATE_LIMIT_LOGIN_WINDOW_SECONDS=300
 RATE_LIMIT_LOGIN_MAX_REQUESTS=5
 
-# Rate Limiting — Organization (protected routes)
+# Rate Limiting — Organization (rotas protegidas)
 RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS=60
 RATE_LIMIT_ORGANIZATION_MAX_REQUESTS=200
 ```
 
 ---
 
-## Testing
+## Testes
 
-### Unit Tests
-
-Todos os componentes têm testes unitários:
+### Executar testes por componente
 
 ```bash
-# Rate Limiter Store
+# Rate Limiter
 go test ./internal/api/middleware -run TestAllow
-
-# Rate Limiter Middleware
 go test ./internal/api/middleware -run TestRateLimit
 
 # Request ID
 go test ./internal/api/middleware -run TestRequestID
 
-# Structured Logger
+# Logger
 go test ./internal/api/middleware -run TestStructuredLogger
 
-# Validation Translator
+# Tradução de validação
 go test ./internal/api/err -run TestTranslateValidationErrors
 
-# Errors Middleware
+# Middleware de erros
 go test ./internal/api/middleware -run TestErrors
 ```
 
-**Cobertura:**
-
-- 26 testes unitários
-- 100% de cobertura em componentes críticos
-- Testes de integração para middleware chain
-
-### Executar Todos os Testes
+### Executar todos os testes
 
 ```bash
 make test
-# ou
-go test ./... -v
 ```
 
 ---
@@ -432,62 +304,46 @@ go test ./... -v
 
 ### Rate Limiter
 
-- **Complexidade:** O(1) por requisição
-- **Memória:** O(n) onde n = número de chaves únicas (IPs ou organizations)
-- **Limpeza:** Lazy (ao acessar chave expirada)
+- Complexidade: O(1) por requisição
+- Memória: O(n) onde n é o número de chaves únicas (IPs ou organizations)
+- Limpeza: lazy (ao acessar chave expirada)
 
-### Structured Logger
+### Logger
 
-- **Overhead:** ~1-2ms por requisição
-- **Formato:** JSON em produção (otimizado para parsing)
-- **Buffering:** Stdout padrão (sem buffering adicional)
+- Overhead: ~1-2ms por requisição
+- Formato JSON em produção (otimizado para parsing)
 
 ### Request ID
 
-- **Geração:** UUID v4 via `github.com/google/uuid`
-- **Overhead:** <0.1ms por requisição
+- Geração via `github.com/google/uuid`
+- Overhead: menos de 0.1ms por requisição
 
 ---
 
 ## Troubleshooting
 
-### Rate Limit Atingido
+### Rate limit atingido
 
-**Sintoma:** Receber 429 Too Many Requests
+**Sintoma:** resposta 429 Too Many Requests
 
 **Solução:**
-1. Aguarde `Retry-After` segundos
-2. Verifique `X-RateLimit-Reset` para timestamp exato
-3. Ajuste limites em `.env` se necessário
+1. Aguarde o número de segundos indicado em `Retry-After`
+2. Verifique `X-RateLimit-Reset` para o timestamp exato de reset
+3. Ajuste os limites em `.env` se necessário
 
-### Logs Não Aparecem
-
-**Sintoma:** Nenhum log em stdout
+### Logs não aparecem
 
 **Verificação:**
-1. Confirme `GO_ENV` está definido
+1. Confirme que `GO_ENV` está definido
 2. Verifique se stdout não está redirecionado
-3. Teste com `curl -v` para ver headers
+3. Teste com `curl -v` para ver os headers
 
-### Validação Não Traduzida
-
-**Sintoma:** Erro bruto em vez de mensagem traduzida
+### Erros de validação não traduzidos
 
 **Verificação:**
-1. Confirme que `validator.ValidationErrors` é passado para `Errors()` middleware
-2. Verifique se handler está chamando `c.Error(err)`
+1. Confirme que `validator.ValidationErrors` está sendo passado para o middleware `Errors()`
+2. Verifique se o handler está chamando `c.Error(err)`
 3. Teste com payload inválido
-
----
-
-## Roadmap
-
-- [ ] Rate limiting por endpoint específico
-- [ ] Whitelist de IPs para bypass de rate limit
-- [ ] Métricas de Prometheus para rate limiter
-- [ ] Alertas automáticos para padrões de ataque
-- [ ] Correlação de logs com trace IDs distribuídos
-- [ ] Exportação de logs para ELK/Datadog
 
 ---
 
@@ -497,4 +353,3 @@ go test ./... -v
 - [Structured Logging with slog](https://pkg.go.dev/log/slog)
 - [go-playground/validator](https://github.com/go-playground/validator)
 - [Gin Middleware](https://gin-gonic.com/docs/examples/using-middleware/)
-

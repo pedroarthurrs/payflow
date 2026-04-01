@@ -1,32 +1,41 @@
-# Comandos Disponíveis
+# Comandos
 
-## Make Commands
+## Make
 
-Todos os comandos estão no [Makefile](Makefile). Execute:
+Todos os comandos estão no [Makefile](../Makefile). Para ver a lista completa com descrições:
 
 ```bash
 make help
 ```
-
-Para ver lista completa com descrições.
 
 ---
 
 ## Docker
 
 ### `make dev`
-Sobe containers de desenvolvimento com hot-reload (Air).
+
+Sobe os containers de desenvolvimento com hot-reload (Air).
 
 ```bash
 make dev
-# Equivalente a: docker compose -f docker/dev/docker-compose.yml up
 ```
 
-**Inicializa:**
+Inicializa:
 - PostgreSQL em `localhost:5433`
 - API em `http://localhost:8080`
 
+### `make build-dev`
+
+Força o rebuild das imagens Docker.
+
+```bash
+make build-dev
+```
+
+Use quando mudar o Dockerfile ou dependências.
+
 ### `make down`
+
 Para os containers sem removê-los.
 
 ```bash
@@ -34,99 +43,117 @@ make down
 ```
 
 ### `make remove`
+
 Para e remove containers, volumes e networks.
 
 ```bash
 make remove
 ```
 
-Use quando quiser limpar completamente e recomeçar.
-
-### `make build-dev`
-Force rebuild das imagens Docker.
-
-```bash
-make build-dev
-```
-
-Use quando mudar Dockerfile ou dependências.
+Use quando quiser limpar completamente e recomeçar do zero.
 
 ---
 
-## SQL & Code Generation
+## Banco de Dados
+
+### `make migrate-up`
+
+Aplica todas as migrations pendentes.
+
+```bash
+make migrate-up
+```
+
+Requer PostgreSQL rodando e `DATABASE_URL` configurada.
+
+### `make migrate-down`
+
+Reverte a última migration aplicada.
+
+```bash
+make migrate-down
+```
+
+### `make migrate-create`
+
+Cria um novo par de arquivos de migration.
+
+```bash
+make migrate-create name=add_products_table
+```
+
+Gera:
+- `migrations/000004_add_products_table.up.sql`
+- `migrations/000004_add_products_table.down.sql`
 
 ### `make sqlc`
+
 Gera código Go a partir das queries SQL em `internal/database/queries.sql`.
 
 ```bash
 make sqlc
 ```
 
-**Output:**
-- Atualiza `internal/database/dbgen/*.go`
-- Type-safe queries prontas para uso
-
-Execute sempre que:
-- Escrever nova query SQL
-- Mudar schema do banco
+Atualiza `internal/database/dbgen/*.go`. Execute sempre que escrever uma nova query ou alterar o schema.
 
 ---
 
-## Go Management
+## Go
 
 ### `make tidy`
-Limpa dependências e atualiza `go.mod` / `go.sum`.
+
+Limpa dependências e atualiza `go.mod` e `go.sum`.
 
 ```bash
 make tidy
 ```
 
-Execute regularmente para manter dependências limpas.
-
 ### `make test`
-Roda todos os testes.
+
+Roda todos os testes com saída verbose.
 
 ```bash
 make test
-# Equivalente a: go test -v ./...
-```
-
-### `make lint`
-Roda o golangci-lint no projeto.
-
-```bash
-make lint
-# Equivalente a: golangci-lint run ./...
 ```
 
 ### `make vet`
-Roda o go vet no projeto.
+
+Roda o `go vet` no projeto.
 
 ```bash
 make vet
-# Equivalente a: go vet -v ./...
+```
+
+### `make lint`
+
+Roda o `golangci-lint` no projeto.
+
+```bash
+make lint
 ```
 
 ### `make fmt`
-Roda o gofmt no projeto.
+
+Roda o `gofmt` no projeto.
 
 ```bash
 make fmt
-# Equivalente a: gofmt -w .
 ```
 
 ---
 
-## Quality
+## Qualidade
 
 ### `make check`
-Roda fmt, tidy, vet, lint e test em sequência. Útil antes de commits.
+
+Roda `fmt`, `tidy`, `vet`, `lint` e `test` em sequência. Recomendado antes de commits.
 
 ```bash
 make check
 ```
 
 ### `make setup-hooks`
+
 Configura o Git para usar os hooks do projeto (`.githooks/`).
 
 ```bash
@@ -137,86 +164,47 @@ Execute uma vez após clonar o repositório.
 
 ---
 
-## Database Migrations
+## Comandos Go Diretos
 
-### `make migrate-up`
-Aplica todas as migrations pendentes.
-
-```bash
-make migrate-up
-```
-
-**Requer:**
-- PostgreSQL rodando
-- `DATABASE_URL` configurada
-
-### `make migrate-down`
-Reverte a última migration aplicada.
-
-```bash
-make migrate-down
-```
-
-Use com cuidado! Desfaz dados.
-
-### `make migrate-create`
-Cria nova migration vazia.
-
-```bash
-make migrate-create name=add_products_table
-```
-
-**Output:**
-- `migrations/000004_add_products_table.up.sql`
-- `migrations/000004_add_products_table.down.sql`
-
-Edite os arquivos com seu SQL.
-
----
-
-## Útil para Development
-
-### Compilar sem rodar
+### Compilar sem executar
 ```bash
 go build ./cmd/server/main.go
 ```
 
-### Run direto (sem docker)
+### Executar sem Docker
 ```bash
 go run ./cmd/server/main.go
 ```
 
-### Format código
+### Atualizar dependência específica
 ```bash
-go fmt ./...
+go get -u github.com/gin-gonic/gin
+go mod tidy
 ```
 
-### Lint
-```bash
-golangci-lint run
-```
-
-### Vet
-```bash
-go vet ./...
-```
-
-### Dependency tree
+### Árvore de dependências
 ```bash
 go mod graph
 ```
 
-### Upgrade dependências
+### Testes com cobertura
 ```bash
-go get -u github.com/gin-gonic/gin
-go mod tidy
+go test -cover ./...
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+### Detectar race conditions
+```bash
+go test -race ./...
 ```
 
 ---
 
 ## Debugging
 
-### Delve (debugger)
+### Delve
+
 ```bash
 go install github.com/go-delve/delve/cmd/dlv@latest
 dlv debug ./cmd/server/main.go
@@ -224,56 +212,51 @@ dlv debug ./cmd/server/main.go
 
 ### Logs estruturados
 
-A aplicação usa `log/slog` nativo do Go 1.21+. Em desenvolvimento os logs saem em texto;
-em produção saem em JSON. O logger é inicializado em `cmd/server/main.go` via `SetupLogger(env)`.
+A aplicação usa `log/slog` nativo do Go 1.21+. Em desenvolvimento os logs saem em texto; em produção saem em JSON. O logger é inicializado em `cmd/server/main.go` via `SetupLogger(env)`.
 
 ---
 
-## Full Workflow Example
+## Fluxo Completo de Desenvolvimento
 
 ```bash
-# 1. Inicie o stack
+# 1. Suba o stack
 make dev
 
-# 2. Em outro terminal, crie migration
+# 2. Em outro terminal, crie a migration
 make migrate-create name=add_products_table
 
 # 3. Edite migrations/000004_add_products_table.up.sql
 
-# 4. Aplique migrations
+# 4. Aplique a migration
 make migrate-up
 
-# 5. Escreva query em internal/database/queries.sql
-# -- name: GetProduct :one
-# SELECT * FROM products WHERE id = $1;
+# 5. Escreva a query em internal/database/queries.sql
 
-# 6. Gere código Go
+# 6. Gere o código Go
 make sqlc
 
 # 7. Implemente service e handler
 
-# 8. Rode quality checks (fmt, tidy, vet, lint, test)
+# 8. Rode os checks de qualidade
 make check
 
-# 9. Se tudo ok, commit
+# 9. Commit
 git add .
 git commit -m "feat: add products feature"
 
-# 10. Limpe antes de parar
+# 10. Limpe o ambiente
 make remove
 ```
 
 ---
 
-## CI/CD Integration
-
-Para integração com Bitbucket Pipelines, use:
+## Integração com CI/CD
 
 ```bash
 # Lint
 golangci-lint run ./...
 
-# Test with coverage
+# Testes com cobertura
 go test -v -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out
 
@@ -283,64 +266,43 @@ go build -o build/server ./cmd/server
 
 ---
 
-## Troubleshooting Comandos
+## Troubleshooting
 
-### Erro: "make: command not found"
+### `make: command not found`
 
-**Linux:**
 ```bash
+# Linux
 sudo apt install make
-```
 
-**macOS:**
-```bash
+# macOS
 brew install make
 ```
 
-**Windows:**
-Use [WSL2](https://docs.microsoft.com/en-us/windows/wsl/install) ou Git Bash.
-
-### Erro: "migrate: command not found"
+### `migrate: command not found`
 
 ```bash
-# Instale migrate
 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
-# Ou via package manager
-brew install migrate  # macOS
-choco install migrate # Windows
 ```
 
-### Erro: "sqlc: command not found"
+### `sqlc: command not found`
 
 ```bash
 go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 ```
 
-### Docker command refused
+### Docker recusando conexão
 
 ```bash
-# Adicione seu user ao grupo docker (Linux)
+# Adicione seu usuário ao grupo docker (Linux)
 sudo usermod -aG docker $USER
-
-# Reinicie
 newgrp docker
 ```
 
 ---
 
-## Performance Tips
+## Referências
 
-- **go build** é rápido, use `make dev` com Air para hot-reload
-- **go test** com `-short` para testes rápidos: `go test -short ./...`
-- **go test -race** detecta race conditions: `go test -race ./...`
-
----
-
-## Próximos Steps
-
-Após dominar os comandos:
-1. Leia [SETUP.md](SETUP.md) para setup detalhado
-2. Leia [ARCHITECTURE.md](ARCHITECTURE.md) para entender fluxo
-3. Leia [API.md](API.md) para rotas disponíveis
-4. Leia [DEVELOPMENT.md](DEVELOPMENT.md) para contribuir
+- [SETUP.md](SETUP.md) — configuração do ambiente
+- [ARCHITECTURE.md](ARCHITECTURE.md) — estrutura e fluxo
+- [API.md](API.md) — rotas disponíveis
+- [DEVELOPMENT.md](DEVELOPMENT.md) — guia de contribuição
