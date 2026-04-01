@@ -47,18 +47,9 @@ Response JSON
 
 **Handlers** (`api/handler/`)
 - Consolidados em um único pacote (um arquivo por recurso)
-- Tipos qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, etc.
-- Consolidados em um único pacote (um arquivo por recurso)
-- Tipos qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, etc.
+- Tipos qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, `UserHandler`, etc.
 - Recebem requisições HTTP
 - Validam payload
-
-**DTOs** (`api/dto/`)
-- Data Transfer Objects compartilhados entre handlers
-- `context.go`: Extração de IDs do contexto Gin (OrganizationID, CustomerID)
-- `request.go`: Structs de request compartilhadas
-- `response.go`: Structs de response compartilhadas
-- Retornam respostas JSON
 
 **DTOs** (`api/dto/`)
 - Data Transfer Objects compartilhados entre handlers
@@ -94,7 +85,6 @@ Response JSON
 - Isolamento multi-organization
 
 Futura expansão:
-- `user_service.go` - Gerenciamento de usuários
 - `subscription_service.go` - Lógica de assinaturas
 - `invoice_service.go` - Geração de faturas
 
@@ -108,34 +98,34 @@ Sem lógica de HTTP, sem banco de dados. Apenas tipos e erros.
 
 ### 4. Database Layer (`database/`)
 
-**Conexão** (`database/postgres.go`)
+**Conexão** (`database/connection.go`)
 - Gerencia conexão com PostgreSQL
 - Expõe interface para queries via SQLC
 
 **SQLC Generated** (`database/dbgen/`)
 - `db.go`: Configuração do DB
 - `models.go`: Structs geradas do schema
-### 5. Health Monitor (`service/health.go`)
+- `queries.sql.go`: Implementação type-safe das queries
 
-**HealthService** (`service/health.go`)
+**SQL** (`database/queries.sql`)
+- Queries neste arquivo geram código Go via `make sqlc`
+- Versionadas com migrations
+
+### 5. Health Monitor (`database/health.go`)
+
+**HealthChecker** (`database/health.go`)
 - Background goroutine pinga o banco a cada 15 segundos
-- Cacheia resultado com `sync.RWMutex` para leituras concorrentes seguras
+- Cacheia resultado no campo `dbStatus` com `sync.RWMutex` para leituras concorrentes seguras
 - Expõe `DatabaseOK() bool` consumido pelo `HealthHandler`
+- Estado interno atualizado via `updateDBStatus(bool)` (write-lock protegido)
 - Separa liveness (processo vivo) de readiness (banco acessível)
 
-### 6. Auth Service (`auth/token/`)
-- `queries.sql.go`: Implementação type-safe das queries
+### 6. Token Service (`auth/token/`)
+
 **JWT Service** (`auth/token/token.go`)
-**SQL** (`database/queries.sql`)
-- Queries acima dessa arquivo geram código Go automaticamente
-- Versionadas com migrations
-- Suporta claims estendidos (user_id, role, auth_type)
-
-### 7. Token Service (`token/`)
-
-**JWT Service** (`token/token.go`)
 - Criação de tokens (access + refresh)
 - Validação e parsing de JWT
+- Suporta claims estendidos (organization_id, role, token_type)
 - Isolado da lógica HTTP
 
 ### 8. Config (`config/`)
@@ -192,23 +182,20 @@ Cada log contém: `request_id`, `method`, `path`, `status`, `latency_ms`, `clien
 Converte erros brutos do `go-playground/validator` em mensagens legíveis:
 - `required` → `{field} is required`
 - `email` → `{field} must be a valid email`
+- Resposta estruturada com `field`, `rejected_value`, `message`
+
+### Handler Pattern
+
 Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos:
 - Uma struct `{Recurso}Handler` com dependências
 - Uma função `New{Recurso}Handler()` para construção
-Resposta estruturada com `field`, `rejected_value`, `message`.
-
-### Handler Pattern
-package handler
-Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos:
-type AuthHandler struct {
-- Uma função `New{Recurso}Handler()` para construção
 - Métodos para cada ação HTTP
 
-func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
-    return &AuthHandler{authSvc: authSvc}
+```go
+package handler
 
 type AuthHandler struct {
-func (h *AuthHandler) Login(c *gin.Context) { /* ... */ }
+    authSvc *service.AuthService
 }
 
 func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
@@ -218,14 +205,12 @@ func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 func (h *AuthHandler) Login(c *gin.Context) { /* ... */ }
 ```
 
-authHandler := handler.NewAuthHandler(authSvc)
-
 Sem usar framework DI. Dependências são passadas explicitamente no `router.go`:
 
 ```go
 tokenSvc := token.NewService(secret, ttl1, ttl2)
-authSvc := service.NewAuthService(tokenSvc)
-authHandler := handler.NewAuthHandler(authSvc)
+authSvc := service.NewAuthService(tokenSvc, db)
+authHandler := handler.NewAuthHandler(authSvc, loginRL)
 ```
 
 ### Tratamento de Erros
@@ -235,33 +220,22 @@ authHandler := handler.NewAuthHandler(authSvc)
 3. Middleware `Errors()` serializa para JSON
 
 ```go
-// Service
-pair, err := h.authSvc.Login(creds)
+// Handler
 if err != nil {
-    _ = c.Error(err.Unauthorized("invalid credentials"))
+    _ = c.Error(apierr.Unauthorized("invalid credentials"))
+    return
 }
 
 // Middleware converte para JSON
-{
-  "error": "invalid credentials"
-1. Crie arquivo em `internal/api/handler/{feature}.go`:
+// {"error": "invalid credentials"}
 ```
-   touch internal/api/handler/product.go
 
 ### Adicionar Nova Feature
 
-1. Crie arquivo em `internal/api/handler/{feature}.go`:
-   ```bash
-   touch internal/api/handler/product.go
-   ```
-
+1. Crie arquivo em `internal/api/handler/{feature}.go`
 2. Implemente handlers com dependências
-
 3. Se necessário, crie service em `internal/service/`
-
 4. Use domain models em `internal/domain/`
-
-├── api/handler/product.go          # HTTP API
 
 Exemplo: Feature de Produtos
 

@@ -450,6 +450,93 @@ Remove um endereço.
 
 ---
 
+### POST /v1/users
+
+Cria um novo usuário na organization. Requer role `owner`.
+
+**Request:**
+```json
+{
+  "name": "Alice",
+  "email": "alice@example.com",
+  "password": "senha123",
+  "role": "operator"
+}
+```
+
+> `role` deve ser um de: `owner`, `admin`, `operator`.
+
+**Response (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440010",
+  "name": "Alice",
+  "email": "alice@example.com",
+  "role": "operator",
+  "created_at": "2026-03-17T10:00:00Z"
+}
+```
+
+**Response (409 Conflict):**
+```json
+{ "error": "email already exists for this organization" }
+```
+
+---
+
+### GET /v1/users
+
+Lista todos os usuários da organization. Requer role `admin` ou superior.
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "name": "Alice",
+    "email": "alice@example.com",
+    "role": "operator",
+    "created_at": "2026-03-17T10:00:00Z"
+  }
+]
+```
+
+---
+
+### PUT /v1/users/:user_id
+
+Atualiza nome e role de um usuário. Requer role `owner`.
+
+**Request:**
+```json
+{
+  "name": "Alice",
+  "role": "admin"
+}
+```
+
+**Response (200 OK):** mesmo formato do item da listagem acima.
+
+**Response (404 Not Found):**
+```json
+{ "error": "user not found" }
+```
+
+---
+
+### DELETE /v1/users/:user_id
+
+Remove um usuário da organization. Requer role `owner`.
+
+**Response (204 No Content):** sem body.
+
+**Response (404 Not Found):**
+```json
+{ "error": "user not found" }
+```
+
+---
+
 ## HTTP Status Codes
 
 | Code | Meaning | Exemplo |

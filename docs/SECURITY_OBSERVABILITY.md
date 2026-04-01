@@ -36,7 +36,7 @@ RATE_LIMIT_MAX_REQUESTS=100         # Máximo de requisições (padrão: 100)
 **Exemplo:**
 ```bash
 # 100 requisições por minuto por IP
-curl http://localhost:8080/v1/health
+curl http://localhost:8080/v1/live
 ```
 
 **Resposta ao exceder limite (429):**
@@ -137,7 +137,7 @@ Registrar cada requisição HTTP com contexto estruturado para:
 
 ### Configuração
 
-**Arquivo:** `cmd/api/main.go`
+**Arquivo:** `cmd/server/main.go`
 
 **Função:** `SetupLogger(env string) *slog.Logger`
 
@@ -171,7 +171,7 @@ Cada log contém:
 |--------|-------|---------|
 | 2xx, 3xx | INFO | `GET /v1/me` |
 | 4xx | WARN | `POST /v1/auth/login` (401) |
-| 5xx | ERROR | `GET /v1/health` (500) |
+| 5xx | ERROR | `GET /v1/ready` (500) |
 
 ### Exemplos
 
@@ -209,7 +209,7 @@ Cada requisição recebe um UUID v4 único:
 
 **Exemplo:**
 ```bash
-curl http://localhost:8080/v1/health -v
+curl http://localhost:8080/v1/live -v
 
 # Response headers:
 # X-Request-ID: 550e8400-e29b-41d4-a716-446655440000

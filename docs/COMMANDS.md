@@ -178,12 +178,12 @@ Edite os arquivos com seu SQL.
 
 ### Compilar sem rodar
 ```bash
-go build ./cmd/api/main.go
+go build ./cmd/server/main.go
 ```
 
 ### Run direto (sem docker)
 ```bash
-go run ./cmd/api/main.go
+go run ./cmd/server/main.go
 ```
 
 ### Format código
@@ -219,13 +219,13 @@ go mod tidy
 ### Delve (debugger)
 ```bash
 go install github.com/go-delve/delve/cmd/dlv@latest
-dlv debug ./cmd/api/main.go
+dlv debug ./cmd/server/main.go
 ```
 
 ### Logs estruturados
 
 A aplicação usa `log/slog` nativo do Go 1.21+. Em desenvolvimento os logs saem em texto;
-em produção saem em JSON. O logger é inicializado em `cmd/api/main.go` via `SetupLogger(env)`.
+em produção saem em JSON. O logger é inicializado em `cmd/server/main.go` via `SetupLogger(env)`.
 
 ---
 
@@ -278,7 +278,7 @@ go test -v -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out
 
 # Build
-go build -o build/api ./cmd/api
+go build -o build/server ./cmd/server
 ```
 
 ---

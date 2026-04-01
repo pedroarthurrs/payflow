@@ -15,7 +15,10 @@
 git clone <repository-url>
 cd i9pay
 
-# 2. Suba o stack completo
+# 2. Configure os Git hooks do projeto
+make setup-hooks
+
+# 3. Suba o stack completo
 make build-dev
 
 # Pronto! API rodando em http://localhost:8080
@@ -27,12 +30,14 @@ make build-dev
 
 ### 1. Variáveis de Ambiente
 
-O arquivo `.env` existe no repositório e é único para todos os ambientes. As variáveis usam sufixos para diferenciar ambientes de desenvolvimento (DEV), staging (STAGING) e produção.
+O arquivo `.env` existe no repositório e é único para todos os ambientes. As variáveis **não utilizam sufixos** por ambiente — o controle de ambiente é feito apenas pela variável `GO_ENV`.
 
-**Para executar em diferentes ambientes:**
-- **Development**: `GO_ENV=development` (usa variáveis com sufixo _DEV)
-- **Staging**: `GO_ENV=staging` (usa variáveis com sufixo _STAGING)
-- **Production**: `GO_ENV=production` (usar variáveis sem sufixo, definidas via secrets/env vars do orquestrador)
+**Para executar em diferentes ambientes, defina:**
+- `GO_ENV=development`
+- `GO_ENV=staging`
+- `GO_ENV=production`
+
+Em produção, as variáveis devem vir via sistema de secrets do orquestrador (K8s, ECS, etc.) em vez do arquivo `.env`.
 
 ### 2. Rodando com Docker
 
@@ -67,18 +72,20 @@ Use quando quiser limpar completamente e recomeçar do zero.
 ## Verificar se está Rodando
 
 ### Health Check
-```bash
-curl http://localhost:8080/v1/health
-```
 
-Resposta esperada:
-```json
-{
-  "status": "ok",
-  "services": {
-    "database": "ok"
-  }
-}
+O serviço expõe duas rotas de health:
+
+- **Liveness** (`/live`): indica que o processo está rodando.
+- **Readiness** (`/ready`): indica que o serviço está pronto para receber tráfego (banco de dados disponível).
+
+```bash
+# Liveness probe
+curl http://localhost:8080/v1/live
+# Resposta: {"status": "alive"}
+
+# Readiness probe
+curl http://localhost:8080/v1/ready
+# Resposta: {"status": "ready"} ou 503 {"status": "unavailable"}
 ```
 
 ### Test Login
@@ -117,13 +124,12 @@ docker logs $(docker ps -q --filter "ancestor=postgres:15")
 
 ### JWT_SECRET não configurada
 
-Certifique-se que `.env` existe e tem as variáveis de secret:
+Certifique-se que `.env` existe e tem a variável de secret:
 ```bash
-JWT_SECRET_DEV=your-secret-key-change-me
-JWT_SECRET_STAGING=staging-secret-key
+JWT_SECRET=your-secret-key-change-me
 ```
 
-Mude para valores seguros. Em produção, as variáveis devem vir via sistema de secrets do orquestrador (K8s, ECS, etc).
+Mude para um valor seguro. Em produção, as variáveis devem vir via sistema de secrets do orquestrador (K8s, ECS, etc).
 
 ### Containers não iniciam
 
@@ -139,6 +145,24 @@ make build-dev
 ---
 
 ## Ambiente de Desenvolvimento
+
+### Git Hooks
+
+Configure os hooks do projeto para garantir que convenções de commit e verificações sejam aplicadas localmente:
+
+```bash
+make setup-hooks
+```
+
+Isso configura o Git para usar os hooks em `.githooks/`.
+
+### Verificar o Projeto
+
+Para rodar formatação, tidy, vet, lint e testes em sequência:
+
+```bash
+make check
+```
 
 ### Adicione tools úteis
 
