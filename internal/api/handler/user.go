@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"i9pay/internal/api/dto"
 	apierr "i9pay/internal/api/err"
@@ -28,8 +29,27 @@ func (h *UserHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	users := rg.Group("/users")
 	users.POST("", middleware.RequireRole(domain.RoleOwner), h.Create)
 	users.GET("", middleware.RequireRole(domain.RoleAdmin), h.List)
+	users.GET("/:user_id", middleware.RequireRole(domain.RoleAdmin), h.GetByID)
 	users.PUT("/:user_id", middleware.RequireRole(domain.RoleOwner), h.Update)
 	users.DELETE("/:user_id", middleware.RequireRole(domain.RoleOwner), h.Delete)
+}
+
+type userResponse struct {
+	ID        string      `json:"id"`
+	Email     string      `json:"email"`
+	Name      string      `json:"name"`
+	Role      domain.Role `json:"role"`
+	CreatedAt *time.Time  `json:"created_at,omitempty"`
+}
+
+func toUserResponse(u *domain.User) userResponse {
+	return userResponse{
+		ID:        u.ID,
+		Email:     u.Email,
+		Name:      u.Name,
+		Role:      u.Role,
+		CreatedAt: nil,
+	}
 }
 
 type createUserRequest struct {
@@ -76,7 +96,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusCreated, toUserResponse(user))
 }
 
 // List handles GET /v1/users.
@@ -92,7 +112,34 @@ func (h *UserHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, users)
+	resp := make([]userResponse, len(users))
+	for i := range users {
+		resp[i] = toUserResponse(&users[i])
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetByID handles GET /v1/users/:user_id.
+func (h *UserHandler) GetByID(c *gin.Context) {
+	tid, ok := dto.OrganizationID(c)
+	if !ok {
+		return
+	}
+
+	userID := c.Param("user_id")
+
+	user, err := h.userSvc.GetByID(c.Request.Context(), tid.String(), userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			_ = c.Error(apierr.NotFound(err.Error()))
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toUserResponse(user))
 }
 
 // Update handles PUT /v1/users/:user_id.
@@ -123,7 +170,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, toUserResponse(user))
 }
 
 // Delete handles DELETE /v1/users/:user_id.

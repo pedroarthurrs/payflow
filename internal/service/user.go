@@ -85,6 +85,20 @@ func (s *UserService) List(ctx context.Context, organizationID string) ([]domain
 	return s.users.List(ctx, tid)
 }
 
+// GetByID returns a single user in an organization.
+// Returns ErrNotFound if organizationID or userID are invalid or user does not exist.
+func (s *UserService) GetByID(ctx context.Context, organizationID, userID string) (*domain.User, error) {
+	tid, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, domain.ErrNotFound
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, domain.ErrNotFound
+	}
+	return s.users.GetByID(ctx, tid, uid)
+}
+
 // Update updates a user's name and role within an organization.
 // Returns ErrNotFound if the user does not exist in the organization.
 func (s *UserService) Update(ctx context.Context, organizationID, userID string, req UpdateUserRequest) (*domain.User, error) {
