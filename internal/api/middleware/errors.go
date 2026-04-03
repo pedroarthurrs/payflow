@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	apierr "i9pay/internal/api/err"
+	"i9pay/internal/monitor"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -35,6 +36,8 @@ func Errors() gin.HandlerFunc {
 			return
 		}
 
+		// Unexpected error — report to monitor and return 500.
+		monitor.CaptureException(c, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 	}
 }

@@ -3,6 +3,8 @@ module i9pay
 go 1.26.1
 
 require (
+	github.com/getsentry/sentry-go v0.44.1
+	github.com/getsentry/sentry-go/gin v0.44.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/golang-jwt/jwt/v5 v5.3.1

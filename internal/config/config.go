@@ -10,6 +10,7 @@ type Config struct {
 	GoEnv      string
 	JwtSecret  string
 	ServerPort string
+	SentryDSN  string
 
 	// Database connection
 	DbDriver   string
@@ -54,6 +55,7 @@ func Load() *Config {
 		GoEnv:      os.Getenv("GO_ENV"),
 		ServerPort: os.Getenv("SERVER_PORT"),
 		JwtSecret:  os.Getenv("JWT_SECRET"),
+		SentryDSN:  os.Getenv("SENTRY_DSN"),
 		DbDriver:   os.Getenv("DB_DRIVER"),
 		DbDSN:      os.Getenv("DB_DSN"),
 		DbUser:     os.Getenv("DB_USER"),

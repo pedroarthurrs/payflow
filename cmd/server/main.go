@@ -7,6 +7,7 @@ import (
 	"i9pay/internal/api/router"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
+	"i9pay/internal/monitor"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,15 +21,10 @@ func SetupLogger(env string) *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stdout, nil))
 }
 
-func main() {
-	if err := run(); err != nil {
-		os.Exit(1)
-	}
-}
-
 func run() error {
 	cfg := config.Load()
 	logger := SetupLogger(cfg.GoEnv)
+	monitor.Init(cfg)
 
 	if cfg.GoEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -57,4 +53,10 @@ func run() error {
 		return err
 	}
 	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		os.Exit(1)
+	}
 }

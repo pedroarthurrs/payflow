@@ -9,6 +9,7 @@ import (
 	"i9pay/internal/auth/token"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
+	"i9pay/internal/monitor"
 	"i9pay/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ const refreshTokenTTL = 7 * 24 * time.Hour
 func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recovery())
+	r.Use(monitor.Middleware())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.StructuredLogger(logger))
 	r.Use(middleware.Errors())
