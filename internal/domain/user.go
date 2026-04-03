@@ -1,5 +1,21 @@
 package domain
 
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
+
+// UserRepository defines persistence operations for the user domain.
+type UserRepository interface {
+	Create(ctx context.Context, organizationID uuid.UUID, name, email, passwordHash, role string) (*User, error)
+	GetByID(ctx context.Context, organizationID, userID uuid.UUID) (*User, error)
+	GetByEmailAndOrg(ctx context.Context, organizationID uuid.UUID, email string) (*User, error)
+	List(ctx context.Context, organizationID uuid.UUID) ([]User, error)
+	Update(ctx context.Context, organizationID, userID uuid.UUID, name, role string) (*User, error)
+	SoftDelete(ctx context.Context, organizationID, userID uuid.UUID) error
+}
+
 // Role represents a user's role within an organization.
 type Role string
 
@@ -24,15 +40,6 @@ func RoleLevel(r Role) int {
 	}
 }
 
-// AuthType represents the authentication mode used to obtain a token.
-type AuthType string
-
-// Authentication modes for token issuance.
-const (
-	AuthTypeUser   AuthType = "user"
-	AuthTypeSystem AuthType = "system"
-)
-
 // User represents a human user with access to an organization's panel.
 type User struct {
 	ID             string
@@ -40,14 +47,4 @@ type User struct {
 	Email          string
 	Name           string
 	Role           Role
-}
-
-// LoginRequest represents the dynamic login payload.
-// Exactly one mode must be populated:
-//   - User mode: Email + Password (organization resolved from user record)
-//   - System mode: APIKey
-type LoginRequest struct {
-	Email    string
-	Password string
-	APIKey   string
 }

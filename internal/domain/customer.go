@@ -1,11 +1,22 @@
 package domain
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// CustomerRepository defines persistence operations for the customer domain.
+type CustomerRepository interface {
+	Create(ctx context.Context, organizationID uuid.UUID, input CreateCustomerInput) (*Customer, error)
+	GetByID(ctx context.Context, organizationID, customerID uuid.UUID) (*Customer, error)
+	List(ctx context.Context, organizationID uuid.UUID) ([]Customer, error)
+	Update(ctx context.Context, organizationID, customerID uuid.UUID, input UpdateCustomerInput) (*Customer, error)
+	SoftDelete(ctx context.Context, organizationID, customerID uuid.UUID) error
+	HardDelete(ctx context.Context, organizationID, customerID uuid.UUID) error
+}
 
 // Customer represents a customer entity in the domain layer.
 type Customer struct {

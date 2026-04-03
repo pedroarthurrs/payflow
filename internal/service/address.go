@@ -2,13 +2,7 @@ package service
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"log/slog"
 
-	apierr "i9pay/internal/api/err"
-	"i9pay/internal/database"
-	"i9pay/internal/database/dbgen"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -16,73 +10,22 @@ import (
 
 // AddressService handles address business logic.
 type AddressService struct {
-	db *database.DB
+	customers domain.CustomerRepository
+	addresses domain.AddressRepository
 }
 
 // NewAddressService creates an AddressService.
-func NewAddressService(db *database.DB) *AddressService {
-	return &AddressService{db: db}
+func NewAddressService(customers domain.CustomerRepository, addresses domain.AddressRepository) *AddressService {
+	return &AddressService{customers: customers, addresses: addresses}
 }
 
 // Create creates a new address for the given customer, applying defaults for omitted fields.
 func (s *AddressService) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
-	// Verify customer exists
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
-
 	applyDefaults(&input)
-
-	row, dbErr := s.db.Queries.CreateAddress(ctx, dbgen.CreateAddressParams{
-		OrganizationID: organizationID,
-		CustomerID:     customerID,
-		Type:           toNullAddressType(input.Type),
-		PostalCode:     input.PostalCode,
-		Street:         input.Street,
-		Number:         toNullString(input.Number),
-		Complement:     toNullString(input.Complement),
-		Neighborhood:   toNullString(input.Neighborhood),
-		City:           input.City,
-		State:          input.State,
-		Country:        toNullString(input.Country),
-		IsMain:         toNullBool(input.IsMain),
-	})
-	if dbErr != nil {
-		slog.Error("failed to create address", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
-		return nil, apierr.Internal("internal server error")
-	}
-
-	addr := toDomainAddress(row)
-	return &addr, nil
-}
-
-// CreateWithTx creates an address within the provided transaction, applying defaults.
-func (s *AddressService) CreateWithTx(ctx context.Context, tx *sql.Tx, organizationID, customerID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
-	applyDefaults(&input)
-
-	qtx := s.db.Queries.(*dbgen.Queries).WithTx(tx)
-
-	row, dbErr := qtx.CreateAddress(ctx, dbgen.CreateAddressParams{
-		OrganizationID: organizationID,
-		CustomerID:     customerID,
-		Type:           toNullAddressType(input.Type),
-		PostalCode:     input.PostalCode,
-		Street:         input.Street,
-		Number:         toNullString(input.Number),
-		Complement:     toNullString(input.Complement),
-		Neighborhood:   toNullString(input.Neighborhood),
-		City:           input.City,
-		State:          input.State,
-		Country:        toNullString(input.Country),
-		IsMain:         toNullBool(input.IsMain),
-	})
-	if dbErr != nil {
-		slog.Error("failed to create address in tx", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
-		return nil, apierr.Internal("internal server error")
-	}
-
-	addr := toDomainAddress(row)
-	return &addr, nil
+	return s.addresses.Create(ctx, organizationID, customerID, input)
 }
 
 // List returns all addresses for the given customer.
@@ -90,21 +33,7 @@ func (s *AddressService) List(ctx context.Context, organizationID, customerID uu
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
-
-	rows, dbErr := s.db.Queries.ListAddressesByCustomer(ctx, dbgen.ListAddressesByCustomerParams{
-		CustomerID:     customerID,
-		OrganizationID: organizationID,
-	})
-	if dbErr != nil {
-		slog.Error("failed to list addresses", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
-		return nil, apierr.Internal("internal server error")
-	}
-
-	addresses := make([]domain.Address, len(rows))
-	for i := range rows {
-		addresses[i] = toDomainAddress(rows[i])
-	}
-	return addresses, nil
+	return s.addresses.List(ctx, organizationID, customerID)
 }
 
 // GetByID returns a single address by ID.
@@ -112,22 +41,7 @@ func (s *AddressService) GetByID(ctx context.Context, organizationID, customerID
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
-
-	row, dbErr := s.db.Queries.GetAddressByID(ctx, dbgen.GetAddressByIDParams{
-		ID:             addressID,
-		CustomerID:     customerID,
-		OrganizationID: organizationID,
-	})
-	if dbErr != nil {
-		if errors.Is(dbErr, sql.ErrNoRows) {
-			return nil, domain.ErrAddressNotFound
-		}
-		slog.Error("failed to get address", "organization_id", organizationID, "address_id", addressID, "error", dbErr)
-		return nil, apierr.Internal("internal server error")
-	}
-
-	addr := toDomainAddress(row)
-	return &addr, nil
+	return s.addresses.GetByID(ctx, organizationID, customerID, addressID)
 }
 
 // Update updates an existing address.
@@ -135,32 +49,7 @@ func (s *AddressService) Update(ctx context.Context, organizationID, customerID,
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
-
-	row, dbErr := s.db.Queries.UpdateAddress(ctx, dbgen.UpdateAddressParams{
-		ID:             addressID,
-		CustomerID:     customerID,
-		OrganizationID: organizationID,
-		Type:           toNullAddressType(input.Type),
-		PostalCode:     input.PostalCode,
-		Street:         input.Street,
-		Number:         toNullString(input.Number),
-		Complement:     toNullString(input.Complement),
-		Neighborhood:   toNullString(input.Neighborhood),
-		City:           input.City,
-		State:          input.State,
-		Country:        toNullString(input.Country),
-		IsMain:         toNullBool(input.IsMain),
-	})
-	if dbErr != nil {
-		if errors.Is(dbErr, sql.ErrNoRows) {
-			return nil, domain.ErrAddressNotFound
-		}
-		slog.Error("failed to update address", "organization_id", organizationID, "address_id", addressID, "error", dbErr)
-		return nil, apierr.Internal("internal server error")
-	}
-
-	addr := toDomainAddress(row)
-	return &addr, nil
+	return s.addresses.Update(ctx, organizationID, customerID, addressID, input)
 }
 
 // Delete removes an address by ID.
@@ -168,84 +57,13 @@ func (s *AddressService) Delete(ctx context.Context, organizationID, customerID,
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return err
 	}
-
-	// Verify address exists first (DeleteAddress is :exec and won't return sql.ErrNoRows)
-	_, getErr := s.db.Queries.GetAddressByID(ctx, dbgen.GetAddressByIDParams{
-		ID:             addressID,
-		CustomerID:     customerID,
-		OrganizationID: organizationID,
-	})
-	if getErr != nil {
-		if errors.Is(getErr, sql.ErrNoRows) {
-			return domain.ErrAddressNotFound
-		}
-		slog.Error("failed to get address for delete", "organization_id", organizationID, "address_id", addressID, "error", getErr)
-		return apierr.Internal("internal server error")
-	}
-
-	if dbErr := s.db.Queries.DeleteAddress(ctx, dbgen.DeleteAddressParams{
-		ID:             addressID,
-		CustomerID:     customerID,
-		OrganizationID: organizationID,
-	}); dbErr != nil {
-		slog.Error("failed to delete address", "organization_id", organizationID, "address_id", addressID, "error", dbErr)
-		return apierr.Internal("internal server error")
-	}
-
-	return nil
+	return s.addresses.Delete(ctx, organizationID, customerID, addressID)
 }
 
 // ensureCustomerExists checks that the customer exists for the given organization.
 func (s *AddressService) ensureCustomerExists(ctx context.Context, organizationID, customerID uuid.UUID) error {
-	_, dbErr := s.db.Queries.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
-		ID:             customerID,
-		OrganizationID: organizationID,
-	})
-	if dbErr != nil {
-		if errors.Is(dbErr, sql.ErrNoRows) {
-			return domain.ErrCustomerNotFound
-		}
-		slog.Error("failed to verify customer", "organization_id", organizationID, "customer_id", customerID, "error", dbErr)
-		return apierr.Internal("internal server error")
-	}
-	return nil
-}
-
-// toDomainAddress converts a dbgen.Address to a domain.Address.
-func toDomainAddress(row dbgen.Address) domain.Address {
-	a := domain.Address{
-		ID:             row.ID,
-		OrganizationID: row.OrganizationID,
-		CustomerID:     row.CustomerID,
-		PostalCode:     row.PostalCode,
-		Street:         row.Street,
-		City:           row.City,
-		State:          row.State,
-	}
-
-	if row.Type.Valid {
-		a.Type = string(row.Type.AddressType)
-	}
-	if row.Number.Valid {
-		a.Number = &row.Number.String
-	}
-	if row.Complement.Valid {
-		a.Complement = &row.Complement.String
-	}
-	if row.Neighborhood.Valid {
-		a.Neighborhood = &row.Neighborhood.String
-	}
-	if row.Country.Valid {
-		a.Country = row.Country.String
-	}
-	if row.IsMain.Valid {
-		a.IsMain = row.IsMain.Bool
-	}
-	if row.CreatedAt.Valid {
-		a.CreatedAt = row.CreatedAt.Time
-	}
-
-	return a
+	_, err := s.customers.GetByID(ctx, organizationID, customerID)
+	return err
 }
 
 // applyDefaults sets default values for omitted fields in CreateAddressInput.
@@ -262,20 +80,4 @@ func applyDefaults(input *domain.CreateAddressInput) {
 		t := true
 		input.IsMain = &t
 	}
-}
-
-// toNullAddressType converts a *string to dbgen.NullAddressType.
-func toNullAddressType(s *string) dbgen.NullAddressType {
-	if s == nil {
-		return dbgen.NullAddressType{}
-	}
-	return dbgen.NullAddressType{AddressType: dbgen.AddressType(*s), Valid: true}
-}
-
-// toNullBool converts a *bool to sql.NullBool.
-func toNullBool(b *bool) sql.NullBool {
-	if b == nil {
-		return sql.NullBool{}
-	}
-	return sql.NullBool{Bool: *b, Valid: true}
 }

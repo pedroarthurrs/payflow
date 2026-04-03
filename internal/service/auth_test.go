@@ -3,15 +3,12 @@ package service
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"i9pay/internal/auth/token"
-	"i9pay/internal/database"
-	"i9pay/internal/database/dbgen"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -64,105 +61,7 @@ func (m *mockTokenProvider) RefreshWithClaims(refreshToken string) (*token.Pair,
 }
 
 // ============================================================
-// Mock DB Querier
-// ============================================================
-
-// authMockQuerier is a minimal implementation of dbgen.Querier for auth service testing.
-type authMockQuerier struct {
-	getAPIKeyByHashFn      func(ctx context.Context, keyHash string) (dbgen.ApiKey, error)
-	updateAPIKeyLastUsedFn func(ctx context.Context, id uuid.UUID) error
-	getUserByEmailFn       func(ctx context.Context, email string) (dbgen.User, error)
-	lastUsedUpdated        bool
-}
-
-func (m *authMockQuerier) GetAPIKeyByHash(ctx context.Context, keyHash string) (dbgen.ApiKey, error) {
-	if m.getAPIKeyByHashFn != nil {
-		return m.getAPIKeyByHashFn(ctx, keyHash)
-	}
-	return dbgen.ApiKey{}, errors.New("not found")
-}
-
-func (m *authMockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
-	m.lastUsedUpdated = true
-	if m.updateAPIKeyLastUsedFn != nil {
-		return m.updateAPIKeyLastUsedFn(ctx, id)
-	}
-	return nil
-}
-
-func (m *authMockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
-	if m.getUserByEmailFn != nil {
-		return m.getUserByEmailFn(ctx, email)
-	}
-	return dbgen.User{}, errors.New("not found")
-}
-
-func (m *authMockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
-	return dbgen.User{}, errors.New("not implemented")
-}
-
-func (m *authMockQuerier) CreateAddress(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-	return dbgen.Address{}, nil
-}
-func (m *authMockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
-	return dbgen.Customer{}, nil
-}
-func (m *authMockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *authMockQuerier) DeleteAddress(ctx context.Context, arg dbgen.DeleteAddressParams) error {
-	return nil
-}
-func (m *authMockQuerier) GetAddressByID(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-	return dbgen.Address{}, nil
-}
-func (m *authMockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-	return dbgen.Customer{}, nil
-}
-func (m *authMockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
-	return dbgen.Organization{}, nil
-}
-func (m *authMockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *authMockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error {
-	return nil
-}
-func (m *authMockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
-	return nil, nil
-}
-func (m *authMockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
-	return nil, nil
-}
-func (m *authMockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
-	return nil, nil
-}
-func (m *authMockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
-	return nil, nil
-}
-func (m *authMockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
-	return nil
-}
-func (m *authMockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
-	return nil
-}
-func (m *authMockQuerier) UpdateAddress(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
-	return dbgen.Address{}, nil
-}
-func (m *authMockQuerier) UpdateCustomer(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
-	return dbgen.Customer{}, nil
-}
-func (m *authMockQuerier) UpdateUser(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-
-// newMockDB wraps an authMockQuerier in a *database.DB for use in AuthService.
-func newMockDB(q dbgen.Querier) *database.DB {
-	return &database.DB{Queries: q}
-}
-
-// ============================================================
-// Unit tests — Login (user mode)
+// Unit tests - Login (user mode)
 // ============================================================
 
 func TestLogin_UserMode_Success(t *testing.T) {
@@ -171,14 +70,13 @@ func TestLogin_UserMode_Success(t *testing.T) {
 	password := "s3cret"
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 
-	q := &authMockQuerier{
-		getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
-			return dbgen.User{
+	auth := &mockAuthRepo{
+		getUserByEmailFn: func(_ context.Context, email string) (*domain.AuthUser, error) {
+			return &domain.AuthUser{
 				ID:             userID,
 				OrganizationID: organizationID,
-				Email:          email,
-				Role:           "admin",
 				Password:       string(hash),
+				Role:           domain.RoleAdmin,
 			}, nil
 		},
 	}
@@ -191,7 +89,7 @@ func TestLogin_UserMode_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewAuthService(mock, newMockDB(q))
+	svc := NewAuthService(mock, auth)
 	pair, err := svc.Login(context.Background(), domain.LoginRequest{
 		Email:    "user@example.com",
 		Password: password,
@@ -217,13 +115,13 @@ func TestLogin_UserMode_Success(t *testing.T) {
 func TestLogin_UserMode_WrongPassword(t *testing.T) {
 	hash, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.MinCost)
 
-	q := &authMockQuerier{
-		getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
-			return dbgen.User{Password: string(hash)}, nil
+	auth := &mockAuthRepo{
+		getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
+			return &domain.AuthUser{Password: string(hash)}, nil
 		},
 	}
 
-	svc := NewAuthService(&mockTokenProvider{}, newMockDB(q))
+	svc := NewAuthService(&mockTokenProvider{}, auth)
 	_, err := svc.Login(context.Background(), domain.LoginRequest{
 		Email:    "user@example.com",
 		Password: "wrong",
@@ -238,14 +136,14 @@ func TestLogin_APIKeyMode_Success(t *testing.T) {
 	organizationID := uuid.New()
 	keyID := uuid.New()
 	apiKey := "sk_live_testkey123"
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
+	expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
 
-	q := &authMockQuerier{
-		getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
-			if keyHash != hash {
-				return dbgen.ApiKey{}, errors.New("not found")
+	auth := &mockAuthRepo{
+		getAPIKeyByHashFn: func(_ context.Context, keyHash string) (*domain.APIKey, error) {
+			if keyHash != expectedHash {
+				return nil, errors.New("not found")
 			}
-			return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
+			return &domain.APIKey{ID: keyID, OrganizationID: organizationID}, nil
 		},
 	}
 
@@ -257,7 +155,7 @@ func TestLogin_APIKeyMode_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewAuthService(mock, newMockDB(q))
+	svc := NewAuthService(mock, auth)
 	pair, err := svc.Login(context.Background(), domain.LoginRequest{APIKey: apiKey})
 
 	if err != nil {
@@ -275,13 +173,13 @@ func TestLogin_APIKeyMode_Success(t *testing.T) {
 	if capturedInput.Role != "" {
 		t.Fatalf("expected empty role, got %s", capturedInput.Role)
 	}
-	if !q.lastUsedUpdated {
+	if !auth.lastUsedUpdated {
 		t.Fatal("expected UpdateAPIKeyLastUsed to be called")
 	}
 }
 
 func TestLogin_BadRequest(t *testing.T) {
-	svc := NewAuthService(&mockTokenProvider{}, newMockDB(&authMockQuerier{}))
+	svc := NewAuthService(&mockTokenProvider{}, &mockAuthRepo{})
 	_, err := svc.Login(context.Background(), domain.LoginRequest{})
 	if !errors.Is(err, domain.ErrBadRequest) {
 		t.Fatalf("expected ErrBadRequest, got %v", err)
@@ -289,7 +187,7 @@ func TestLogin_BadRequest(t *testing.T) {
 }
 
 // ============================================================
-// Unit tests — RefreshToken
+// Unit tests - RefreshToken
 // ============================================================
 
 func TestRefreshToken_Success(t *testing.T) {
@@ -309,7 +207,7 @@ func TestRefreshToken_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewAuthService(mock, newMockDB(&authMockQuerier{}))
+	svc := NewAuthService(mock, &mockAuthRepo{})
 	pair, err := svc.RefreshToken(expectedRefresh)
 
 	if err != nil {
@@ -332,7 +230,7 @@ func TestRefreshToken_Error(t *testing.T) {
 		},
 	}
 
-	svc := NewAuthService(mock, newMockDB(&authMockQuerier{}))
+	svc := NewAuthService(mock, &mockAuthRepo{})
 	pair, err := svc.RefreshToken("some-expired-token")
 
 	if pair != nil {
@@ -367,7 +265,6 @@ func TestProperty_APIKeyHashRoundTrip(t *testing.T) {
 // For any valid user login, the emitted access token must have non-empty user_id,
 // non-empty role, and auth_type == "user".
 func TestProperty_UserTokenClaimsComplete(t *testing.T) {
-	// Pre-compute hash once — bcrypt is expensive and its correctness isn't what we're testing here.
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
 
@@ -376,14 +273,13 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 		userID := uuid.New()
 		role := rapid.SampledFrom([]string{"owner", "admin", "member"}).Draw(t, "role")
 
-		q := &authMockQuerier{
-			getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
-				return dbgen.User{
+		auth := &mockAuthRepo{
+			getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
+				return &domain.AuthUser{
 					ID:             userID,
 					OrganizationID: organizationID,
-					Email:          "user@example.com",
-					Role:           role,
 					Password:       string(fixedHash),
+					Role:           domain.Role(role),
 				}, nil
 			},
 		}
@@ -396,7 +292,7 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 			},
 		}
 
-		svc := NewAuthService(mock, newMockDB(q))
+		svc := NewAuthService(mock, auth)
 		_, loginErr := svc.Login(context.Background(), domain.LoginRequest{
 			Email:    "user@example.com",
 			Password: fixedPassword,
@@ -426,12 +322,12 @@ func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 		apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 		expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
 
-		q := &authMockQuerier{
-			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
+		auth := &mockAuthRepo{
+			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (*domain.APIKey, error) {
 				if keyHash != expectedHash {
-					return dbgen.ApiKey{}, errors.New("not found")
+					return nil, errors.New("not found")
 				}
-				return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
+				return &domain.APIKey{ID: keyID, OrganizationID: organizationID}, nil
 			},
 		}
 
@@ -443,7 +339,7 @@ func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 			},
 		}
 
-		svc := NewAuthService(mock, newMockDB(q))
+		svc := NewAuthService(mock, auth)
 		_, loginErr := svc.Login(context.Background(), domain.LoginRequest{APIKey: apiKey})
 		if loginErr != nil {
 			t.Fatalf("unexpected login error: %v", loginErr)
@@ -462,9 +358,8 @@ func TestProperty_SystemTokenClaimsAbsent(t *testing.T) {
 }
 
 // For any payload with api_key present, mode must be system.
-// For any payload with organization_id+email+password and no api_key, mode must be user.
+// For any payload with email+password and no api_key, mode must be user.
 func TestProperty_LoginModeDetection(t *testing.T) {
-	// Pre-compute hash once — bcrypt cost is not what this property tests.
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
 
@@ -474,15 +369,15 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 		apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 		apiKeyHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
 
-		q := &authMockQuerier{
-			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
+		auth := &mockAuthRepo{
+			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (*domain.APIKey, error) {
 				if keyHash == apiKeyHash {
-					return dbgen.ApiKey{ID: uuid.New(), OrganizationID: organizationID}, nil
+					return &domain.APIKey{ID: uuid.New(), OrganizationID: organizationID}, nil
 				}
-				return dbgen.ApiKey{}, errors.New("not found")
+				return nil, errors.New("not found")
 			},
-			getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
-				return dbgen.User{
+			getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
+				return &domain.AuthUser{
 					ID:             userID,
 					OrganizationID: organizationID,
 					Role:           "member",
@@ -499,9 +394,9 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 			},
 		}
 
-		svc := NewAuthService(mock, newMockDB(q))
+		svc := NewAuthService(mock, auth)
 
-		// System mode: api_key present (even with other fields)
+		// System mode: api_key present
 		_, err := svc.Login(context.Background(), domain.LoginRequest{
 			APIKey: apiKey,
 		})
@@ -534,22 +429,22 @@ func TestProperty_APIKeyLastUsedAtUpdated(t *testing.T) {
 		apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 		expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
 
-		q := &authMockQuerier{
-			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
+		auth := &mockAuthRepo{
+			getAPIKeyByHashFn: func(_ context.Context, keyHash string) (*domain.APIKey, error) {
 				if keyHash == expectedHash {
-					return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
+					return &domain.APIKey{ID: keyID, OrganizationID: organizationID}, nil
 				}
-				return dbgen.ApiKey{}, errors.New("not found")
+				return nil, errors.New("not found")
 			},
 		}
 
-		svc := NewAuthService(&mockTokenProvider{}, newMockDB(q))
+		svc := NewAuthService(&mockTokenProvider{}, auth)
 		_, err := svc.Login(context.Background(), domain.LoginRequest{APIKey: apiKey})
 		if err != nil {
 			t.Fatalf("unexpected login error: %v", err)
 		}
 
-		if !q.lastUsedUpdated {
+		if !auth.lastUsedUpdated {
 			t.Fatal("UpdateAPIKeyLastUsed must be called after successful API key login")
 		}
 	})
@@ -601,7 +496,7 @@ func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
 	})
 }
 
-// TestProperty_RefreshTokenErrorPropagation verifies that RefreshToken propagates errors from the TokenProvider.
+// TestProperty_RefreshTokenErrorPropagation verifies that RefreshToken propagates errors.
 func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		refreshInput := rapid.String().Draw(t, "refreshToken")
@@ -615,7 +510,7 @@ func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 			},
 		}
 
-		svc := NewAuthService(mock, newMockDB(&authMockQuerier{}))
+		svc := NewAuthService(mock, &mockAuthRepo{})
 		pair, err := svc.RefreshToken(refreshInput)
 
 		if pair != nil {
@@ -631,15 +526,6 @@ func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 // Bug condition exploration test
 // ============================================================
 
-// TestLogin_BugCondition_EmailPasswordWithoutOrganizationID confirms that Login
-// succeeds when called with email+password and no OrganizationID.
-//
-// The test asserts the correct behavior: err==nil AND pair!=nil.
-//
-//	("organization_id, email and password or api_key required")
-//
-// Root cause: `req.OrganizationID != ""` guard in AuthService.Login (auth.go) is false
-// when OrganizationID is empty, so the function falls through to `return nil, ErrBadRequest`.
 func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
@@ -647,15 +533,13 @@ func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		email := rapid.StringMatching(`[a-zA-Z0-9]{3,10}@example\.com`).Draw(t, "email")
 
-		q := &authMockQuerier{
-			getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
-				// Return a valid user for any email so the bug is isolated to the dispatch guard.
-				return dbgen.User{
+		auth := &mockAuthRepo{
+			getUserByEmailFn: func(_ context.Context, email string) (*domain.AuthUser, error) {
+				return &domain.AuthUser{
 					ID:             uuid.New(),
 					OrganizationID: uuid.New(),
-					Email:          email,
-					Role:           "member",
 					Password:       string(fixedHash),
+					Role:           "member",
 				}, nil
 			},
 		}
@@ -666,17 +550,13 @@ func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
 			},
 		}
 
-		svc := NewAuthService(mock, newMockDB(q))
+		svc := NewAuthService(mock, auth)
 
-		// Bug condition: no OrganizationID supplied.
 		pair, err := svc.Login(context.Background(), domain.LoginRequest{
 			Email:    email,
 			Password: fixedPassword,
-			// OrganizationID intentionally omitted
 		})
 
-		// CORRECT behavior: should succeed.
-		// On UNFIXED code this fails because `req.OrganizationID != ""` is false → ErrBadRequest.
 		if err != nil {
 			t.Fatalf("expected no error for email+password login without OrganizationID, got: %v", err)
 		}
@@ -686,11 +566,10 @@ func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
 	})
 }
 
-// TestProperty_Preservation_NonBuggyInputs verifies that non-bug-condition inputs
-// (where isBugCondition returns FALSE) produce the same results before and after the fix.
+// TestProperty_Preservation_NonBuggyInputs verifies non-bug-condition inputs
+// produce the same results before and after the fix.
 func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	// Sub-property A: API key preservation
-	// For any valid API key, auth_type=system token is returned.
 	t.Run("A_APIKeyPreservation", func(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {
 			organizationID := uuid.New()
@@ -698,12 +577,12 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 			apiKey := rapid.StringMatching(`[a-zA-Z0-9]{16,32}`).Draw(t, "apiKey")
 			expectedHash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
 
-			q := &authMockQuerier{
-				getAPIKeyByHashFn: func(_ context.Context, keyHash string) (dbgen.ApiKey, error) {
+			auth := &mockAuthRepo{
+				getAPIKeyByHashFn: func(_ context.Context, keyHash string) (*domain.APIKey, error) {
 					if keyHash == expectedHash {
-						return dbgen.ApiKey{ID: keyID, OrganizationID: organizationID}, nil
+						return &domain.APIKey{ID: keyID, OrganizationID: organizationID}, nil
 					}
-					return dbgen.ApiKey{}, errors.New("not found")
+					return nil, errors.New("not found")
 				},
 			}
 
@@ -715,7 +594,7 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 				},
 			}
 
-			svc := NewAuthService(mock, newMockDB(q))
+			svc := NewAuthService(mock, auth)
 			_, err := svc.Login(context.Background(), domain.LoginRequest{APIKey: apiKey})
 
 			if err != nil {
@@ -728,10 +607,9 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	})
 
 	// Sub-property B: Empty request preservation
-	// For any empty LoginRequest{}, ErrBadRequest is returned.
 	t.Run("B_EmptyRequestPreservation", func(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {
-			svc := NewAuthService(&mockTokenProvider{}, newMockDB(&authMockQuerier{}))
+			svc := NewAuthService(&mockTokenProvider{}, &mockAuthRepo{})
 			_, err := svc.Login(context.Background(), domain.LoginRequest{})
 
 			if !errors.Is(err, domain.ErrBadRequest) {
@@ -741,28 +619,24 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	})
 
 	// Sub-property C: Wrong password preservation
-	// For any {Email, Password: "wrong", OrganizationID: <valid uuid>} where DB returns a user
-	// with a different password hash, ErrUnauthorized is returned.
 	t.Run("C_WrongPasswordPreservation", func(t *testing.T) {
 		knownHash, _ := bcrypt.GenerateFromPassword([]byte("correct-password"), bcrypt.MinCost)
 
 		rapid.Check(t, func(t *rapid.T) {
-			organizationID := uuid.New()
 			email := rapid.StringMatching(`[a-zA-Z0-9]{3,10}@example\.com`).Draw(t, "email")
 
-			q := &authMockQuerier{
-				getUserByEmailFn: func(_ context.Context, email string) (dbgen.User, error) {
-					return dbgen.User{
+			auth := &mockAuthRepo{
+				getUserByEmailFn: func(_ context.Context, email string) (*domain.AuthUser, error) {
+					return &domain.AuthUser{
 						ID:             uuid.New(),
-						OrganizationID: organizationID,
-						Email:          email,
-						Role:           "member",
+						OrganizationID: uuid.New(),
 						Password:       string(knownHash),
+						Role:           "member",
 					}, nil
 				},
 			}
 
-			svc := NewAuthService(&mockTokenProvider{}, newMockDB(q))
+			svc := NewAuthService(&mockTokenProvider{}, auth)
 			_, err := svc.Login(context.Background(), domain.LoginRequest{
 				Email:    email,
 				Password: "wrong",
@@ -775,20 +649,18 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 	})
 
 	// Sub-property D: Unknown email preservation
-	// For any {Email: generated, Password: generated, OrganizationID: <valid uuid>} where DB
-	// returns not-found, ErrUnauthorized is returned.
 	t.Run("D_UnknownEmailPreservation", func(t *testing.T) {
 		rapid.Check(t, func(t *rapid.T) {
 			email := rapid.StringMatching(`[a-zA-Z0-9]{3,10}@example\.com`).Draw(t, "email")
 			password := rapid.StringMatching(`[a-zA-Z0-9]{8,16}`).Draw(t, "password")
 
-			q := &authMockQuerier{
-				getUserByEmailFn: func(_ context.Context, _ string) (dbgen.User, error) {
-					return dbgen.User{}, errors.New("not found")
+			auth := &mockAuthRepo{
+				getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
+					return nil, errors.New("not found")
 				},
 			}
 
-			svc := NewAuthService(&mockTokenProvider{}, newMockDB(q))
+			svc := NewAuthService(&mockTokenProvider{}, auth)
 			_, err := svc.Login(context.Background(), domain.LoginRequest{
 				Email:    email,
 				Password: password,
@@ -800,9 +672,3 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 		})
 	})
 }
-
-// Ensure authMockQuerier satisfies the interface at compile time.
-var _ dbgen.Querier = (*authMockQuerier)(nil)
-
-// Ensure sql package is used (for NullTime in stubs).
-var _ = sql.NullTime{}

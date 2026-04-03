@@ -14,8 +14,8 @@ import (
 	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
 	"i9pay/internal/auth/token"
-	"i9pay/internal/database"
 	"i9pay/internal/database/dbgen"
+	"i9pay/internal/database/repository"
 	"i9pay/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -155,8 +155,9 @@ func withClaims(organizationID string) gin.HandlerFunc {
 // setupAddressRouter creates a Gin test router with the error middleware, claims, and address handler routes.
 func setupAddressRouter(mock *mockQuerier, organizationID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	db := &database.DB{Queries: mock}
-	svc := service.NewAddressService(db)
+	customerRepo := repository.NewCustomerRepo(mock)
+	addressRepo := repository.NewAddressRepo(mock)
+	svc := service.NewAddressService(customerRepo, addressRepo)
 	h := NewAddressHandler(svc)
 
 	r := gin.New()

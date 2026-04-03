@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"i9pay/internal/auth/token"
-	"i9pay/internal/database"
 	"i9pay/internal/domain"
 
 	"golang.org/x/crypto/bcrypt"
@@ -23,12 +22,12 @@ type TokenProvider interface {
 // AuthService handles authentication logic.
 type AuthService struct {
 	tokenSvc TokenProvider
-	db       *database.DB
+	auth     domain.AuthRepository
 }
 
-// NewAuthService creates an AuthService with token provider and database access.
-func NewAuthService(tokenSvc TokenProvider, db *database.DB) *AuthService {
-	return &AuthService{tokenSvc: tokenSvc, db: db}
+// NewAuthService creates an AuthService with token provider and auth repository.
+func NewAuthService(tokenSvc TokenProvider, auth domain.AuthRepository) *AuthService {
+	return &AuthService{tokenSvc: tokenSvc, auth: auth}
 }
 
 // Login authenticates via dynamic mode detection:
@@ -54,13 +53,13 @@ func (s *AuthService) RefreshToken(refreshToken string) (*token.Pair, error) {
 func (s *AuthService) loginByAPIKey(ctx context.Context, apiKey string) (*token.Pair, error) {
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
 
-	key, err := s.db.Queries.GetAPIKeyByHash(ctx, hash)
+	key, err := s.auth.GetAPIKeyByHash(ctx, hash)
 	if err != nil {
 		return nil, domain.ErrUnauthorized
 	}
 
 	// Update last_used_at — best effort, don't fail auth on error
-	_ = s.db.Queries.UpdateAPIKeyLastUsed(ctx, key.ID)
+	_ = s.auth.UpdateAPIKeyLastUsed(ctx, key.ID)
 
 	pair, err := s.tokenSvc.NewPairWithClaims(token.ClaimsInput{
 		OrganizationID: key.OrganizationID.String(),
@@ -74,7 +73,7 @@ func (s *AuthService) loginByAPIKey(ctx context.Context, apiKey string) (*token.
 
 // loginByUser authenticates a human user with email + password; organization is resolved from the user record.
 func (s *AuthService) loginByUser(ctx context.Context, email, password string) (*token.Pair, error) {
-	user, err := s.db.Queries.GetUserByEmail(ctx, email)
+	user, err := s.auth.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, domain.ErrUnauthorized
 	}
@@ -86,7 +85,7 @@ func (s *AuthService) loginByUser(ctx context.Context, email, password string) (
 	pair, err := s.tokenSvc.NewPairWithClaims(token.ClaimsInput{
 		OrganizationID: user.OrganizationID.String(),
 		UserID:         user.ID.String(),
-		Role:           domain.Role(user.Role),
+		Role:           user.Role,
 		AuthType:       domain.AuthTypeUser,
 	})
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"i9pay/internal/auth/token"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
+	"i9pay/internal/database/repository"
 	"i9pay/internal/monitor"
 	"i9pay/internal/service"
 
@@ -37,12 +38,19 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	loginWindow := time.Duration(cfg.RateLimitLoginWindowSeconds) * time.Second
 	organizationWindow := time.Duration(cfg.RateLimitOrganizationWindowSeconds) * time.Second
 
+	// Repositories
+	customerRepo := repository.NewCustomerRepo(db.Queries)
+	addressRepo := repository.NewAddressRepo(db.Queries)
+	userRepo := repository.NewUserRepo(db.Queries)
+	authRepo := repository.NewAuthRepo(db.Queries)
+	txManager := repository.NewTxManager(db)
+
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
-	authSvc := service.NewAuthService(tokenSvc, db)
-	addressSvc := service.NewAddressService(db)
-	customerSvc := service.NewCustomerService(db, addressSvc)
-	userSvc := service.NewUserService(db)
+	authSvc := service.NewAuthService(tokenSvc, authRepo)
+	addressSvc := service.NewAddressService(customerRepo, addressRepo)
+	customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
+	userSvc := service.NewUserService(userRepo)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")

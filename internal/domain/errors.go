@@ -13,4 +13,7 @@ var (
 	ErrNotFound             = errors.New("not found")
 	ErrConflict             = errors.New("conflict")
 	ErrForbidden            = errors.New("forbidden")
+	ErrInternal             = errors.New("internal server error")
+	ErrDuplicateEmail       = errors.New("customer with this email already exists")
+	ErrDuplicateDocument    = errors.New("customer with this document already exists")
 )

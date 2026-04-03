@@ -1,7 +1,16 @@
 package domain
 
-// Credentials represents the input for organization authentication.
-type Credentials struct {
-	Email    string
-	Password string
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// Organization represents the top-level tenant entity.
+type Organization struct {
+	ID        uuid.UUID
+	Name      string
+	Status    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

@@ -5,11 +5,28 @@ import (
 	"net/http"
 
 	apierr "i9pay/internal/api/err"
+	"i9pay/internal/domain"
 	"i9pay/internal/monitor"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
+
+// domainStatusMap maps domain sentinel errors to HTTP status codes.
+var domainStatusMap = map[error]int{
+	domain.ErrNotFound:             http.StatusNotFound,
+	domain.ErrCustomerNotFound:     http.StatusNotFound,
+	domain.ErrAddressNotFound:      http.StatusNotFound,
+	domain.ErrOrganizationNotFound: http.StatusNotFound,
+	domain.ErrConflict:             http.StatusConflict,
+	domain.ErrDuplicateEmail:       http.StatusConflict,
+	domain.ErrDuplicateDocument:    http.StatusConflict,
+	domain.ErrUnauthorized:         http.StatusUnauthorized,
+	domain.ErrInvalidCredentials:   http.StatusUnauthorized,
+	domain.ErrForbidden:            http.StatusForbidden,
+	domain.ErrBadRequest:           http.StatusBadRequest,
+	domain.ErrInternal:             http.StatusInternalServerError,
+}
 
 // Errors reads errors attached via c.Error() after the handler chain runs and
 // writes a uniform JSON response. Skips if the response was already written
@@ -34,6 +51,14 @@ func Errors() gin.HandlerFunc {
 		if appErr, ok := apierr.As(err); ok {
 			c.JSON(appErr.Status, gin.H{"error": appErr.Message})
 			return
+		}
+
+		// Check domain sentinel errors
+		for sentinel, status := range domainStatusMap {
+			if errors.Is(err, sentinel) {
+				c.JSON(status, gin.H{"error": sentinel.Error()})
+				return
+			}
 		}
 
 		// Unexpected error — report to monitor and return 500.
