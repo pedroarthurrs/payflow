@@ -290,32 +290,32 @@ onMounted(() => {
 .customer-detail__error {
   text-align: center;
   padding: 2rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--card);
+  border: 1px solid var(--destructive);
   border-radius: 0.5rem;
 }
 
 .customer-detail__error-message {
-  color: #dc2626;
+  color: var(--destructive);
   margin-bottom: 1rem;
 }
 
 .customer-detail__not-found {
   text-align: center;
   padding: 2rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--card);
+  border: 1px solid var(--destructive);
   border-radius: 0.5rem;
 }
 
 .customer-detail__not-found-message {
-  color: #dc2626;
+  color: var(--destructive);
   margin-bottom: 1rem;
   font-size: 1rem;
 }
 
 .customer-detail__back-link {
-  color: #2563eb;
+  color: var(--primary);
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
@@ -328,8 +328,8 @@ onMounted(() => {
 .customer-detail__retry-btn,
 .customer-detail__address-retry-btn {
   padding: 0.5rem 1rem;
-  background: #2563eb;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -338,7 +338,7 @@ onMounted(() => {
 
 .customer-detail__retry-btn:hover,
 .customer-detail__address-retry-btn:hover {
-  background: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .customer-detail__header {
@@ -351,7 +351,7 @@ onMounted(() => {
 .customer-detail__title {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--foreground);
 }
 
 .customer-detail__actions {
@@ -361,8 +361,8 @@ onMounted(() => {
 
 .customer-detail__edit-btn {
   padding: 0.5rem 1rem;
-  background: #2563eb;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -371,13 +371,13 @@ onMounted(() => {
 }
 
 .customer-detail__edit-btn:hover {
-  background: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .customer-detail__delete-btn {
   padding: 0.5rem 1rem;
-  background: #dc2626;
-  color: #fff;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -386,12 +386,12 @@ onMounted(() => {
 }
 
 .customer-detail__delete-btn:hover {
-  background: #b91c1c;
+  filter: brightness(1.08);
 }
 
 .customer-detail__info {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -406,7 +406,7 @@ onMounted(() => {
 .customer-detail__field dt {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.25rem;
@@ -414,7 +414,7 @@ onMounted(() => {
 
 .customer-detail__field dd {
   font-size: 0.9375rem;
-  color: #1f2937;
+  color: var(--foreground);
   margin: 0;
 }
 
@@ -426,10 +426,10 @@ onMounted(() => {
   white-space: pre-wrap;
   font-family: monospace;
   font-size: 0.8125rem;
-  background: #f9fafb;
+  background: var(--muted);
   padding: 0.75rem;
   border-radius: 0.375rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
 }
 
 .customer-detail__addresses {
@@ -446,13 +446,13 @@ onMounted(() => {
 .customer-detail__addresses-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--foreground);
 }
 
 .customer-detail__new-address-btn {
   padding: 0.5rem 1rem;
-  background: #2563eb;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -461,19 +461,19 @@ onMounted(() => {
 }
 
 .customer-detail__new-address-btn:hover {
-  background: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .customer-detail__address-error {
   text-align: center;
   padding: 2rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--card);
+  border: 1px solid var(--destructive);
   border-radius: 0.5rem;
 }
 
 .customer-detail__address-error-message {
-  color: #dc2626;
+  color: var(--destructive);
   margin-bottom: 1rem;
 }
 
@@ -482,7 +482,7 @@ onMounted(() => {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--foreground);
   cursor: pointer;
   margin-top: 0.5rem;
 }

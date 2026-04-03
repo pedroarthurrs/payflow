@@ -197,7 +197,7 @@ onMounted(() => {
 .user-form__title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--foreground);
   margin-bottom: 1.5rem;
 }
 
@@ -207,9 +207,9 @@ onMounted(() => {
 }
 
 .user-form__error {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background-color: var(--card);
+  border: 1px solid var(--destructive);
+  color: var(--destructive);
   padding: 0.75rem 1rem;
   border-radius: 0.375rem;
   margin-bottom: 1rem;
@@ -224,19 +224,19 @@ onMounted(() => {
 .user-form__not-found {
   text-align: center;
   padding: 2rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--card);
+  border: 1px solid var(--destructive);
   border-radius: 0.5rem;
 }
 
 .user-form__not-found-message {
-  color: #dc2626;
+  color: var(--destructive);
   margin-bottom: 1rem;
   font-size: 1rem;
 }
 
 .user-form__back-link {
-  color: #2563eb;
+  color: var(--primary);
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
@@ -247,14 +247,14 @@ onMounted(() => {
 }
 
 .user-form__fetch-error-message {
-  color: #dc2626;
+  color: var(--destructive);
   margin-bottom: 1rem;
 }
 
 .user-form__retry-btn {
   padding: 0.5rem 1rem;
-  background-color: #2563eb;
-  color: #fff;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -262,7 +262,7 @@ onMounted(() => {
 }
 
 .user-form__retry-btn:hover {
-  background-color: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .user-form__actions {
@@ -274,22 +274,22 @@ onMounted(() => {
 
 .user-form__cancel-btn {
   padding: 0.5rem 1rem;
-  background-color: #fff;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
   border-radius: 0.375rem;
   cursor: pointer;
   font-size: 0.875rem;
 }
 
 .user-form__cancel-btn:hover {
-  background-color: #f9fafb;
+  filter: brightness(1.08);
 }
 
 .user-form__submit-btn {
   padding: 0.5rem 1.5rem;
-  background-color: #2563eb;
-  color: #fff;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -298,7 +298,7 @@ onMounted(() => {
 }
 
 .user-form__submit-btn:hover:not(:disabled) {
-  background-color: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .user-form__submit-btn:disabled {

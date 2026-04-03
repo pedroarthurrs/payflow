@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import FormField from '@/components/FormField.vue'
+import { Button } from '@/components/ui/button'
 import { useAuth } from '@/composables/useAuth'
 import type { ApiError } from '@/types'
 
@@ -32,10 +33,10 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="login-page">
-    <div class="login-card">
-      <h1 class="login-brand">i9pay</h1>
-      <form class="login-form" @submit.prevent="handleSubmit">
+  <div class="flex min-h-svh items-center justify-center bg-background px-4">
+    <div class="w-full max-w-sm rounded-xl border bg-card p-8 shadow-sm">
+      <h1 class="mb-6 text-center text-3xl font-bold text-foreground">i9pay</h1>
+      <form class="flex flex-col" @submit.prevent="handleSubmit">
         <FormField
           label="Email"
           v-model="email"
@@ -50,75 +51,15 @@ async function handleSubmit() {
           :required="true"
           placeholder="Sua senha"
         />
-        <p v-if="errorMessage" class="login-error">{{ errorMessage }}</p>
-        <button
+        <p v-if="errorMessage" class="mb-3 text-center text-sm text-destructive">{{ errorMessage }}</p>
+        <Button
           type="submit"
-          class="login-button"
+          class="w-full"
           :disabled="loading"
         >
           {{ loading ? 'Entrando...' : 'Entrar' }}
-        </button>
+        </Button>
       </form>
     </div>
   </div>
 </template>
-
-<style scoped>
-.login-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  background-color: #f3f4f6;
-}
-
-.login-card {
-  background: #fff;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  padding: 2rem;
-  width: 100%;
-  max-width: 24rem;
-}
-
-.login-brand {
-  text-align: center;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #2563eb;
-  margin: 0 0 1.5rem;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.login-error {
-  color: #dc2626;
-  font-size: 0.875rem;
-  margin: 0 0 0.75rem;
-  text-align: center;
-}
-
-.login-button {
-  padding: 0.625rem 1rem;
-  background-color: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.login-button:hover:not(:disabled) {
-  background-color: #1d4ed8;
-}
-
-.login-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>

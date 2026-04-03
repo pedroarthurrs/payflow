@@ -82,7 +82,7 @@ onMounted(fetchData)
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
-  color: #1f2937;
+  color: var(--foreground);
 }
 
 .dashboard__loading {
@@ -94,20 +94,20 @@ onMounted(fetchData)
 .dashboard__error {
   text-align: center;
   padding: 2rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: var(--card);
+  border: 1px solid var(--destructive);
   border-radius: 0.5rem;
 }
 
 .dashboard__error-message {
-  color: #dc2626;
+  color: var(--destructive);
   margin-bottom: 1rem;
 }
 
 .dashboard__retry-btn {
   padding: 0.5rem 1rem;
-  background: #2563eb;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -115,7 +115,7 @@ onMounted(fetchData)
 }
 
 .dashboard__retry-btn:hover {
-  background: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .dashboard__grid {
@@ -125,24 +125,24 @@ onMounted(fetchData)
 }
 
 .dashboard__card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
 }
 
 .dashboard__card-title {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--muted-foreground);
   margin-bottom: 0.5rem;
 }
 
 .dashboard__card-value {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--foreground);
   word-break: break-all;
 }
 </style>
