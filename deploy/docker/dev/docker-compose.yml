@@ -24,6 +24,7 @@ services:
       - "5433:5432"
     volumes:
       - ../../migrations:/docker-entrypoint-initdb.d
+      - ./initdb/999999_dev_seed_user.sql:/docker-entrypoint-initdb.d/999999_dev_seed_user.sql
       - postgres_data:/var/lib/postgresql/data
     env_file:
       - ../../../.env
@@ -39,7 +40,7 @@ services:
       - ../../../web:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://api:8080
+      - VITE_API_PROXY_TARGET=http://api:8080
     depends_on:
       - api
 

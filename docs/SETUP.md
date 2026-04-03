@@ -51,6 +51,11 @@ make build-dev
 
 Este comando constrói as imagens Docker, sobe os containers (API + PostgreSQL) e aplica as migrations automaticamente.
 
+No ambiente de desenvolvimento, um usuário de teste é criado automaticamente no primeiro bootstrap do banco:
+- Email: `dev@i9pay.local`
+- Senha: `Dev@123456`
+- Role: `owner`
+
 - API: `http://localhost:8080`
 - Banco de dados: `localhost:5433`
 
@@ -87,7 +92,7 @@ curl http://localhost:8080/v1/ready
 ```bash
 curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "test123"}'
+  -d '{"email": "dev@i9pay.local", "password": "Dev@123456"}'
 ```
 
 ---
