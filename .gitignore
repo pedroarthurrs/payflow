@@ -16,5 +16,9 @@ vendor/
 # AIR
 /tmp
 
-# Temp
-*.md
+# Node.js / Frontend
+web/node_modules/
+web/dist/
+web/coverage/
+web/*.tsbuildinfo
+web/tsconfig.*.tsbuildinfo

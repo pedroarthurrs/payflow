@@ -28,6 +28,21 @@ services:
     env_file:
       - ../../../.env
 
+  web:
+    build:
+      context: ../../../
+      dockerfile: build/docker/dev/Dockerfile.web
+    container_name: web_dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../../web:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://api:8080
+    depends_on:
+      - api
+
   adminer:
     image: adminer
     ports:
