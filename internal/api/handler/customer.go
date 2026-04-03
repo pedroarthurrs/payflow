@@ -28,8 +28,8 @@ func NewCustomerHandler(customerSvc *service.CustomerService) *CustomerHandler {
 // RegisterRoutes registers the customer handler routes.
 func (h *CustomerHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	customers := rg.Group("/customers")
-	customers.POST("/", h.Create)
-	customers.GET("/", h.List)
+	customers.POST("", h.Create)
+	customers.GET("", h.List)
 	customers.GET("/:customer_id", h.GetByID)
 	customers.PUT("/:customer_id", h.Update)
 	customers.DELETE("/:customer_id", h.Delete)

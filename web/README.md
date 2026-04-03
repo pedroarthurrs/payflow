@@ -88,3 +88,8 @@ pnpm test:watch   # Testes em modo watch
 - **Auth flow**: JWT com auto-refresh via interceptor do Axios; tokens no `localStorage`
 - **RBAC no frontend**: guard no router verifica role hierarchy (`owner > admin > member`)
 - **Proxy**: `/api` é redirecionado para o backend Go (porta 8080) via Vite proxy
+
+## Variáveis de Ambiente
+
+- **`VITE_API_PROXY_TARGET`**: alvo do proxy do Vite no ambiente de desenvolvimento. Exemplo: `http://localhost:8080` ou `http://api:8080` em Docker.
+- **`VITE_API_BASE_URL`**: base consumida pelo browser fora do proxy do Vite. Exemplo: `http://localhost:8080`.

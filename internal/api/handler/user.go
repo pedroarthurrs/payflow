@@ -26,8 +26,8 @@ func NewUserHandler(userSvc *service.UserService) *UserHandler {
 // RegisterRoutes registers the user handler routes.
 func (h *UserHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	users := rg.Group("/users")
-	users.POST("/", middleware.RequireRole(domain.RoleOwner), h.Create)
-	users.GET("/", middleware.RequireRole(domain.RoleAdmin), h.List)
+	users.POST("", middleware.RequireRole(domain.RoleOwner), h.Create)
+	users.GET("", middleware.RequireRole(domain.RoleAdmin), h.List)
 	users.PUT("/:user_id", middleware.RequireRole(domain.RoleOwner), h.Update)
 	users.DELETE("/:user_id", middleware.RequireRole(domain.RoleOwner), h.Delete)
 }

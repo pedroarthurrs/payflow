@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { AxiosHeaders } from 'axios'
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import type { ApiError, ApiValidationError, TokenPair } from '@/types'
 
@@ -14,10 +14,12 @@ const http = axios.create({
 })
 
 // Request interceptor: inject Authorization header
-http.interceptors.request.use((config) => {
+http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('access_token')
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    const headers = config.headers ?? new AxiosHeaders()
+    headers.set('Authorization', `Bearer ${token}`)
+    config.headers = headers
   }
   return config
 })
@@ -60,7 +62,9 @@ http.interceptors.response.use(
       const refreshed = await refreshPromise
       if (refreshed) {
         const newToken = localStorage.getItem('access_token')
-        config.headers.Authorization = `Bearer ${newToken}`
+        const headers = config.headers ?? new AxiosHeaders()
+        headers.set('Authorization', `Bearer ${newToken}`)
+        config.headers = headers
         return http(config)
       }
 

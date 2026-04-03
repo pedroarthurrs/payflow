@@ -64,22 +64,22 @@ func buildTestEngine() *gin.Engine {
 	})
 
 	customers := protected.Group("/customers")
-	customers.POST("/", func(c *gin.Context) { c.Status(http.StatusCreated) })
-	customers.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
+	customers.POST("", func(c *gin.Context) { c.Status(http.StatusCreated) })
+	customers.GET("", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	customers.GET("/:customer_id", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	customers.PUT("/:customer_id", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	customers.DELETE("/:customer_id", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
 	addresses := protected.Group("/customers/:customer_id/addresses")
-	addresses.POST("/", func(c *gin.Context) { c.Status(http.StatusCreated) })
-	addresses.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
+	addresses.POST("", func(c *gin.Context) { c.Status(http.StatusCreated) })
+	addresses.GET("", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	addresses.GET("/:id", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	addresses.PUT("/:id", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	addresses.DELETE("/:id", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
 	users := protected.Group("/users")
-	users.POST("/", func(c *gin.Context) { c.Status(http.StatusCreated) })
-	users.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
+	users.POST("", func(c *gin.Context) { c.Status(http.StatusCreated) })
+	users.GET("", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	users.PUT("/:user_id", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	users.DELETE("/:user_id", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
@@ -150,13 +150,13 @@ func TestProtectedRoutesRequireAuth(t *testing.T) {
 		path   string
 	}{
 		{http.MethodGet, "/api/v1/me"},
-		{http.MethodPost, "/api/v1/customers/"},
-		{http.MethodGet, "/api/v1/customers/"},
+		{http.MethodPost, "/api/v1/customers"},
+		{http.MethodGet, "/api/v1/customers"},
 		{http.MethodGet, "/api/v1/customers/some-id"},
 		{http.MethodPut, "/api/v1/customers/some-id"},
 		{http.MethodDelete, "/api/v1/customers/some-id"},
-		{http.MethodPost, "/api/v1/users/"},
-		{http.MethodGet, "/api/v1/users/"},
+		{http.MethodPost, "/api/v1/users"},
+		{http.MethodGet, "/api/v1/users"},
 	}
 
 	for _, tt := range tests {
@@ -179,7 +179,7 @@ func TestAddressRoutesNestedUnderCustomers(t *testing.T) {
 	routes := r.Routes()
 
 	expected := map[string][]string{
-		"/api/v1/customers/:customer_id/addresses/":    {http.MethodPost, http.MethodGet},
+		"/api/v1/customers/:customer_id/addresses":     {http.MethodPost, http.MethodGet},
 		"/api/v1/customers/:customer_id/addresses/:id": {http.MethodGet, http.MethodPut, http.MethodDelete},
 	}
 
@@ -203,8 +203,8 @@ func TestAddressRoutesNestedUnderCustomers(t *testing.T) {
 		method string
 		path   string
 	}{
-		{http.MethodPost, "/api/v1/customers/some-id/addresses/"},
-		{http.MethodGet, "/api/v1/customers/some-id/addresses/"},
+		{http.MethodPost, "/api/v1/customers/some-id/addresses"},
+		{http.MethodGet, "/api/v1/customers/some-id/addresses"},
 		{http.MethodGet, "/api/v1/customers/some-id/addresses/some-addr"},
 		{http.MethodPut, "/api/v1/customers/some-id/addresses/some-addr"},
 		{http.MethodDelete, "/api/v1/customers/some-id/addresses/some-addr"},
@@ -239,18 +239,18 @@ func TestProperty_PublicProtectedSeparation(t *testing.T) {
 
 	protectedRoutes := []route{
 		{http.MethodGet, "/api/v1/me"},
-		{http.MethodPost, "/api/v1/customers/"},
-		{http.MethodGet, "/api/v1/customers/"},
+		{http.MethodPost, "/api/v1/customers"},
+		{http.MethodGet, "/api/v1/customers"},
 		{http.MethodGet, "/api/v1/customers/abc123"},
 		{http.MethodPut, "/api/v1/customers/abc123"},
 		{http.MethodDelete, "/api/v1/customers/abc123"},
-		{http.MethodPost, "/api/v1/customers/abc123/addresses/"},
-		{http.MethodGet, "/api/v1/customers/abc123/addresses/"},
+		{http.MethodPost, "/api/v1/customers/abc123/addresses"},
+		{http.MethodGet, "/api/v1/customers/abc123/addresses"},
 		{http.MethodGet, "/api/v1/customers/abc123/addresses/addr1"},
 		{http.MethodPut, "/api/v1/customers/abc123/addresses/addr1"},
 		{http.MethodDelete, "/api/v1/customers/abc123/addresses/addr1"},
-		{http.MethodPost, "/api/v1/users/"},
-		{http.MethodGet, "/api/v1/users/"},
+		{http.MethodPost, "/api/v1/users"},
+		{http.MethodGet, "/api/v1/users"},
 		{http.MethodPut, "/api/v1/users/user1"},
 		{http.MethodDelete, "/api/v1/users/user1"},
 	}
@@ -311,8 +311,8 @@ func buildRBACTestEngine() *gin.Engine {
 	})
 
 	users := protected.Group("/users")
-	users.POST("/", middleware.RequireRole(domain.RoleOwner), func(c *gin.Context) { c.Status(http.StatusCreated) })
-	users.GET("/", middleware.RequireRole(domain.RoleAdmin), func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
+	users.POST("", middleware.RequireRole(domain.RoleOwner), func(c *gin.Context) { c.Status(http.StatusCreated) })
+	users.GET("", middleware.RequireRole(domain.RoleAdmin), func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	users.PUT("/:user_id", middleware.RequireRole(domain.RoleOwner), func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	users.DELETE("/:user_id", middleware.RequireRole(domain.RoleOwner), func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
@@ -330,8 +330,8 @@ func TestProperty_RBACUserRoutes(t *testing.T) {
 	}
 
 	routes := []userRoute{
-		{http.MethodPost, "/api/v1/users/", domain.RoleOwner},
-		{http.MethodGet, "/api/v1/users/", domain.RoleAdmin},
+		{http.MethodPost, "/api/v1/users", domain.RoleOwner},
+		{http.MethodGet, "/api/v1/users", domain.RoleAdmin},
 		{http.MethodPut, "/api/v1/users/user1", domain.RoleOwner},
 		{http.MethodDelete, "/api/v1/users/user1", domain.RoleOwner},
 	}
@@ -467,11 +467,11 @@ func buildRequestIDTestEngine() *gin.Engine {
 
 	// Protected routes (stub — no real auth needed for this property)
 	v1.GET("/me", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
-	v1.POST("/customers/", func(c *gin.Context) { c.Status(http.StatusCreated) })
-	v1.GET("/customers/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
+	v1.POST("/customers", func(c *gin.Context) { c.Status(http.StatusCreated) })
+	v1.GET("/customers", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 	v1.GET("/customers/:customer_id", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
-	v1.POST("/users/", func(c *gin.Context) { c.Status(http.StatusCreated) })
-	v1.GET("/users/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
+	v1.POST("/users", func(c *gin.Context) { c.Status(http.StatusCreated) })
+	v1.GET("/users", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{}) })
 
 	return r
 }
@@ -490,11 +490,11 @@ func TestProperty_GlobalMiddlewareRequestID(t *testing.T) {
 		{http.MethodPost, "/api/v1/auth/login"},
 		{http.MethodPost, "/api/v1/auth/refresh"},
 		{http.MethodGet, "/api/v1/me"},
-		{http.MethodPost, "/api/v1/customers/"},
-		{http.MethodGet, "/api/v1/customers/"},
+		{http.MethodPost, "/api/v1/customers"},
+		{http.MethodGet, "/api/v1/customers"},
 		{http.MethodGet, "/api/v1/customers/abc123"},
-		{http.MethodPost, "/api/v1/users/"},
-		{http.MethodGet, "/api/v1/users/"},
+		{http.MethodPost, "/api/v1/users"},
+		{http.MethodGet, "/api/v1/users"},
 	}
 
 	r := buildRequestIDTestEngine()

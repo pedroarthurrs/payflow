@@ -22,6 +22,8 @@ const refreshTokenTTL = 7 * 24 * time.Hour
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
 func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker) *gin.Engine {
 	r := gin.New()
+	r.RedirectTrailingSlash = false
+	r.RedirectFixedPath = false
 	r.Use(middleware.Recovery())
 	r.Use(monitor.Middleware())
 	r.Use(middleware.RequestID())

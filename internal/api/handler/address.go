@@ -26,8 +26,8 @@ func NewAddressHandler(addressSvc *service.AddressService) *AddressHandler {
 // RegisterRoutes registers the address handler routes.
 func (h *AddressHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	addresses := rg.Group("/customers/:customer_id/addresses")
-	addresses.POST("/", h.Create)
-	addresses.GET("/", h.List)
+	addresses.POST("", h.Create)
+	addresses.GET("", h.List)
 	addresses.GET("/:id", h.GetByID)
 	addresses.PUT("/:id", h.Update)
 	addresses.DELETE("/:id", h.Delete)
