@@ -9,6 +9,7 @@ Três capacidades transversais são aplicadas via middleware:
 1. Rate Limiting — proteção contra abuso e força bruta com 3 tiers configuráveis
 2. Logging Estruturado — logs com `log/slog` (JSON em produção, texto em desenvolvimento)
 3. Tradução de Erros de Validação — mensagens legíveis para erros de entrada
+4. RBAC — controle de acesso baseado em roles (owner > admin > member)
 
 ---
 
@@ -248,6 +249,66 @@ A ordem de middleware é crítica para segurança e observabilidade:
 5. RateLimitByIP()               — limita por IP (grupo v1)
 6. Auth()                        — valida JWT (grupo protegido)
 7. RateLimitByOrganization()     — limita por organization (grupo protegido)
+8. RequireRole()                 — RBAC por endpoint (onde aplicável)
+```
+
+---
+
+## Controle de Acesso (RBAC)
+
+### Propósito
+
+Restringir acesso a endpoints sensíveis com base no role do usuário autenticado.
+
+### Hierarquia de Roles
+
+```
+owner (3) > admin (2) > member (1)
+```
+
+Cada role herda as permissões dos níveis inferiores. Um `owner` pode acessar tudo que `admin` e `member` podem.
+
+### Middleware `RequireRole`
+
+**Arquivo:** `internal/api/middleware/rbac.go`
+
+O middleware `RequireRole(minRole)` verifica:
+
+1. Se claims JWT existem no contexto → caso contrário, 401
+2. Se o token possui role (tokens de sistema via API Key não possuem) → caso contrário, 403 `"user role required"`
+3. Se o role é reconhecido (nível > 0) → caso contrário, 403
+4. Se o nível do role é >= ao mínimo exigido → caso contrário, 403 `"insufficient permissions"`
+
+### Endpoints Protegidos por Role
+
+| Endpoint | Role Mínimo |
+|----------|-------------|
+| `POST /v1/users` | owner |
+| `PUT /v1/users/:user_id` | owner |
+| `DELETE /v1/users/:user_id` | owner |
+| `GET /v1/users` | admin |
+
+### Respostas de Erro
+
+**401 Unauthorized** (sem token):
+```json
+{
+  "error": "authorization required"
+}
+```
+
+**403 Forbidden** (token de sistema sem role):
+```json
+{
+  "error": "user role required"
+}
+```
+
+**403 Forbidden** (role insuficiente):
+```json
+{
+  "error": "insufficient permissions"
+}
 ```
 
 ---
@@ -284,6 +345,9 @@ go test ./internal/api/middleware -run TestRequestID
 
 # Logger
 go test ./internal/api/middleware -run TestStructuredLogger
+
+# RBAC
+go test ./internal/api/middleware -run TestRequireRole
 
 # Tradução de validação
 go test ./internal/api/err -run TestTranslateValidationErrors

@@ -180,7 +180,7 @@ Configurações recomendadas em `.vscode/settings.json`:
 lsof -i :5433
 ```
 
-Ou altere a porta em `docker/dev/docker-compose.yml`: `"5433:5432"` para `"5434:5432"`.
+Ou altere a porta em `deploy/docker/dev/docker-compose.yml`: `"5433:5432"` para `"5434:5432"`.
 
 ### Database connection refused
 
@@ -208,7 +208,7 @@ Em produção, use um valor gerado de forma segura e armazene via sistema de sec
 
 ```bash
 # Verifique os logs
-docker compose -f docker/dev/docker-compose.yml logs
+docker compose -f deploy/docker/dev/docker-compose.yml logs
 
 # Limpe e tente novamente
 make remove
@@ -265,7 +265,7 @@ Execute antes do deploy:
 
 ```bash
 docker run --rm \
-  -v "$(pwd)/migrations:/migrations" \
+  -v "$(pwd)/deploy/migrations:/migrations" \
   migrate/migrate \
   -path /migrations \
   -database "postgres://user:pass@db:5432/i9pay" \

@@ -18,10 +18,15 @@ i9pay/
 │   ├── config/               — configurações
 │   ├── database/             — conexão e queries (SQLC)
 │   └── auth/token/           — JWT service
-├── migrations/               — SQL migrations
-├── docker/
-│   ├── dev/                  — ambiente de desenvolvimento
-│   └── prod/                 — ambiente de produção
+├── build/
+│   └── docker/
+│       ├── dev/              — Dockerfile de desenvolvimento
+│       └── prod/             — Dockerfile de produção
+├── deploy/
+│   ├── docker/
+│   │   ├── dev/              — docker-compose de desenvolvimento
+│   │   └── prod/             — docker-compose de produção
+│   └── migrations/           — SQL migrations
 ├── docs/                     — documentação
 ├── go.mod / go.sum           — dependências
 ├── sqlc.yml                  — configuração SQLC
@@ -57,6 +62,13 @@ type ProductHandler struct {
 
 func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
     return &ProductHandler{productSvc: productSvc}
+}
+
+// RegisterRoutes registra as rotas do handler no grupo fornecido.
+func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    products := rg.Group("/products")
+    products.POST("/", h.Create)
+    products.GET("/:id", h.Get)
 }
 
 type createProductRequest struct {
@@ -194,18 +206,30 @@ make sqlc
 
 ### 5. Registrar no Router (`internal/api/router/router.go`)
 
+Cada handler implementa `RegisterRoutes()` para registrar suas rotas:
+
 ```go
+// O handler registra suas próprias rotas
+func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    products := rg.Group("/products")
+    products.POST("/", h.Create)
+    products.GET("/:id", h.Get)
+}
+
+// No router.go, basta chamar RegisterRoutes no grupo correto
 productSvc := service.NewProductService(db)
 productHandler := handler.NewProductHandler(productSvc)
+productHandler.RegisterRoutes(protected)
+```
 
-protected := v1.Group("/")
-protected.Use(middleware.Auth(tokenSvc))
-{
-    productGroup := protected.Group("/products")
-    {
-        productGroup.POST("", productHandler.Create)
-        productGroup.GET("/:id", productHandler.Get)
-    }
+Para endpoints que exigem role específico, use `middleware.RequireRole()`:
+
+```go
+func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    products := rg.Group("/products")
+    products.POST("/", middleware.RequireRole(domain.RoleAdmin), h.Create)
+    products.GET("/", h.List)
+    products.DELETE("/:id", middleware.RequireRole(domain.RoleOwner), h.Delete)
 }
 ```
 

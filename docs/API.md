@@ -80,15 +80,26 @@ Um `HealthMonitor` em background faz ping no banco a cada 15 segundos e cacheia 
 
 ### POST /v1/auth/login
 
-Autentica uma organization e emite um par de tokens.
+Autentica e emite um par de tokens. Suporta dois modos de autenticação:
 
-**Requisição:**
+**Modo 1 — Usuário (email + password):**
 ```json
 {
-  "email": "organization@example.com",
+  "email": "user@example.com",
   "password": "senha123"
 }
 ```
+
+A organization é resolvida automaticamente a partir do registro do usuário. O token gerado inclui `auth_type: "user"` e o `role` do usuário.
+
+**Modo 2 — API Key (sistema):**
+```json
+{
+  "api_key": "sk_live_abc123..."
+}
+```
+
+A API key é validada via hash SHA-256. O token gerado inclui `auth_type: "system"` sem role associado.
 
 **Resposta (200 OK):**
 ```json
@@ -103,7 +114,7 @@ Autentica uma organization e emite um par de tokens.
 **Resposta (400 Bad Request):**
 ```json
 {
-  "error": "email and password are required"
+  "error": "organization_id, email and password or api_key required"
 }
 ```
 
@@ -452,7 +463,7 @@ Remove um endereço.
 
 ### POST /v1/users
 
-Cria um novo usuário na organization. Requer role `owner`.
+Cria um novo usuário na organization. Requer role `owner`. Apenas um `owner` é permitido por organization.
 
 **Requisição:**
 ```json
@@ -460,11 +471,11 @@ Cria um novo usuário na organization. Requer role `owner`.
   "name": "Alice",
   "email": "alice@example.com",
   "password": "senha123",
-  "role": "operator"
+  "role": "member"
 }
 ```
 
-`role` deve ser um de: `owner`, `admin`, `operator`.
+`role` deve ser um de: `owner`, `admin`, `member`.
 
 **Resposta (201 Created):**
 ```json
@@ -472,10 +483,19 @@ Cria um novo usuário na organization. Requer role `owner`.
   "id": "550e8400-e29b-41d4-a716-446655440010",
   "name": "Alice",
   "email": "alice@example.com",
-  "role": "operator",
+  "role": "member",
   "created_at": "2026-03-17T10:00:00Z"
 }
 ```
+
+**Resposta (403 Forbidden):**
+```json
+{
+  "error": "forbidden"
+}
+```
+
+Retornado ao tentar criar um segundo `owner` na organization.
 
 **Resposta (409 Conflict):**
 ```json
@@ -497,7 +517,7 @@ Lista todos os usuários da organization. Requer role `admin` ou superior.
     "id": "550e8400-e29b-41d4-a716-446655440010",
     "name": "Alice",
     "email": "alice@example.com",
-    "role": "operator",
+    "role": "member",
     "created_at": "2026-03-17T10:00:00Z"
   }
 ]
@@ -530,7 +550,7 @@ Atualiza nome e role de um usuário. Requer role `owner`.
 
 ### DELETE /v1/users/:user_id
 
-Remove um usuário da organization. Requer role `owner`.
+Remove um usuário da organization (soft delete). Requer role `owner`.
 
 **Resposta (204 No Content):** sem body.
 
@@ -538,6 +558,33 @@ Remove um usuário da organization. Requer role `owner`.
 ```json
 {
   "error": "user not found"
+}
+```
+
+---
+
+## Controle de Acesso (RBAC)
+
+Endpoints protegidos podem exigir um role mínimo. A hierarquia de roles é:
+
+```
+owner (3) > admin (2) > member (1)
+```
+
+| Endpoint | Role Mínimo |
+|----------|-------------|
+| `POST /v1/users` | owner |
+| `PUT /v1/users/:user_id` | owner |
+| `DELETE /v1/users/:user_id` | owner |
+| `GET /v1/users` | admin |
+| Demais rotas protegidas | Qualquer role (autenticação JWT válida) |
+
+Tokens gerados via API Key (`auth_type: "system"`) não possuem role e recebem `403 Forbidden` em endpoints que exigem role.
+
+**Resposta (403 Forbidden):**
+```json
+{
+  "error": "insufficient permissions"
 }
 ```
 
@@ -691,11 +738,18 @@ curl http://localhost:8080/v1/live
 curl http://localhost:8080/v1/ready
 ```
 
-### Login
+### Login (usuário)
 ```bash
 curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "organization@example.com", "password": "senha123"}'
+  -d '{"email": "user@example.com", "password": "senha123"}'
+```
+
+### Login (API Key)
+```bash
+curl -X POST http://localhost:8080/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"api_key": "sk_live_abc123..."}'
 ```
 
 ### Dados do usuário autenticado
@@ -715,7 +769,7 @@ curl -X POST http://localhost:8080/v1/auth/refresh \
 ```bash
 RESPONSE=$(curl -s -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "organization@example.com", "password": "senha123"}')
+  -d '{"email": "user@example.com", "password": "senha123"}')
 
 ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.access_token')
 REFRESH_TOKEN=$(echo $RESPONSE | jq -r '.refresh_token')

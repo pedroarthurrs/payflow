@@ -47,7 +47,9 @@ curl http://localhost:8080/v1/live
 ```
 i9pay/
 ├── cmd/server/               — ponto de entrada (main.go)
-├── docker/                   — Dockerfiles (dev/prod)
+├── deploy/
+│   ├── docker/               — Dockerfiles (dev/prod)
+│   └── migrations/           — SQL migrations versionadas
 ├── docs/                     — documentação
 ├── internal/
 │   ├── api/
@@ -61,7 +63,6 @@ i9pay/
 │   ├── domain/               — modelos e validações
 │   ├── config/               — configurações
 │   └── database/             — conexão e queries (SQLC)
-├── migrations/               — SQL migrations versionadas
 ├── Makefile                  — comandos de build e desenvolvimento
 ├── go.mod / go.sum           — dependências
 └── sqlc.yml                  — configuração SQLC
@@ -71,9 +72,13 @@ i9pay/
 
 ## Funcionalidades
 
-- Autenticação JWT com access e refresh tokens
-- Arquitetura multi-tenant com isolamento de dados
-- Health check com status de dependências
+- Autenticação JWT com access e refresh tokens (email/password e API Key)
+- RBAC com hierarquia de roles (owner > admin > member)
+- Gerenciamento de usuários (CRUD com controle de roles)
+- Gerenciamento de clientes (CRUD com soft/hard delete para LGPD/GDPR)
+- Gerenciamento de endereços (CRUD vinculado a clientes)
+- Arquitetura multi-organization com isolamento de dados
+- Health check com status de dependências (monitor em background)
 - Rate limiting com 3 tiers (IP, login, organization)
 - Logging estruturado com slog (JSON em produção, texto em desenvolvimento)
 - Validação de entrada com mensagens traduzidas

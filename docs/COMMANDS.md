@@ -83,8 +83,8 @@ make migrate-create name=add_products_table
 ```
 
 Gera:
-- `migrations/000004_add_products_table.up.sql`
-- `migrations/000004_add_products_table.down.sql`
+- `deploy/migrations/000004_add_products_table.up.sql`
+- `deploy/migrations/000004_add_products_table.down.sql`
 
 ### `make sqlc`
 

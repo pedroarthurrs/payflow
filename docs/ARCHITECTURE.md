@@ -76,8 +76,10 @@ Resposta JSON
 
 **AuthService** (`service/auth.go`)
 - Orquestra o fluxo de autenticação
-- Valida credenciais contra o banco de dados
-- Coordena o token service
+- Suporta dois modos: usuário (email + password) e sistema (API Key)
+- Login por usuário resolve a organization automaticamente a partir do registro
+- Login por API Key valida via hash SHA-256
+- Coordena o token service para emissão de pares access/refresh
 - Lógica de negócio isolada da camada HTTP
 
 **CustomerService** (`service/customer.go`)
@@ -85,6 +87,22 @@ Resposta JSON
 - Soft delete padrão (marca `deleted_at`)
 - Hard delete para conformidade legal (LGPD/GDPR)
 - Validação de unicidade (email, documento por organization)
+- Criação atômica de cliente + endereço (com transação)
+- Isolamento multi-organization
+
+**AddressService** (`service/address.go`)
+- CRUD completo de endereços vinculados a clientes
+- Validação de existência do cliente antes de operações
+- Suporte a criação dentro de transação (`CreateWithTx`)
+- Defaults automáticos: tipo `billing`, país `BR`, `is_main: true`
+- Isolamento multi-organization
+
+**UserService** (`service/user.go`)
+- CRUD de usuários dentro de uma organization
+- Soft delete (marca `deleted_at`)
+- Hash de senha com bcrypt (cost 12)
+- Validação de unicidade de email por organization
+- Bloqueio de criação de segundo `owner` por organization
 - Isolamento multi-organization
 
 Expansões planejadas:
@@ -97,8 +115,20 @@ Expansões planejadas:
 
 Modelos de dados puros e erros tipados. Sem dependências de HTTP ou banco de dados.
 
-- `organization.go`: estruturas de dados (Credentials, etc.)
-- `errors.go`: erros de domínio tipados
+- `organization.go`: estruturas de dados (Credentials)
+- `user.go`: modelo User, roles (owner/admin/member), AuthType (user/system), LoginRequest
+- `customer.go`: modelo Customer, inputs de criação e atualização
+- `address.go`: modelo Address, inputs de criação e atualização
+- `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
+
+**Roles disponíveis:**
+```
+owner (3) > admin (2) > member (1)
+```
+
+**Tipos de autenticação:**
+- `user` — login por email + password (inclui role no token)
+- `system` — login por API Key (sem role no token)
 
 ---
 
@@ -132,7 +162,8 @@ Modelos de dados puros e erros tipados. Sem dependências de HTTP ou banco de da
 
 - Criação de tokens (access e refresh)
 - Validação e parsing de JWT
-- Suporta claims estendidos (`organization_id`, `role`, `token_type`)
+- Suporta claims estendidos (`organization_id`, `role`, `auth_type`, `token_type`)
+- Dois tipos de autenticação: `user` (com role) e `system` (API Key, sem role)
 - Isolado da lógica HTTP
 
 ---
@@ -159,7 +190,23 @@ A ordem de middleware é crítica para segurança e observabilidade:
 5. RateLimitByIP()               — limita por IP (grupo v1)
 6. Auth()                        — valida JWT (grupo protegido)
 7. RateLimitByOrganization()     — limita por organization (grupo protegido)
+8. RequireRole()                 — RBAC por endpoint (onde aplicável)
 ```
+
+### RBAC (Role-Based Access Control)
+
+O middleware `RequireRole(minRole)` em `api/middleware/rbac.go` aplica controle de acesso baseado em roles:
+
+- Verifica se o token possui claims válidos
+- Tokens de sistema (`auth_type: "system"`) sem role recebem 403
+- Compara o nível do role do usuário com o mínimo exigido
+- Hierarquia: `owner (3) > admin (2) > member (1)`
+
+Usado nos endpoints de gerenciamento de usuários:
+- `POST /v1/users` → requer `owner`
+- `GET /v1/users` → requer `admin`
+- `PUT /v1/users/:user_id` → requer `owner`
+- `DELETE /v1/users/:user_id` → requer `owner`
 
 ### Rate Limiting
 
@@ -188,20 +235,26 @@ Converte erros brutos do `go-playground/validator` em mensagens legíveis:
 
 ### Padrão de Handler
 
-Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos:
+Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos. Cada handler implementa `RegisterRoutes()` para registrar suas rotas:
 
 ```go
 package handler
 
 type AuthHandler struct {
     authSvc *service.AuthService
+    loginRL gin.HandlerFunc
 }
 
-func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
-    return &AuthHandler{authSvc: authSvc}
+func NewAuthHandler(authSvc *service.AuthService, loginRL gin.HandlerFunc) *AuthHandler {
+    return &AuthHandler{authSvc: authSvc, loginRL: loginRL}
 }
 
-func (h *AuthHandler) Login(c *gin.Context) { /* ... */ }
+// RegisterRoutes registra as rotas do handler no grupo fornecido.
+func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    auth := rg.Group("/auth")
+    auth.POST("/login", h.loginRL, h.Login)
+    auth.POST("/refresh", h.Refresh)
+}
 ```
 
 Sem framework de injeção de dependências. Dependências são passadas explicitamente no `router.go`:
@@ -210,6 +263,12 @@ Sem framework de injeção de dependências. Dependências são passadas explici
 tokenSvc := token.NewService(secret, ttl1, ttl2)
 authSvc := service.NewAuthService(tokenSvc, db)
 authHandler := handler.NewAuthHandler(authSvc, loginRL)
+
+// Cada handler registra suas próprias rotas
+authHandler.RegisterRoutes(v1)
+customerHandler.RegisterRoutes(protected)
+addressHandler.RegisterRoutes(protected)
+userHandler.RegisterRoutes(protected)
 ```
 
 ### Tratamento de Erros
@@ -270,6 +329,10 @@ product, err := s.db.Queries.GetProduct(ctx, productID)
 - TTLs curtos para access token (15min) e longos para refresh (7 dias)
 - Header `Authorization` obrigatório em rotas protegidas
 - Middleware `Recovery` captura panics
+- RBAC com hierarquia de roles (owner > admin > member)
+- Senhas armazenadas com bcrypt (cost 12)
+- API Keys validadas via hash SHA-256
+- Bloqueio de criação de segundo owner por organization
 
 ---
 
