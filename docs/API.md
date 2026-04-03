@@ -256,7 +256,7 @@ O campo `address` só aparece na resposta se foi enviado na requisição.
 **Resposta (409 Conflict):**
 ```json
 {
-  "error": "email already exists for this organization"
+  "error": "customer with this email already exists"
 }
 ```
 

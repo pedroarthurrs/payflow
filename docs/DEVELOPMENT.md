@@ -16,7 +16,10 @@ i9pay/
 │   ├── service/              — lógica de negócio
 │   ├── domain/               — modelos e validações
 │   ├── config/               — configurações
-│   ├── database/             — conexão e queries (SQLC)
+│   ├── database/
+│   │   ├── repository/       — implementações de persistência
+│   │   └── dbgen/            — código gerado pelo SQLC
+│   ├── monitor/              — monitor de saúde de dependências
 │   └── auth/token/           — JWT service
 ├── build/
 │   └── docker/
@@ -34,6 +37,17 @@ i9pay/
 ```
 
 Handlers ficam consolidados em `internal/api/handler/` (um arquivo por recurso). DTOs compartilhados ficam em `internal/api/dto/`.
+
+## Direção Arquitetural
+
+O projeto segue uma arquitetura em camadas com princípios de Clean Architecture aplicados de forma pragmática:
+
+- `service/` depende de contratos definidos em `domain/`
+- `database/repository/` implementa esses contratos
+- SQLC e banco ficam na borda de infraestrutura
+- A composição das dependências ocorre no `router` (composition root)
+
+Ao adicionar novas features, preserve essa regra: a camada de serviço não deve depender diretamente de SQLC ou `database.DB`.
 
 ---
 
@@ -120,7 +134,7 @@ import (
 
     "github.com/google/uuid"
 
-    "i9pay/internal/database"
+    "i9pay/internal/domain"
 )
 
 type Product struct {
@@ -131,15 +145,15 @@ type Product struct {
 }
 
 type ProductService struct {
-    db *database.DB
+    repo domain.ProductRepository
 }
 
-func NewProductService(db *database.DB) *ProductService {
-    return &ProductService{db: db}
+func NewProductService(repo domain.ProductRepository) *ProductService {
+    return &ProductService{repo: repo}
 }
 
 func (s *ProductService) Create(ctx context.Context, name string, price int64) (*Product, error) {
-    // Use s.db.Queries.CreateProduct() com query gerada pelo SQLC
+    // Use s.repo.Create() (implementado em database/repository)
     return &Product{
         ID:        uuid.New(),
         Name:      name,
@@ -149,8 +163,7 @@ func (s *ProductService) Create(ctx context.Context, name string, price int64) (
 }
 
 func (s *ProductService) Get(ctx context.Context, id uuid.UUID) (*Product, error) {
-    // Use s.db.Queries.GetProduct(ctx, id) com query gerada pelo SQLC
-    return nil, nil
+    return s.repo.Get(ctx, id)
 }
 ```
 
@@ -204,7 +217,37 @@ Gere o código:
 make sqlc
 ```
 
-### 5. Registrar no Router (`internal/api/router/router.go`)
+### 5. Repository (`internal/database/repository/product_repo.go`)
+
+```go
+package repository
+
+import (
+    "context"
+
+    "github.com/google/uuid"
+
+    "i9pay/internal/database/dbgen"
+)
+
+type ProductRepo struct {
+    q dbgen.Querier
+}
+
+func NewProductRepo(q dbgen.Querier) *ProductRepo {
+    return &ProductRepo{q: q}
+}
+
+func (r *ProductRepo) Get(ctx context.Context, id uuid.UUID) (*Product, error) {
+    row, err := r.q.GetProduct(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+    return &Product{ID: row.ID, Name: row.Name, Price: row.Price}, nil
+}
+```
+
+### 6. Registrar no Router (`internal/api/router/router.go`)
 
 Cada handler implementa `RegisterRoutes()` para registrar suas rotas:
 
@@ -217,7 +260,8 @@ func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 // No router.go, basta chamar RegisterRoutes no grupo correto
-productSvc := service.NewProductService(db)
+productRepo := repository.NewProductRepo(db.Queries)
+productSvc := service.NewProductService(productRepo)
 productHandler := handler.NewProductHandler(productSvc)
 productHandler.RegisterRoutes(protected)
 ```
@@ -297,12 +341,12 @@ Sempre explícita no construtor:
 
 ```go
 // Correto
-func NewProductService(db *database.DB) *ProductService {
-    return &ProductService{db: db}
+func NewProductService(repo domain.ProductRepository) *ProductService {
+    return &ProductService{repo: repo}
 }
 
 // Evite estado global
-var globalDB *database.DB
+var globalRepo domain.ProductRepository
 ```
 
 ### Organização de Testes
@@ -374,29 +418,31 @@ go tool cover -html=coverage.out
 
 ### Mock de dependências
 
-Use [testify/mock](https://pkg.go.dev/github.com/stretchr/testify/mock):
+Prefira mocks simples por interface de domínio:
 
 ```go
-import "github.com/stretchr/testify/mock"
-
-type mockDB struct {
-    mock.Mock
+type mockProductRepo struct {
+    getFn func(ctx context.Context, id uuid.UUID) (*Product, error)
 }
 
-func (m *mockDB) GetProduct(ctx context.Context, id uuid.UUID) (Product, error) {
-    args := m.Called(ctx, id)
-    return args.Get(0).(Product), args.Error(1)
+func (m *mockProductRepo) Get(ctx context.Context, id uuid.UUID) (*Product, error) {
+    return m.getFn(ctx, id)
 }
 
 func TestServiceGetProduct(t *testing.T) {
-    db := &mockDB{}
-    db.On("GetProduct", mock.Anything, mock.Anything).Return(Product{Name: "Widget"}, nil)
+    repo := &mockProductRepo{getFn: func(_ context.Context, _ uuid.UUID) (*Product, error) {
+        return &Product{Name: "Widget"}, nil
+    }}
 
-    svc := NewProductService(db)
+    svc := NewProductService(repo)
     product, err := svc.Get(context.Background(), uuid.New())
 
-    assert.NoError(t, err)
-    assert.Equal(t, "Widget", product.Name)
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if product.Name != "Widget" {
+        t.Fatalf("expected Widget, got %s", product.Name)
+    }
 }
 ```
 

@@ -4,7 +4,7 @@ API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-ten
 
 ## Visão Geral
 
-i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular e pragmática.
+i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular em camadas e orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
 
 Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Docker
 
@@ -62,7 +62,10 @@ i9pay/
 │   ├── service/              — lógica de negócio
 │   ├── domain/               — modelos e validações
 │   ├── config/               — configurações
-│   └── database/             — conexão e queries (SQLC)
+│   ├── monitor/              — monitoramento de saúde de dependências
+│   └── database/
+│       ├── repository/       — implementações de repositórios (persistência)
+│       └── dbgen/            — código gerado pelo SQLC
 ├── Makefile                  — comandos de build e desenvolvimento
 ├── go.mod / go.sum           — dependências
 └── sqlc.yml                  — configuração SQLC

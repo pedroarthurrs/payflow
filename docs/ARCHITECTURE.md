@@ -2,7 +2,14 @@
 
 ## Visão Geral
 
-A arquitetura segue o padrão modular com camadas lógicas. Não utiliza Clean Architecture, DDD ou Hexagonal — é pragmática e orientada à escalabilidade incremental.
+A arquitetura segue um modelo modular em camadas com forte uso de princípios de Clean Architecture (especialmente inversão de dependências e separação entre domínio/aplicação e infraestrutura).
+
+Na prática, o projeto funciona como uma variação pragmática de Ports and Adapters:
+- A camada de aplicação (`service/`) depende de contratos do domínio (`domain/`), não de SQLC ou banco diretamente.
+- A infraestrutura (`database/repository/`) implementa esses contratos e encapsula persistência.
+- A composição das dependências ocorre no `router` (composition root), mantendo o núcleo de negócio desacoplado.
+
+Ou seja: não é uma implementação "by the book" de Clean Architecture em círculos formais, mas a direção arquitetural real do código é clean-oriented.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -12,9 +19,11 @@ A arquitetura segue o padrão modular com camadas lógicas. Não utiliza Clean A
 ├─────────────────────────────────────────────┤
 │   Lógica de Negócio (service/)              │
 ├─────────────────────────────────────────────┤
-│   Modelos de Domínio (domain/)              │
+│   Domínio (modelos + contratos + erros)     │
 ├─────────────────────────────────────────────┤
-│   Acesso a Dados (database/)                │
+│   Repositórios (database/repository/)       │
+├─────────────────────────────────────────────┤
+│   SQLC + PostgreSQL (database/dbgen/)       │
 └─────────────────────────────────────────────┘
 ```
 
@@ -29,9 +38,11 @@ Handler (recebe e valida payload)
     ↓
 Service (lógica de negócio)
     ↓
-Domain (modelos e validações)
+Domain (modelos, contratos e erros)
     ↓
-Database (queries SQLC)
+Repository (implementa contratos do domínio)
+    ↓
+SQLC (queries type-safe)
     ↓
 Resposta JSON
 ```
@@ -80,6 +91,7 @@ Resposta JSON
 - Login por usuário resolve a organization automaticamente a partir do registro
 - Login por API Key valida via hash SHA-256
 - Coordena o token service para emissão de pares access/refresh
+- Depende da interface `domain.AuthRepository` (sem acoplamento direto ao SQLC)
 - Lógica de negócio isolada da camada HTTP
 
 **CustomerService** (`service/customer.go`)
@@ -87,13 +99,14 @@ Resposta JSON
 - Soft delete padrão (marca `deleted_at`)
 - Hard delete para conformidade legal (LGPD/GDPR)
 - Validação de unicidade (email, documento por organization)
-- Criação atômica de cliente + endereço (com transação)
+- Criação/atualização atômica de cliente + endereço via `domain.TxManager`
+- Depende de `domain.CustomerRepository` e `domain.AddressRepository`
 - Isolamento multi-organization
 
 **AddressService** (`service/address.go`)
 - CRUD completo de endereços vinculados a clientes
 - Validação de existência do cliente antes de operações
-- Suporte a criação dentro de transação (`CreateWithTx`)
+- Depende de `domain.CustomerRepository` e `domain.AddressRepository`
 - Defaults automáticos: tipo `billing`, país `BR`, `is_main: true`
 - Isolamento multi-organization
 
@@ -103,6 +116,7 @@ Resposta JSON
 - Hash de senha com bcrypt (cost 12)
 - Validação de unicidade de email por organization
 - Bloqueio de criação de segundo `owner` por organization
+- Depende de `domain.UserRepository`
 - Isolamento multi-organization
 
 Expansões planejadas:
@@ -113,12 +127,14 @@ Expansões planejadas:
 
 ### Camada de Domínio (`domain/`)
 
-Modelos de dados puros e erros tipados. Sem dependências de HTTP ou banco de dados.
+Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependências de HTTP.
 
-- `organization.go`: estruturas de dados (Credentials)
-- `user.go`: modelo User, roles (owner/admin/member), AuthType (user/system), LoginRequest
-- `customer.go`: modelo Customer, inputs de criação e atualização
-- `address.go`: modelo Address, inputs de criação e atualização
+- `organization.go`: entidade Organization
+- `auth.go`: `AuthRepository`, `AuthUser`, `APIKey`, `AuthType`, `LoginRequest`
+- `user.go`: `UserRepository`, modelo User e roles (owner/admin/member)
+- `customer.go`: `CustomerRepository`, modelo Customer, inputs de criação e atualização
+- `address.go`: `AddressRepository`, modelo Address, inputs de criação e atualização
+- `tx.go`: contratos transacionais (`TxManager`, `TxHandle`)
 - `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
 
 **Roles disponíveis:**
@@ -142,6 +158,11 @@ owner (3) > admin (2) > member (1)
 - `db.go`: configuração do banco
 - `models.go`: structs geradas a partir do schema
 - `queries.sql.go`: implementação type-safe das queries
+
+**Repositórios** (`database/repository/`)
+- Implementam os contratos da camada de domínio
+- Encapsulam acesso ao SQLC e mapeamento de erros
+- Incluem gerenciador transacional (`TxManager`) para casos atômicos
 
 **SQL** (`database/queries.sql`)
 - Queries neste arquivo geram código Go via `make sqlc`
@@ -261,7 +282,17 @@ Sem framework de injeção de dependências. Dependências são passadas explici
 
 ```go
 tokenSvc := token.NewService(secret, ttl1, ttl2)
-authSvc := service.NewAuthService(tokenSvc, db)
+customerRepo := repository.NewCustomerRepo(db.Queries)
+addressRepo := repository.NewAddressRepo(db.Queries)
+userRepo := repository.NewUserRepo(db.Queries)
+authRepo := repository.NewAuthRepo(db.Queries)
+txManager := repository.NewTxManager(db)
+
+authSvc := service.NewAuthService(tokenSvc, authRepo)
+customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
+addressSvc := service.NewAddressService(customerRepo, addressRepo)
+userSvc := service.NewUserService(userRepo)
+
 authHandler := handler.NewAuthHandler(authSvc, loginRL)
 
 // Cada handler registra suas próprias rotas
@@ -274,8 +305,8 @@ userHandler.RegisterRoutes(protected)
 ### Tratamento de Erros
 
 1. Services retornam erros de domínio
-2. Handlers convertem em `apierr.{Type}`
-3. Middleware `Errors()` serializa para JSON
+2. Handlers convertem quando necessário (ex.: `apierr.BadRequest`/`apierr.Unauthorized`)
+3. Middleware `Errors()` mapeia erros de domínio para status HTTP padronizados
 
 ```go
 // Handler
@@ -298,7 +329,8 @@ if err != nil {
 internal/
 ├── api/handler/{feature}.go    — camada HTTP
 ├── service/{feature}.go        — lógica de negócio
-└── domain/{feature}.go         — modelos (se necessário)
+├── domain/{feature}.go         — modelos/contratos (se necessário)
+└── database/repository/{feature}_repo.go — persistência
 ```
 
 ### Usando queries geradas pelo SQLC
@@ -314,12 +346,22 @@ SELECT id, name, price FROM products WHERE id = $1;
 make sqlc
 ```
 
-3. Use no service:
+3. Implemente o repositório em `internal/database/repository/` usando o código gerado:
 ```go
-product, err := s.db.Queries.GetProduct(ctx, productID)
+type ProductRepo struct {
+    q dbgen.Querier
+}
+
+func (r *ProductRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
+    row, err := r.q.GetProduct(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+    return &domain.Product{ID: row.ID, Name: row.Name}, nil
+}
 ```
 
-4. Registre as rotas em `internal/api/router/router.go`.
+4. Injete o repositório no service e registre as rotas em `internal/api/router/router.go`.
 
 ---
 
@@ -360,7 +402,7 @@ O `CustomerService` implementa `HardDelete()` para atender requisitos de remoç�
 ## Estratégia de Testes
 
 **Testes unitários:**
-- Services: mock de dependências (banco de dados)
+- Services: mock de repositórios/interfaces de domínio
 - Handlers: mock de services
 - Domain: sem dependências, 100% testável
 
