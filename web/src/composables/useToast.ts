@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { toast } from 'vue-sonner'
 
 export interface Toast {
   id: string
@@ -7,15 +8,17 @@ export interface Toast {
   duration: number
 }
 
-// Singleton: module-level ref shared across all components
 const toasts: Ref<Toast[]> = ref([])
-
 let counter = 0
 
 function addToast(type: Toast['type'], message: string, duration = 3000): void {
   const id = `toast-${++counter}`
-  const toast: Toast = { id, type, message, duration }
-  toasts.value.push(toast)
+  toasts.value.push({ id, type, message, duration })
+
+  if (type === 'success') toast.success(message)
+  if (type === 'error') toast.error(message)
+  if (type === 'warning') toast.warning(message)
+  if (type === 'info') toast.info(message)
 
   setTimeout(() => {
     removeToast(id)

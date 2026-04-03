@@ -7,6 +7,7 @@ declare module 'vue-router' {
     requiresAuth?: boolean
     requiredRole?: Role
     guestOnly?: boolean
+    keepAlive?: boolean
   }
 }
 
@@ -31,17 +32,17 @@ const router = createRouter({
     {
       path: '/dashboard',
       component: () => import('@/views/DashboardView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, keepAlive: true },
     },
     {
       path: '/customers',
       component: () => import('@/views/customers/CustomerListView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, keepAlive: true },
     },
     {
       path: '/customers/new',
-      component: () => import('@/views/customers/CustomerFormView.vue'),
-      meta: { requiresAuth: true },
+      component: () => import('@/views/customers/CustomerListView.vue'),
+      meta: { requiresAuth: true, keepAlive: true },
     },
     {
       path: '/customers/:id',
@@ -66,12 +67,12 @@ const router = createRouter({
     {
       path: '/users',
       component: () => import('@/views/users/UserListView.vue'),
-      meta: { requiresAuth: true, requiredRole: 'admin' },
+      meta: { requiresAuth: true, requiredRole: 'admin', keepAlive: true },
     },
     {
       path: '/users/new',
-      component: () => import('@/views/users/UserFormView.vue'),
-      meta: { requiresAuth: true, requiredRole: 'owner' },
+      component: () => import('@/views/users/UserListView.vue'),
+      meta: { requiresAuth: true, requiredRole: 'owner', keepAlive: true },
     },
     {
       path: '/users/:id/edit',

@@ -1,5 +1,15 @@
 <script setup lang="ts">
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 export interface Column {
   key: string
@@ -33,137 +43,55 @@ function getCellValue(row: any, column: Column): string {
 </script>
 
 <template>
-  <div class="data-table-wrapper">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th v-for="col in props.columns" :key="col.key">{{ col.label }}</th>
-          <th v-if="props.showActions" class="actions-header">Ações</th>
-        </tr>
-      </thead>
-      <tbody v-if="props.loading">
-        <tr>
-          <td :colspan="props.columns.length + (props.showActions ? 1 : 0)" class="loading-cell">
+  <div class="w-full overflow-x-auto">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead v-for="col in props.columns" :key="col.key">{{ col.label }}</TableHead>
+          <TableHead v-if="props.showActions" class="w-px whitespace-nowrap">Ações</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody v-if="props.loading">
+        <TableRow>
+          <TableCell :colspan="props.columns.length + (props.showActions ? 1 : 0)" class="py-8 text-center">
             <LoadingSpinner />
-          </td>
-        </tr>
-      </tbody>
-      <tbody v-else-if="props.data.length === 0">
-        <tr>
-          <td :colspan="props.columns.length + (props.showActions ? 1 : 0)" class="empty-cell">
-            Nenhum registro encontrado
-          </td>
-        </tr>
-      </tbody>
-      <tbody v-else>
-        <tr
+          </TableCell>
+        </TableRow>
+      </TableBody>
+      <TableEmpty v-else-if="props.data.length === 0">
+        Nenhum registro encontrado
+      </TableEmpty>
+      <TableBody v-else>
+        <TableRow
           v-for="(row, index) in props.data"
           :key="index"
-          class="data-row"
+          class="cursor-pointer"
           @click="emit('row-click', row)"
         >
-          <td v-for="col in props.columns" :key="col.key">
+          <TableCell v-for="col in props.columns" :key="col.key">
             {{ getCellValue(row, col) }}
-          </td>
-          <td v-if="props.showActions" class="actions-cell">
-            <button
-              class="btn-action btn-edit"
-              @click.stop="emit('edit', row)"
+          </TableCell>
+          <TableCell v-if="props.showActions" class="whitespace-nowrap">
+            <Button
+              variant="outline"
+              size="sm"
+              class="mr-2"
               aria-label="Editar"
+              @click.stop="emit('edit', row)"
             >
               Editar
-            </button>
-            <button
-              class="btn-action btn-delete"
-              @click.stop="emit('delete', row)"
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
               aria-label="Excluir"
+              @click.stop="emit('delete', row)"
             >
               Excluir
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            </Button>
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
   </div>
 </template>
-
-<style scoped>
-.data-table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.data-table th,
-.data-table td {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.data-table th {
-  background-color: #f9fafb;
-  font-weight: 600;
-  color: #374151;
-}
-
-.data-row {
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.data-row:hover {
-  background-color: #f3f4f6;
-}
-
-.loading-cell,
-.empty-cell {
-  text-align: center;
-  padding: 2rem 1rem;
-  color: #6b7280;
-}
-
-.actions-header {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.actions-cell {
-  white-space: nowrap;
-}
-
-.btn-action {
-  padding: 0.375rem 0.75rem;
-  border: 1px solid transparent;
-  border-radius: 0.375rem;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-}
-
-.btn-edit {
-  background-color: #eff6ff;
-  color: #2563eb;
-  border-color: #bfdbfe;
-  margin-right: 0.5rem;
-}
-
-.btn-edit:hover {
-  background-color: #dbeafe;
-}
-
-.btn-delete {
-  background-color: #fef2f2;
-  color: #dc2626;
-  border-color: #fecaca;
-}
-
-.btn-delete:hover {
-  background-color: #fee2e2;
-}
-</style>

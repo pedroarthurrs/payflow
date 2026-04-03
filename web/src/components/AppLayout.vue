@@ -3,11 +3,16 @@ import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import ToastContainer from '@/components/ToastContainer.vue'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Menu, LayoutDashboard, Users, UserCog, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { cn } from '@/lib/utils'
 
 const route = useRoute()
 const { hasRole, logout } = useAuth()
 
 const sidebarOpen = ref(false)
+const sidebarCollapsed = ref(false)
 
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value
@@ -17,8 +22,12 @@ function closeSidebar() {
   sidebarOpen.value = false
 }
 
+function toggleSidebarCollapsed() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
 function isActive(path: string): boolean {
-  return route.path === path
+  return route.path === path || route.path.startsWith(`${path}/`)
 }
 
 function handleLogout() {
@@ -27,60 +36,129 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="layout">
-    <button
-      class="hamburger"
+  <div class="flex min-h-svh">
+    <!-- Mobile hamburger -->
+    <Button
+      variant="ghost"
+      size="icon"
       aria-label="Abrir menu"
+      class="fixed top-3 left-3 z-[1100] md:hidden"
       @click="toggleSidebar"
     >
-      ☰
-    </button>
+      <Menu class="size-5" />
+    </Button>
 
+    <!-- Overlay mobile -->
     <div
       v-if="sidebarOpen"
-      class="sidebar-overlay"
+      class="fixed inset-0 z-[999] bg-black/40 md:hidden"
       @click="closeSidebar"
     />
 
-    <aside class="sidebar" :class="{ 'sidebar--open': sidebarOpen }">
-      <div class="sidebar__brand">i9pay</div>
-      <nav class="sidebar__nav">
+    <!-- Sidebar -->
+    <aside
+      :class="cn(
+        'fixed inset-y-0 left-0 z-[1000] flex w-44 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200 md:static md:translate-x-0',
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+        sidebarCollapsed ? 'md:w-16' : 'md:w-44'
+      )"
+    >
+      <div class="flex items-center justify-between border-b border-sidebar-border px-3 py-3">
+        <span :class="cn('text-xl font-extrabold tracking-tight', sidebarCollapsed && 'md:hidden')">i9pay</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Expandir ou retrair sidebar"
+          class="rounded-none text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          @click="toggleSidebarCollapsed"
+        >
+          <PanelLeftOpen v-if="sidebarCollapsed" class="size-5" />
+          <PanelLeftClose v-else class="size-5" />
+        </Button>
+      </div>
+
+      <nav class="flex flex-1 flex-col gap-1 p-2">
         <router-link
           to="/dashboard"
-          class="sidebar__link"
-          :class="{ 'sidebar__link--active': isActive('/dashboard') }"
+          :class="cn(
+            'group relative flex items-center gap-3 rounded-none px-3 py-2.5 text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            isActive('/dashboard') && 'bg-sidebar-accent text-sidebar-accent-foreground',
+            sidebarCollapsed && 'md:justify-center md:px-2'
+          )"
           @click="closeSidebar"
         >
-          Dashboard
+          <LayoutDashboard class="size-5" />
+          <span :class="cn(sidebarCollapsed && 'md:hidden')">Dashboard</span>
+          <span
+            v-if="sidebarCollapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-4 hidden -translate-y-1/2 whitespace-nowrap rounded-none border border-border bg-popover px-2.5 py-1.5 text-sm text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 md:block"
+          >
+            Dashboard
+          </span>
         </router-link>
+
         <router-link
           to="/customers"
-          class="sidebar__link"
-          :class="{ 'sidebar__link--active': isActive('/customers') }"
+          :class="cn(
+            'group relative flex items-center gap-3 rounded-none px-3 py-2.5 text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            isActive('/customers') && 'bg-sidebar-accent text-sidebar-accent-foreground',
+            sidebarCollapsed && 'md:justify-center md:px-2'
+          )"
           @click="closeSidebar"
         >
-          Clientes
+          <Users class="size-5" />
+          <span :class="cn(sidebarCollapsed && 'md:hidden')">Clientes</span>
+          <span
+            v-if="sidebarCollapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-4 hidden -translate-y-1/2 whitespace-nowrap rounded-none border border-border bg-popover px-2.5 py-1.5 text-sm text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 md:block"
+          >
+            Clientes
+          </span>
         </router-link>
+
         <router-link
           v-if="hasRole('admin')"
           to="/users"
-          class="sidebar__link"
-          :class="{ 'sidebar__link--active': isActive('/users') }"
+          :class="cn(
+            'group relative flex items-center gap-3 rounded-none px-3 py-2.5 text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            isActive('/users') && 'bg-sidebar-accent text-sidebar-accent-foreground',
+            sidebarCollapsed && 'md:justify-center md:px-2'
+          )"
           @click="closeSidebar"
         >
-          Usuários
+          <UserCog class="size-5" />
+          <span :class="cn(sidebarCollapsed && 'md:hidden')">Usuários</span>
+          <span
+            v-if="sidebarCollapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-4 hidden -translate-y-1/2 whitespace-nowrap rounded-none border border-border bg-popover px-2.5 py-1.5 text-sm text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 md:block"
+          >
+            Usuários
+          </span>
         </router-link>
-        <button class="sidebar__link sidebar__logout" @click="handleLogout">
-          Logout
+
+        <Separator class="mt-auto bg-sidebar-border" />
+        <button
+          :class="cn(
+            'group relative flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-left text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            sidebarCollapsed && 'md:justify-center md:px-2'
+          )"
+          @click="handleLogout"
+        >
+          <LogOut class="size-5" />
+          <span :class="cn(sidebarCollapsed && 'md:hidden')">Logout</span>
+          <span
+            v-if="sidebarCollapsed"
+            class="pointer-events-none absolute left-full top-1/2 z-50 ml-4 hidden -translate-y-1/2 whitespace-nowrap rounded-none border border-border bg-popover px-2.5 py-1.5 text-sm text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 md:block"
+          >
+            Logout
+          </span>
         </button>
       </nav>
     </aside>
 
-    <div class="main">
-      <header class="header">
-        <span class="header__brand">i9pay</span>
-      </header>
-      <main class="content">
+    <!-- Main content -->
+    <div class="flex min-w-0 flex-1 flex-col">
+      <main class="flex-1 bg-muted/20 p-6 pt-14 md:pt-6">
         <slot />
       </main>
     </div>
@@ -88,141 +166,3 @@ function handleLogout() {
     <ToastContainer />
   </div>
 </template>
-
-<style scoped>
-.layout {
-  display: flex;
-  min-height: 100vh;
-}
-
-.hamburger {
-  display: none;
-  position: fixed;
-  top: 0.75rem;
-  left: 0.75rem;
-  z-index: 1100;
-  background: #1e293b;
-  color: #fff;
-  border: none;
-  font-size: 1.5rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.sidebar-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 999;
-}
-
-.sidebar {
-  width: 220px;
-  background: #1e293b;
-  color: #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.sidebar__brand {
-  padding: 1.25rem 1rem;
-  font-size: 1.25rem;
-  font-weight: 700;
-  border-bottom: 1px solid #334155;
-}
-
-.sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  padding: 0.5rem 0;
-  flex: 1;
-}
-
-.sidebar__link {
-  display: block;
-  padding: 0.625rem 1rem;
-  color: #cbd5e1;
-  text-decoration: none;
-  font-size: 0.875rem;
-  transition: background 0.15s, color 0.15s;
-}
-
-.sidebar__link:hover {
-  background: #334155;
-  color: #fff;
-}
-
-.sidebar__link--active {
-  background: #3b82f6;
-  color: #fff;
-}
-
-.sidebar__logout {
-  margin-top: auto;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  border-top: 1px solid #334155;
-}
-
-.main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.header {
-  height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  padding: 0 1.5rem;
-}
-
-.header__brand {
-  font-weight: 600;
-  font-size: 1rem;
-  color: #1e293b;
-}
-
-.content {
-  flex: 1;
-  padding: 1.5rem;
-  background: #f8fafc;
-}
-
-@media (max-width: 767px) {
-  .hamburger {
-    display: block;
-  }
-
-  .sidebar-overlay {
-    display: block;
-  }
-
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 1000;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-  }
-
-  .sidebar--open {
-    transform: translateX(0);
-  }
-
-  .header {
-    padding-left: 3.5rem;
-  }
-}
-</style>
