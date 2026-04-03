@@ -1,15 +1,15 @@
 services:
   api:
     build:
-      context: ../../
-      dockerfile: docker/dev/Dockerfile
+      context: ../../../
+      dockerfile: build/docker/dev/Dockerfile
     container_name: api_dev
     ports:
       - "8080:8080"
     volumes:
-      - ../../:/app
+      - ../../../:/app
     env_file:
-      - ../../.env
+      - ../../../.env
     depends_on:
       - db
       
@@ -26,7 +26,7 @@ services:
       - ../../migrations:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
     env_file:
-      - ../../.env
+      - ../../../.env
 
   adminer:
     image: adminer

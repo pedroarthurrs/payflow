@@ -3,8 +3,8 @@ include .env
 export $(shell sed 's/=.*//' .env)
 
 # Variáveis de caminhos
-DOCKER_COMPOSE_DEV = docker/dev/docker-compose.yml
-MIGRATIONS_PATH = migrations
+DOCKER_COMPOSE_DEV = deploy/docker/dev/docker-compose.yml
+MIGRATIONS_PATH = deploy/migrations
 DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?sslmode=disable
 
 .PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test lint vet fmt check setup-hooks help
