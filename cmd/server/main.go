@@ -12,19 +12,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupLogger creates an slog.Logger based on the environment.
-// Production uses JSON output; all other environments use text output.
+// SetupLogger creates an slog.Logger based on the environment, wrapped with
+// Sentry integration so error-level records are captured as Sentry events.
 func SetupLogger(env string) *slog.Logger {
+	var handler slog.Handler
 	if env == "production" {
-		return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		handler = slog.NewJSONHandler(os.Stdout, nil)
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, nil)
 	}
-	return slog.New(slog.NewTextHandler(os.Stdout, nil))
+	return slog.New(monitor.NewLogHandler(handler))
 }
 
 func run() error {
 	cfg := config.Load()
 	logger := SetupLogger(cfg.GoEnv)
 	monitor.Init(cfg)
+	defer monitor.Flush()
 
 	if cfg.GoEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
