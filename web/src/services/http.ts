@@ -53,7 +53,8 @@ http.interceptors.response.use(
     }
 
     const config = error.config as RetryableRequestConfig | undefined
-    if (error.response?.status === 401 && config && !config._retry) {
+    const isAuthEndpoint = config?.url?.includes('/auth/login') || config?.url?.includes('/auth/refresh')
+    if (error.response?.status === 401 && config && !config._retry && !isAuthEndpoint) {
       config._retry = true
 
       if (!isRefreshing) {

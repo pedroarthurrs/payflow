@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -25,10 +26,17 @@ const props = withDefaults(defineProps<{
   required?: boolean
   options?: SelectOption[]
   placeholder?: string
+  showPasswordToggle?: boolean
 }>(), {
   type: 'text',
   required: false,
+  showPasswordToggle: false,
 })
+
+const showPassword = ref(false)
+const effectiveType = computed(() =>
+  props.type === 'password' && props.showPasswordToggle && showPassword.value ? 'text' : props.type,
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | boolean]
@@ -49,7 +57,7 @@ const inputId = computed(() => `field-${props.label.toLowerCase().replace(/\s+/g
         />
         <Label :for="inputId" class="font-normal cursor-pointer">
           {{ label }}
-          <span v-if="required" class="text-destructive ml-0.5">*</span>
+          <span v-if="required" class="form-field__required text-destructive ml-0.5">*</span>
         </Label>
       </div>
     </template>
@@ -57,7 +65,7 @@ const inputId = computed(() => `field-${props.label.toLowerCase().replace(/\s+/g
     <template v-else>
       <Label :for="inputId">
         {{ label }}
-        <span v-if="required" class="text-destructive ml-0.5">*</span>
+        <span v-if="required" class="form-field__required text-destructive ml-0.5">*</span>
       </Label>
 
       <!-- Select -->
@@ -92,17 +100,28 @@ const inputId = computed(() => `field-${props.label.toLowerCase().replace(/\s+/g
       />
 
       <!-- Input -->
-      <Input
-        v-else
-        :id="inputId"
-        :type="type"
-        :model-value="modelValue as string"
-        :placeholder="placeholder"
-        :class="{ 'border-destructive': !!error }"
-        @update:model-value="emit('update:modelValue', String($event ?? ''))"
-      />
+      <div v-else :class="showPasswordToggle && type === 'password' ? 'relative' : undefined">
+        <Input
+          :id="inputId"
+          :type="effectiveType"
+          :model-value="modelValue as string"
+          :placeholder="placeholder"
+          :class="{ 'border-destructive': !!error, 'pr-10': showPasswordToggle && type === 'password' }"
+          @update:model-value="emit('update:modelValue', String($event ?? ''))"
+        />
+        <button
+          v-if="showPasswordToggle && type === 'password'"
+          type="button"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+          :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
+          @click="showPassword = !showPassword"
+        >
+          <EyeOff v-if="showPassword" :size="16" />
+          <Eye v-else :size="16" />
+        </button>
+      </div>
     </template>
 
-    <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
+    <p v-if="error" class="form-field__error text-sm text-destructive">{{ error }}</p>
   </div>
 </template>

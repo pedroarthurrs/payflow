@@ -169,4 +169,83 @@ describe('LoginView', () => {
     // During loading, old error should be gone
     expect(wrapper.find('.login-error').exists()).toBe(false)
   })
+
+  it('shows email required error when email is empty', async () => {
+    const wrapper = mountView()
+    await wrapper.find('input[type="password"]').setValue('mypassword')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.form-field__error').text()).toBe('Email é obrigatório.')
+  })
+
+  it('shows invalid email error when email format is wrong', async () => {
+    const wrapper = mountView()
+    await wrapper.find('input[type="email"]').setValue('not-an-email')
+    await wrapper.find('input[type="password"]').setValue('mypassword')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.form-field__error').text()).toBe('Informe um email válido.')
+  })
+
+  it('shows password required error when password is empty', async () => {
+    const wrapper = mountView()
+    await wrapper.find('input[type="email"]').setValue('user@test.com')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.form-field__error').text()).toBe('Senha é obrigatória.')
+  })
+
+  it('does not call API when validation fails', async () => {
+    const http = (await import('@/services/http')).default
+
+    const wrapper = mountView()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(http.post).not.toHaveBeenCalled()
+  })
+
+  it('renders password toggle button', () => {
+    const wrapper = mountView()
+    expect(wrapper.find('button[aria-label="Mostrar senha"]').exists()).toBe(true)
+  })
+
+  it('toggles password visibility on button click', async () => {
+    const wrapper = mountView()
+
+    expect(wrapper.find('input[type="password"]').exists()).toBe(true)
+
+    await wrapper.find('button[aria-label="Mostrar senha"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('input[type="text"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Ocultar senha"]').exists()).toBe(true)
+  })
+
+  it('clears email error dynamically when a valid email is typed after submit', async () => {
+    const wrapper = mountView()
+    await wrapper.find('input[type="email"]').setValue('not-an-email')
+    await wrapper.find('input[type="password"]').setValue('mypassword')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.form-field__error').exists()).toBe(true)
+
+    await wrapper.find('input[type="email"]').setValue('valid@test.com')
+    await flushPromises()
+
+    expect(wrapper.find('.form-field__error').exists()).toBe(false)
+  })
+
+  it('does not show field errors before first submit attempt', async () => {
+    const wrapper = mountView()
+
+    await wrapper.find('input[type="email"]').setValue('bad-email')
+    await flushPromises()
+
+    expect(wrapper.find('.form-field__error').exists()).toBe(false)
+  })
 })
