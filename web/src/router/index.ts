@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { Role } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import { useStatusStore } from '@/stores/status'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -84,10 +85,28 @@ const router = createRouter({
       component: () => import('@/components/AccessDenied.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/maintenance',
+      component: () => import('@/views/MaintenanceView.vue'),
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      component: () => import('@/views/NotFoundView.vue'),
+    },
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  // For guest-only routes (login, etc.) verify maintenance status before proceeding.
+  // For authenticated routes, a 503 response from any API call will redirect to /maintenance via the HTTP interceptor.
+  if (to.meta.guestOnly) {
+    const statusStore = useStatusStore()
+    await statusStore.check()
+    if (statusStore.maintenance) {
+      return '/maintenance'
+    }
+  }
+
   const authStore = useAuthStore()
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

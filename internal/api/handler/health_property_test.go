@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"i9pay/internal/api/middleware"
 	"i9pay/internal/database"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ func TestProperty_ReadinessResponseDeterministicFromState(t *testing.T) {
 		svc.SetDatabaseOKForTest(ok)
 
 		gin.SetMode(gin.TestMode)
-		h := NewHealthHandler(svc)
+		h := NewHealthHandler(svc, middleware.NewMaintenanceProvider())
 		r := gin.New()
 		h.RegisterRoutes(&r.RouterGroup)
 

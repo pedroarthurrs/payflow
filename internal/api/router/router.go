@@ -21,6 +21,12 @@ const refreshTokenTTL = 7 * 24 * time.Hour
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
 func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker) *gin.Engine {
+	// Stores
+	ipStore := middleware.NewRateLimiterStore()
+	loginStore := middleware.NewRateLimiterStore()
+	organizationStore := middleware.NewRateLimiterStore()
+	maintenanceProvider := middleware.NewMaintenanceProvider()
+
 	r := gin.New()
 	r.RedirectTrailingSlash = false
 	r.RedirectFixedPath = false
@@ -28,12 +34,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	r.Use(monitor.Middleware())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.StructuredLogger(logger))
+	r.Use(middleware.Maintenance(maintenanceProvider))
 	r.Use(middleware.Errors())
-
-	// Rate limiter stores
-	ipStore := middleware.NewRateLimiterStore()
-	loginStore := middleware.NewRateLimiterStore()
-	organizationStore := middleware.NewRateLimiterStore()
 
 	// Rate limiter windows
 	ipWindow := time.Duration(cfg.RateLimitWindowSeconds) * time.Second
@@ -60,7 +62,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	// Handlers
 	rootHandler := handler.NewRootHandler()
 	authHandler := handler.NewAuthHandler(authSvc, loginRL)
-	healthHandler := handler.NewHealthHandler(healthCheck)
+	healthHandler := handler.NewHealthHandler(healthCheck, maintenanceProvider)
 	meHandler := handler.NewMeHandler()
 	customerHandler := handler.NewCustomerHandler(customerSvc)
 	addressHandler := handler.NewAddressHandler(addressSvc)

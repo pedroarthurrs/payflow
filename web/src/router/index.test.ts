@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
+import { useStatusStore } from '@/stores/status'
 import router from './index'
 
 function authenticateAs(
@@ -17,6 +18,9 @@ function authenticateAs(
 describe('Router', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // Stub status check so guestOnly routes don't make real HTTP calls
+    const statusStore = useStatusStore()
+    vi.spyOn(statusStore, 'check').mockResolvedValue()
     // Reset router to a known state
     router.currentRoute.value.path !== '/' && router.push('/')
   })

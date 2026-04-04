@@ -43,10 +43,15 @@ async function refreshToken(): Promise<boolean> {
   }
 }
 
-// Response interceptor: auto-refresh on 401
+// Response interceptor: auto-refresh on 401, redirect on 503
 http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    if (error.response?.status === 503) {
+      window.location.href = '/maintenance'
+      return Promise.reject(error)
+    }
+
     const config = error.config as RetryableRequestConfig | undefined
     if (error.response?.status === 401 && config && !config._retry) {
       config._retry = true
