@@ -58,7 +58,7 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 			getByIDFn: customerExistsMock(),
 		}
 		addresses := &mockAddressRepo{
-			createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+			createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 				now := time.Now().Truncate(time.Second)
 				stored = &domain.Address{
 					ID:             addressID,
@@ -89,7 +89,7 @@ func TestProperty_AddressCreateAndGetByID_RoundTrip(t *testing.T) {
 		svc := NewAddressService(customers, addresses)
 		ctx := context.Background()
 
-		input := domain.CreateAddressInput{
+		input := domain.AddressInput{
 			Type:         &addrType,
 			PostalCode:   postalCode,
 			Street:       street,
@@ -199,7 +199,7 @@ func TestProperty_AddressDefaultValues(t *testing.T) {
 			getByIDFn: customerExistsMock(),
 		}
 		addresses := &mockAddressRepo{
-			createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+			createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 				return &domain.Address{
 					ID:             addressID,
 					OrganizationID: orgID,
@@ -219,7 +219,7 @@ func TestProperty_AddressDefaultValues(t *testing.T) {
 		svc := NewAddressService(customers, addresses)
 		ctx := context.Background()
 
-		input := domain.CreateAddressInput{
+		input := domain.AddressInput{
 			PostalCode: postalCode,
 			Street:     street,
 			City:       city,
@@ -262,7 +262,7 @@ func TestAddressCreate_AllFields(t *testing.T) {
 		getByIDFn: customerExistsMock(),
 	}
 	addresses := &mockAddressRepo{
-		createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+		createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 			return &domain.Address{
 				ID:             addressID,
 				OrganizationID: orgID,
@@ -283,7 +283,7 @@ func TestAddressCreate_AllFields(t *testing.T) {
 	}
 
 	svc := NewAddressService(customers, addresses)
-	input := domain.CreateAddressInput{
+	input := domain.AddressInput{
 		Type:         &addrType,
 		PostalCode:   "12345-678",
 		Street:       "Main St",
@@ -427,7 +427,7 @@ func TestAddressUpdate_Found(t *testing.T) {
 		getByIDFn: customerExistsMock(),
 	}
 	addresses := &mockAddressRepo{
-		updateFn: func(_ context.Context, orgID, custID, addrID uuid.UUID, input domain.UpdateAddressInput) (*domain.Address, error) {
+		updateFn: func(_ context.Context, orgID, custID, addrID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 			return &domain.Address{
 				ID: addrID, OrganizationID: orgID, CustomerID: custID,
 				Type:         *input.Type,
@@ -446,7 +446,7 @@ func TestAddressUpdate_Found(t *testing.T) {
 	}
 
 	svc := NewAddressService(customers, addresses)
-	addr, err := svc.Update(context.Background(), organizationID, customerID, addressID, domain.UpdateAddressInput{
+	addr, err := svc.Update(context.Background(), organizationID, customerID, addressID, domain.AddressInput{
 		Type:       &addrType,
 		PostalCode: "99999",
 		Street:     "Updated St",
@@ -471,13 +471,13 @@ func TestAddressUpdate_NotFound(t *testing.T) {
 		getByIDFn: customerExistsMock(),
 	}
 	addresses := &mockAddressRepo{
-		updateFn: func(_ context.Context, _, _, _ uuid.UUID, _ domain.UpdateAddressInput) (*domain.Address, error) {
+		updateFn: func(_ context.Context, _, _, _ uuid.UUID, _ domain.AddressInput) (*domain.Address, error) {
 			return nil, domain.ErrAddressNotFound
 		},
 	}
 
 	svc := NewAddressService(customers, addresses)
-	_, err := svc.Update(context.Background(), uuid.New(), uuid.New(), uuid.New(), domain.UpdateAddressInput{
+	_, err := svc.Update(context.Background(), uuid.New(), uuid.New(), uuid.New(), domain.AddressInput{
 		PostalCode: "12345", Street: "St", City: "C", State: "ST",
 	})
 	if !errors.Is(err, domain.ErrAddressNotFound) {
@@ -534,7 +534,7 @@ func TestAddressCreate_CustomerNotFound(t *testing.T) {
 	}
 
 	svc := NewAddressService(customers, &mockAddressRepo{})
-	_, err := svc.Create(context.Background(), uuid.New(), uuid.New(), domain.CreateAddressInput{
+	_, err := svc.Create(context.Background(), uuid.New(), uuid.New(), domain.AddressInput{
 		PostalCode: "12345", Street: "St", City: "C", State: "ST",
 	})
 	if !errors.Is(err, domain.ErrCustomerNotFound) {
@@ -578,7 +578,7 @@ func TestAddressUpdate_CustomerNotFound(t *testing.T) {
 	}
 
 	svc := NewAddressService(customers, &mockAddressRepo{})
-	_, err := svc.Update(context.Background(), uuid.New(), uuid.New(), uuid.New(), domain.UpdateAddressInput{
+	_, err := svc.Update(context.Background(), uuid.New(), uuid.New(), uuid.New(), domain.AddressInput{
 		PostalCode: "12345", Street: "St", City: "C", State: "ST",
 	})
 	if !errors.Is(err, domain.ErrCustomerNotFound) {

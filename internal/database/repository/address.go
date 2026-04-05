@@ -23,7 +23,7 @@ func NewAddressRepo(q dbgen.Querier) *AddressRepo {
 }
 
 // Create persists a new address for a customer in an organization.
-func (r *AddressRepo) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+func (r *AddressRepo) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 	row, err := r.q.CreateAddress(ctx, dbgen.CreateAddressParams{
 		OrganizationID: organizationID,
 		CustomerID:     customerID,
@@ -82,7 +82,7 @@ func (r *AddressRepo) List(ctx context.Context, organizationID, customerID uuid.
 }
 
 // Update updates an existing address scoped to organization and customer.
-func (r *AddressRepo) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.UpdateAddressInput) (*domain.Address, error) {
+func (r *AddressRepo) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 	row, err := r.q.UpdateAddress(ctx, dbgen.UpdateAddressParams{
 		ID:             addressID,
 		CustomerID:     customerID,
@@ -169,22 +169,6 @@ func toDomainAddress(row dbgen.Address) domain.Address {
 		a.CreatedAt = row.CreatedAt.Time
 	}
 	return a
-}
-
-// toNullAddressType converts a *string to dbgen.NullAddressType.
-func toNullAddressType(s *string) dbgen.NullAddressType {
-	if s == nil {
-		return dbgen.NullAddressType{}
-	}
-	return dbgen.NullAddressType{AddressType: dbgen.AddressType(*s), Valid: true}
-}
-
-// toNullBool converts a *bool to sql.NullBool.
-func toNullBool(b *bool) sql.NullBool {
-	if b == nil {
-		return sql.NullBool{}
-	}
-	return sql.NullBool{Bool: *b, Valid: true}
 }
 
 var _ domain.AddressRepository = (*AddressRepo)(nil)

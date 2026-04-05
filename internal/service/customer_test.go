@@ -30,11 +30,11 @@ func TestGetByID_NotFound_ReturnsDomainError(t *testing.T) {
 }
 
 func TestUpdate_NotFound_ReturnsDomainError(t *testing.T) {
-	customers := &mockCustomerRepo{updateFn: func(_ context.Context, _, _ uuid.UUID, _ domain.UpdateCustomerInput) (*domain.Customer, error) {
+	customers := &mockCustomerRepo{updateFn: func(_ context.Context, _, _ uuid.UUID, _ domain.CustomerInput) (*domain.Customer, error) {
 		return nil, domain.ErrCustomerNotFound
 	}}
 	svc := NewCustomerService(customers, &mockAddressRepo{}, &mockTxManager{})
-	_, _, err := svc.Update(context.Background(), uuid.New(), uuid.New(), domain.UpdateCustomerInput{
+	_, _, err := svc.Update(context.Background(), uuid.New(), uuid.New(), domain.CustomerInput{
 		Name: "Test", Email: "test@example.com", Document: "123", DocumentType: "cpf",
 	})
 	if !errors.Is(err, domain.ErrCustomerNotFound) {
@@ -43,11 +43,11 @@ func TestUpdate_NotFound_ReturnsDomainError(t *testing.T) {
 }
 
 func TestCreate_UniqueEmailViolation_ReturnsConflict(t *testing.T) {
-	customers := &mockCustomerRepo{createFn: func(_ context.Context, _ uuid.UUID, _ domain.CreateCustomerInput) (*domain.Customer, error) {
+	customers := &mockCustomerRepo{createFn: func(_ context.Context, _ uuid.UUID, _ domain.CustomerInput) (*domain.Customer, error) {
 		return nil, domain.ErrDuplicateEmail
 	}}
 	svc := NewCustomerService(customers, &mockAddressRepo{}, &mockTxManager{})
-	_, _, err := svc.Create(context.Background(), uuid.New(), domain.CreateCustomerInput{
+	_, _, err := svc.Create(context.Background(), uuid.New(), domain.CustomerInput{
 		Name: "Test", Email: "dup@example.com", Document: "123", DocumentType: "cpf",
 	})
 	if !errors.Is(err, domain.ErrDuplicateEmail) {
@@ -103,7 +103,7 @@ func TestCreate_WithAddress_BothCreated(t *testing.T) {
 		withTxFn: func(_ context.Context, fn func(tx domain.TxHandle) error) error {
 			return fn(&mockTxHandle{
 				customers: &mockCustomerRepo{
-					createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+					createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 						customerCreated = true
 						return &domain.Customer{
 							ID: customerID, OrganizationID: orgID,
@@ -114,7 +114,7 @@ func TestCreate_WithAddress_BothCreated(t *testing.T) {
 					},
 				},
 				addresses: &mockAddressRepo{
-					createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+					createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 						addressCreated = true
 						return &domain.Address{
 							ID: addressID, OrganizationID: orgID, CustomerID: custID,
@@ -129,9 +129,9 @@ func TestCreate_WithAddress_BothCreated(t *testing.T) {
 	}
 
 	svc := NewCustomerService(&mockCustomerRepo{}, &mockAddressRepo{}, txMgr)
-	cust, addr, err := svc.Create(context.Background(), organizationID, domain.CreateCustomerInput{
+	cust, addr, err := svc.Create(context.Background(), organizationID, domain.CustomerInput{
 		Name: "Alice", Email: "alice@test.com", Document: "12345", DocumentType: "cpf",
-		Address: &domain.CreateAddressInput{
+		Address: &domain.AddressInput{
 			PostalCode: "12345-678", Street: "Main St", City: "Springfield", State: "IL",
 		},
 	})
@@ -155,7 +155,7 @@ func TestCreate_WithAddress_BothCreated(t *testing.T) {
 func TestCreate_WithoutAddress_OnlyCustomerCreated(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	customers := &mockCustomerRepo{
-		createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+		createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 			return &domain.Customer{
 				ID: uuid.New(), OrganizationID: orgID,
 				Name: input.Name, Email: input.Email,
@@ -165,7 +165,7 @@ func TestCreate_WithoutAddress_OnlyCustomerCreated(t *testing.T) {
 		},
 	}
 	svc := NewCustomerService(customers, &mockAddressRepo{}, &mockTxManager{})
-	cust, addr, err := svc.Create(context.Background(), uuid.New(), domain.CreateCustomerInput{
+	cust, addr, err := svc.Create(context.Background(), uuid.New(), domain.CustomerInput{
 		Name: "Bob", Email: "bob@test.com", Document: "67890", DocumentType: "cpf",
 	})
 	if err != nil {
@@ -188,7 +188,7 @@ func TestCreate_WithAddress_AddressFailure_Rollback(t *testing.T) {
 		withTxFn: func(_ context.Context, fn func(tx domain.TxHandle) error) error {
 			return fn(&mockTxHandle{
 				customers: &mockCustomerRepo{
-					createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+					createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 						return &domain.Customer{
 							ID: customerID, OrganizationID: orgID,
 							Name: input.Name, Email: input.Email,
@@ -198,7 +198,7 @@ func TestCreate_WithAddress_AddressFailure_Rollback(t *testing.T) {
 					},
 				},
 				addresses: &mockAddressRepo{
-					createFn: func(_ context.Context, _, _ uuid.UUID, _ domain.CreateAddressInput) (*domain.Address, error) {
+					createFn: func(_ context.Context, _, _ uuid.UUID, _ domain.AddressInput) (*domain.Address, error) {
 						return nil, errors.New("address creation failed")
 					},
 				},
@@ -207,9 +207,9 @@ func TestCreate_WithAddress_AddressFailure_Rollback(t *testing.T) {
 	}
 
 	svc := NewCustomerService(&mockCustomerRepo{}, &mockAddressRepo{}, txMgr)
-	cust, addr, err := svc.Create(context.Background(), organizationID, domain.CreateCustomerInput{
+	cust, addr, err := svc.Create(context.Background(), organizationID, domain.CustomerInput{
 		Name: "Charlie", Email: "charlie@test.com", Document: "11111", DocumentType: "cpf",
-		Address: &domain.CreateAddressInput{
+		Address: &domain.AddressInput{
 			PostalCode: "12345-678", Street: "Main St", City: "Springfield", State: "IL",
 		},
 	})
@@ -227,7 +227,7 @@ func TestCreate_WithAddress_AddressFailure_Rollback(t *testing.T) {
 func TestUpdate_WithoutAddress_OnlyCustomerUpdated(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	customers := &mockCustomerRepo{
-		updateFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, error) {
+		updateFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 			return &domain.Customer{
 				ID: custID, OrganizationID: orgID,
 				Name: input.Name, Email: input.Email,
@@ -237,7 +237,7 @@ func TestUpdate_WithoutAddress_OnlyCustomerUpdated(t *testing.T) {
 		},
 	}
 	svc := NewCustomerService(customers, &mockAddressRepo{}, &mockTxManager{})
-	cust, addr, err := svc.Update(context.Background(), uuid.New(), uuid.New(), domain.UpdateCustomerInput{
+	cust, addr, err := svc.Update(context.Background(), uuid.New(), uuid.New(), domain.CustomerInput{
 		Name: "Updated", Email: "updated@test.com", Document: "123", DocumentType: "cpf",
 	})
 	if err != nil {
@@ -289,7 +289,7 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
 		var stored *domain.Customer
 		customers := &mockCustomerRepo{
-			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 				stored = &domain.Customer{
 					ID: generatedID, OrganizationID: orgID,
 					Name: input.Name, Email: input.Email,
@@ -308,7 +308,7 @@ func TestProperty_CreateAndGetByID_RoundTrip(t *testing.T) {
 		}
 		svc := NewCustomerService(customers, &mockAddressRepo{}, &mockTxManager{})
 		ctx := context.Background()
-		created, _, err := svc.Create(ctx, organizationID, domain.CreateCustomerInput{
+		created, _, err := svc.Create(ctx, organizationID, domain.CustomerInput{
 			Name: name, Email: email, Phone: phone, Document: document, DocumentType: documentType, Metadata: metadata,
 		})
 		if err != nil {
@@ -382,7 +382,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
 		store := make(map[uuid.UUID][]*domain.Customer)
 		customers := &mockCustomerRepo{
-			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 				c := &domain.Customer{
 					ID: customerID, OrganizationID: orgID, Name: input.Name, Email: input.Email,
 					Phone: input.Phone, Document: input.Document, DocumentType: input.DocumentType,
@@ -407,7 +407,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 				}
 				return nil, domain.ErrCustomerNotFound
 			},
-			updateFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, error) {
+			updateFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 				for _, c := range store[orgID] {
 					if c.ID == custID {
 						c.Name = input.Name
@@ -427,7 +427,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		}
 		svc := NewCustomerService(customers, &mockAddressRepo{}, &mockTxManager{})
 		ctx := context.Background()
-		created, _, err := svc.Create(ctx, organizationA, domain.CreateCustomerInput{Name: name, Email: email, Document: document, DocumentType: documentType})
+		created, _, err := svc.Create(ctx, organizationA, domain.CustomerInput{Name: name, Email: email, Document: document, DocumentType: documentType})
 		if err != nil {
 			return false
 		}
@@ -439,7 +439,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		if !errors.Is(err, domain.ErrCustomerNotFound) {
 			return false
 		}
-		_, _, err = svc.Update(ctx, organizationB, created.ID, domain.UpdateCustomerInput{Name: "hacked", Email: "h@e.com", Document: document, DocumentType: documentType})
+		_, _, err = svc.Update(ctx, organizationB, created.ID, domain.CustomerInput{Name: "hacked", Email: "h@e.com", Document: document, DocumentType: documentType})
 		if !errors.Is(err, domain.ErrCustomerNotFound) {
 			return false
 		}
@@ -451,7 +451,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		if len(listA) != 1 || listA[0].ID != created.ID {
 			return false
 		}
-		updatedA, _, err := svc.Update(ctx, organizationA, created.ID, domain.UpdateCustomerInput{Name: "updated", Email: email, Document: document, DocumentType: documentType})
+		updatedA, _, err := svc.Update(ctx, organizationA, created.ID, domain.CustomerInput{Name: "updated", Email: email, Document: document, DocumentType: documentType})
 		if err != nil || updatedA.Name != "updated" {
 			return false
 		}
@@ -486,7 +486,7 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 			withTxFn: func(_ context.Context, fn func(tx domain.TxHandle) error) error {
 				return fn(&mockTxHandle{
 					customers: &mockCustomerRepo{
-						createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+						createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 							customerCreated = true
 							return &domain.Customer{
 								ID: customerID, OrganizationID: orgID,
@@ -497,7 +497,7 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 						},
 					},
 					addresses: &mockAddressRepo{
-						createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+						createFn: func(_ context.Context, orgID, custID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 							addressCreated = true
 							return &domain.Address{
 								ID: addressID, OrganizationID: orgID, CustomerID: custID,
@@ -512,9 +512,9 @@ func TestProperty_AtomicCustomerWithAddress(t *testing.T) {
 		}
 
 		svc := NewCustomerService(&mockCustomerRepo{}, &mockAddressRepo{}, txMgr)
-		cust, addr, err := svc.Create(context.Background(), organizationID, domain.CreateCustomerInput{
+		cust, addr, err := svc.Create(context.Background(), organizationID, domain.CustomerInput{
 			Name: name, Email: email, Document: document, DocumentType: documentType,
-			Address: &domain.CreateAddressInput{
+			Address: &domain.AddressInput{
 				PostalCode: postalCode, Street: street, City: city, State: state,
 			},
 		})
@@ -562,7 +562,7 @@ func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 
 		txCalled := false
 		customers := &mockCustomerRepo{
-			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 				return &domain.Customer{
 					ID: uuid.New(), OrganizationID: orgID,
 					Name: input.Name, Email: input.Email,
@@ -579,7 +579,7 @@ func TestProperty_CreateWithoutAddress_NoAddressCreated(t *testing.T) {
 		}
 
 		svc := NewCustomerService(customers, &mockAddressRepo{}, txMgr)
-		cust, addr, err := svc.Create(context.Background(), organizationID, domain.CreateCustomerInput{
+		cust, addr, err := svc.Create(context.Background(), organizationID, domain.CustomerInput{
 			Name: name, Email: email, Document: document, DocumentType: documentType,
 		})
 

@@ -10,10 +10,10 @@ import (
 
 // CustomerRepository defines persistence operations for the customer domain.
 type CustomerRepository interface {
-	Create(ctx context.Context, organizationID uuid.UUID, input CreateCustomerInput) (*Customer, error)
+	Create(ctx context.Context, organizationID uuid.UUID, input CustomerInput) (*Customer, error)
 	GetByID(ctx context.Context, organizationID, customerID uuid.UUID) (*Customer, error)
 	List(ctx context.Context, organizationID uuid.UUID) ([]Customer, error)
-	Update(ctx context.Context, organizationID, customerID uuid.UUID, input UpdateCustomerInput) (*Customer, error)
+	Update(ctx context.Context, organizationID, customerID uuid.UUID, input CustomerInput) (*Customer, error)
 	SoftDelete(ctx context.Context, organizationID, customerID uuid.UUID) error
 	HardDelete(ctx context.Context, organizationID, customerID uuid.UUID) error
 }
@@ -33,24 +33,13 @@ type Customer struct {
 	UpdatedAt      time.Time
 }
 
-// CreateCustomerInput represents the input for creating a new customer.
-type CreateCustomerInput struct {
+// CustomerInput represents the input for creating or updating a customer.
+type CustomerInput struct {
 	Name         string
 	Email        string
 	Phone        *string
 	Document     string
 	DocumentType string
 	Metadata     json.RawMessage
-	Address      *CreateAddressInput
-}
-
-// UpdateCustomerInput represents the input for updating an existing customer.
-type UpdateCustomerInput struct {
-	Name         string
-	Email        string
-	Phone        *string
-	Document     string
-	DocumentType string
-	Metadata     json.RawMessage
-	Address      *CreateAddressInput
+	Address      *AddressInput
 }

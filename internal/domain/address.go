@@ -9,10 +9,10 @@ import (
 
 // AddressRepository defines persistence operations for the address domain.
 type AddressRepository interface {
-	Create(ctx context.Context, organizationID, customerID uuid.UUID, input CreateAddressInput) (*Address, error)
+	Create(ctx context.Context, organizationID, customerID uuid.UUID, input AddressInput) (*Address, error)
 	GetByID(ctx context.Context, organizationID, customerID, addressID uuid.UUID) (*Address, error)
 	List(ctx context.Context, organizationID, customerID uuid.UUID) ([]Address, error)
-	Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input UpdateAddressInput) (*Address, error)
+	Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input AddressInput) (*Address, error)
 	Delete(ctx context.Context, organizationID, customerID, addressID uuid.UUID) error
 }
 
@@ -34,22 +34,8 @@ type Address struct {
 	CreatedAt      time.Time
 }
 
-// CreateAddressInput represents the input for creating a new address.
-type CreateAddressInput struct {
-	Type         *string
-	PostalCode   string
-	Street       string
-	Number       *string
-	Complement   *string
-	Neighborhood *string
-	City         string
-	State        string
-	Country      *string
-	IsMain       *bool
-}
-
-// UpdateAddressInput represents the input for updating an existing address.
-type UpdateAddressInput struct {
+// AddressInput represents the input for creating or updating an address.
+type AddressInput struct {
 	Type         *string
 	PostalCode   string
 	Street       string

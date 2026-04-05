@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/sqlc-dev/pqtype"
 )
 
 // CustomerRepo implements domain.CustomerRepository backed by PostgreSQL via sqlc.
@@ -26,7 +25,7 @@ func NewCustomerRepo(q dbgen.Querier) *CustomerRepo {
 }
 
 // Create persists a new customer in an organization.
-func (r *CustomerRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+func (r *CustomerRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 	row, err := r.q.CreateCustomer(ctx, dbgen.CreateCustomerParams{
 		OrganizationID: organizationID,
 		Name:           input.Name,
@@ -75,7 +74,7 @@ func (r *CustomerRepo) List(ctx context.Context, organizationID uuid.UUID) ([]do
 }
 
 // Update updates a customer scoped to an organization.
-func (r *CustomerRepo) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, error) {
+func (r *CustomerRepo) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 	row, err := r.q.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
 		ID:             customerID,
 		OrganizationID: organizationID,
@@ -175,22 +174,6 @@ func toDomainCustomer(row dbgen.Customer) domain.Customer {
 		c.UpdatedAt = row.UpdatedAt.Time
 	}
 	return c
-}
-
-// toNullString converts a *string to sql.NullString.
-func toNullString(s *string) sql.NullString {
-	if s == nil {
-		return sql.NullString{}
-	}
-	return sql.NullString{String: *s, Valid: true}
-}
-
-// toNullRawMessage converts a json.RawMessage to pqtype.NullRawMessage.
-func toNullRawMessage(data json.RawMessage) pqtype.NullRawMessage {
-	if data == nil {
-		return pqtype.NullRawMessage{}
-	}
-	return pqtype.NullRawMessage{RawMessage: data, Valid: true}
 }
 
 var _ domain.CustomerRepository = (*CustomerRepo)(nil)

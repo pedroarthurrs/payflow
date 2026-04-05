@@ -93,7 +93,7 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 		return
 	}
 
-	input := domain.CreateCustomerInput{
+	input := domain.CustomerInput{
 		Name:         req.Name,
 		Email:        req.Email,
 		Phone:        req.Phone,
@@ -103,7 +103,7 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 	}
 
 	if req.Address != nil {
-		input.Address = &domain.CreateAddressInput{
+		input.Address = &domain.AddressInput{
 			Type:         req.Address.Type,
 			PostalCode:   req.Address.PostalCode,
 			Street:       req.Address.Street,
@@ -198,7 +198,7 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 		return
 	}
 
-	input := domain.UpdateCustomerInput{
+	input := domain.CustomerInput{
 		Name:         req.Name,
 		Email:        req.Email,
 		Phone:        req.Phone,
@@ -208,7 +208,7 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 	}
 
 	if req.Address != nil {
-		input.Address = &domain.CreateAddressInput{
+		input.Address = &domain.AddressInput{
 			Type:         req.Address.Type,
 			PostalCode:   req.Address.PostalCode,
 			Street:       req.Address.Street,

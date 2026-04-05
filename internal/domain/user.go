@@ -8,12 +8,26 @@ import (
 
 // UserRepository defines persistence operations for the user domain.
 type UserRepository interface {
-	Create(ctx context.Context, organizationID uuid.UUID, name, email, passwordHash, role string) (*User, error)
+	Create(ctx context.Context, organizationID uuid.UUID, input CreateUserInput) (*User, error)
 	GetByID(ctx context.Context, organizationID, userID uuid.UUID) (*User, error)
 	GetByEmailAndOrg(ctx context.Context, organizationID uuid.UUID, email string) (*User, error)
 	List(ctx context.Context, organizationID uuid.UUID) ([]User, error)
-	Update(ctx context.Context, organizationID, userID uuid.UUID, name, role string) (*User, error)
+	Update(ctx context.Context, organizationID, userID uuid.UUID, input UpdateUserInput) (*User, error)
 	SoftDelete(ctx context.Context, organizationID, userID uuid.UUID) error
+}
+
+// CreateUserInput represents the input for creating a new user.
+type CreateUserInput struct {
+	Name         string
+	Email        string
+	PasswordHash string
+	Role         string
+}
+
+// UpdateUserInput represents the input for updating an existing user.
+type UpdateUserInput struct {
+	Name string
+	Role string
 }
 
 // Role represents a user's role within an organization.

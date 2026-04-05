@@ -73,7 +73,12 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 		return nil, err
 	}
 
-	return s.users.Create(ctx, tid, req.Name, req.Email, string(hash), string(req.Role))
+	return s.users.Create(ctx, tid, domain.CreateUserInput{
+		Name:         req.Name,
+		Email:        req.Email,
+		PasswordHash: string(hash),
+		Role:         string(req.Role),
+	})
 }
 
 // List returns all active users for an organization, without password fields.
@@ -110,7 +115,10 @@ func (s *UserService) Update(ctx context.Context, organizationID, userID string,
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
-	return s.users.Update(ctx, tid, uid, req.Name, string(req.Role))
+	return s.users.Update(ctx, tid, uid, domain.UpdateUserInput{
+		Name: req.Name,
+		Role: string(req.Role),
+	})
 }
 
 // Delete soft-deletes a user within an organization.

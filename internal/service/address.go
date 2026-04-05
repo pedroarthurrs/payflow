@@ -20,7 +20,7 @@ func NewAddressService(customers domain.CustomerRepository, addresses domain.Add
 }
 
 // Create creates a new address for the given customer, applying defaults for omitted fields.
-func (s *AddressService) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+func (s *AddressService) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s *AddressService) GetByID(ctx context.Context, organizationID, customerID
 }
 
 // Update updates an existing address.
-func (s *AddressService) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.UpdateAddressInput) (*domain.Address, error) {
+func (s *AddressService) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (s *AddressService) ensureCustomerExists(ctx context.Context, organizationI
 }
 
 // applyDefaults sets default values for omitted fields in CreateAddressInput.
-func applyDefaults(input *domain.CreateAddressInput) {
+func applyDefaults(input *domain.AddressInput) {
 	if input.Type == nil {
 		billing := "billing"
 		input.Type = &billing

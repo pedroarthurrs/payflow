@@ -14,17 +14,17 @@ import (
 // ============================================================
 
 type mockCustomerRepo struct {
-	createFn     func(ctx context.Context, organizationID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error)
+	createFn     func(ctx context.Context, organizationID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error)
 	getByIDFn    func(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.Customer, error)
 	listFn       func(ctx context.Context, organizationID uuid.UUID) ([]domain.Customer, error)
-	updateFn     func(ctx context.Context, organizationID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, error)
+	updateFn     func(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error)
 	softDeleteFn func(ctx context.Context, organizationID, customerID uuid.UUID) error
 	hardDeleteFn func(ctx context.Context, organizationID, customerID uuid.UUID) error
 }
 
 var _ domain.CustomerRepository = (*mockCustomerRepo)(nil)
 
-func (m *mockCustomerRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, error) {
+func (m *mockCustomerRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 	if m.createFn != nil {
 		return m.createFn(ctx, organizationID, input)
 	}
@@ -45,7 +45,7 @@ func (m *mockCustomerRepo) List(ctx context.Context, organizationID uuid.UUID) (
 	return nil, nil
 }
 
-func (m *mockCustomerRepo) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, error) {
+func (m *mockCustomerRepo) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
 	if m.updateFn != nil {
 		return m.updateFn(ctx, organizationID, customerID, input)
 	}
@@ -71,16 +71,16 @@ func (m *mockCustomerRepo) HardDelete(ctx context.Context, organizationID, custo
 // ============================================================
 
 type mockAddressRepo struct {
-	createFn  func(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error)
+	createFn  func(ctx context.Context, organizationID, customerID uuid.UUID, input domain.AddressInput) (*domain.Address, error)
 	getByIDFn func(ctx context.Context, organizationID, customerID, addressID uuid.UUID) (*domain.Address, error)
 	listFn    func(ctx context.Context, organizationID, customerID uuid.UUID) ([]domain.Address, error)
-	updateFn  func(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.UpdateAddressInput) (*domain.Address, error)
+	updateFn  func(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.AddressInput) (*domain.Address, error)
 	deleteFn  func(ctx context.Context, organizationID, customerID, addressID uuid.UUID) error
 }
 
 var _ domain.AddressRepository = (*mockAddressRepo)(nil)
 
-func (m *mockAddressRepo) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CreateAddressInput) (*domain.Address, error) {
+func (m *mockAddressRepo) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 	if m.createFn != nil {
 		return m.createFn(ctx, organizationID, customerID, input)
 	}
@@ -101,7 +101,7 @@ func (m *mockAddressRepo) List(ctx context.Context, organizationID, customerID u
 	return nil, nil
 }
 
-func (m *mockAddressRepo) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.UpdateAddressInput) (*domain.Address, error) {
+func (m *mockAddressRepo) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
 	if m.updateFn != nil {
 		return m.updateFn(ctx, organizationID, customerID, addressID, input)
 	}
@@ -120,19 +120,19 @@ func (m *mockAddressRepo) Delete(ctx context.Context, organizationID, customerID
 // ============================================================
 
 type mockUserRepo struct {
-	createFn           func(ctx context.Context, organizationID uuid.UUID, name, email, passwordHash, role string) (*domain.User, error)
+	createFn           func(ctx context.Context, organizationID uuid.UUID, input domain.CreateUserInput) (*domain.User, error)
 	getByIDFn          func(ctx context.Context, organizationID, userID uuid.UUID) (*domain.User, error)
 	getByEmailAndOrgFn func(ctx context.Context, organizationID uuid.UUID, email string) (*domain.User, error)
 	listFn             func(ctx context.Context, organizationID uuid.UUID) ([]domain.User, error)
-	updateFn           func(ctx context.Context, organizationID, userID uuid.UUID, name, role string) (*domain.User, error)
+	updateFn           func(ctx context.Context, organizationID, userID uuid.UUID, input domain.UpdateUserInput) (*domain.User, error)
 	softDeleteFn       func(ctx context.Context, organizationID, userID uuid.UUID) error
 }
 
 var _ domain.UserRepository = (*mockUserRepo)(nil)
 
-func (m *mockUserRepo) Create(ctx context.Context, organizationID uuid.UUID, name, email, passwordHash, role string) (*domain.User, error) {
+func (m *mockUserRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateUserInput) (*domain.User, error) {
 	if m.createFn != nil {
-		return m.createFn(ctx, organizationID, name, email, passwordHash, role)
+		return m.createFn(ctx, organizationID, input)
 	}
 	return nil, errors.New("not implemented")
 }
@@ -158,9 +158,9 @@ func (m *mockUserRepo) List(ctx context.Context, organizationID uuid.UUID) ([]do
 	return nil, nil
 }
 
-func (m *mockUserRepo) Update(ctx context.Context, organizationID, userID uuid.UUID, name, role string) (*domain.User, error) {
+func (m *mockUserRepo) Update(ctx context.Context, organizationID, userID uuid.UUID, input domain.UpdateUserInput) (*domain.User, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, organizationID, userID, name, role)
+		return m.updateFn(ctx, organizationID, userID, input)
 	}
 	return nil, errors.New("not found")
 }

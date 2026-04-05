@@ -22,7 +22,6 @@ var domainStatusMap = map[error]int{
 	domain.ErrDuplicateEmail:       http.StatusConflict,
 	domain.ErrDuplicateDocument:    http.StatusConflict,
 	domain.ErrUnauthorized:         http.StatusUnauthorized,
-	domain.ErrInvalidCredentials:   http.StatusUnauthorized,
 	domain.ErrForbidden:            http.StatusForbidden,
 	domain.ErrBadRequest:           http.StatusBadRequest,
 	domain.ErrInternal:             http.StatusInternalServerError,

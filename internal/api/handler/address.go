@@ -61,7 +61,7 @@ func (h *AddressHandler) Create(c *gin.Context) {
 		return
 	}
 
-	addr, err := h.addressSvc.Create(c.Request.Context(), tid, cid, domain.CreateAddressInput{
+	addr, err := h.addressSvc.Create(c.Request.Context(), tid, cid, domain.AddressInput{
 		Type:         req.Type,
 		PostalCode:   req.PostalCode,
 		Street:       req.Street,
@@ -172,7 +172,7 @@ func (h *AddressHandler) Update(c *gin.Context) {
 		return
 	}
 
-	addr, err := h.addressSvc.Update(c.Request.Context(), tid, cid, aid, domain.UpdateAddressInput{
+	addr, err := h.addressSvc.Update(c.Request.Context(), tid, cid, aid, domain.AddressInput{
 		Type:         req.Type,
 		PostalCode:   req.PostalCode,
 		Street:       req.Street,

@@ -23,7 +23,7 @@ func NewCustomerService(customers domain.CustomerRepository, addresses domain.Ad
 
 // Create creates a new customer for the given organization.
 // When input.Address is provided, the customer and address are created atomically within a transaction.
-func (s *CustomerService) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateCustomerInput) (*domain.Customer, *domain.Address, error) {
+func (s *CustomerService) Create(ctx context.Context, organizationID uuid.UUID, input domain.CustomerInput) (*domain.Customer, *domain.Address, error) {
 	if input.Address == nil {
 		c, err := s.customers.Create(ctx, organizationID, input)
 		if err != nil {
@@ -68,7 +68,7 @@ func (s *CustomerService) GetByID(ctx context.Context, organizationID, customerI
 
 // Update updates an existing customer for the given organization.
 // When input.Address is provided, the customer update and address creation are performed atomically.
-func (s *CustomerService) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.UpdateCustomerInput) (*domain.Customer, *domain.Address, error) {
+func (s *CustomerService) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CustomerInput) (*domain.Customer, *domain.Address, error) {
 	if input.Address == nil {
 		c, err := s.customers.Update(ctx, organizationID, customerID, input)
 		if err != nil {

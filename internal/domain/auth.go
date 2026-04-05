@@ -45,9 +45,3 @@ type LoginRequest struct {
 	Password string
 	APIKey   string
 }
-
-// Credentials represents the input for user authentication.
-type Credentials struct {
-	Email    string
-	Password string
-}

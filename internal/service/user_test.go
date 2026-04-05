@@ -147,16 +147,16 @@ func TestProperty_UserCreationRoundTrip(t *testing.T) {
 			getByEmailAndOrgFn: func(_ context.Context, _ uuid.UUID, _ string) (*domain.User, error) {
 				return nil, errors.New("not found")
 			},
-			createFn: func(_ context.Context, orgID uuid.UUID, uName, uEmail, passwordHash, uRole string) (*domain.User, error) {
-				if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(fixedPassword)); err != nil {
+			createFn: func(_ context.Context, orgID uuid.UUID, input domain.CreateUserInput) (*domain.User, error) {
+				if err := bcrypt.CompareHashAndPassword([]byte(input.PasswordHash), []byte(fixedPassword)); err != nil {
 					return nil, errors.New("invalid bcrypt hash in CreateUser call")
 				}
 				return &domain.User{
 					ID:             newUserID.String(),
 					OrganizationID: orgID.String(),
-					Email:          uEmail,
-					Name:           uName,
-					Role:           domain.Role(uRole),
+					Email:          input.Email,
+					Name:           input.Name,
+					Role:           domain.Role(input.Role),
 				}, nil
 			},
 		}
