@@ -49,6 +49,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userRepo := repository.NewUserRepo(db.UserQ)
 	authRepo := repository.NewAuthRepo(db.AuthQ)
 	credentialRepo := repository.NewCredentialRepo(db.CredentialQ)
+	credentialLogRepo := repository.NewCredentialLogRepo(db.CredentialLogQ)
 	txManager := repository.NewTxManager(db)
 
 	// Services
@@ -59,6 +60,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	productSvc := service.NewProductService(productRepo)
 	userSvc := service.NewUserService(userRepo)
 	credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
+	credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -73,6 +75,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	productHandler := handler.NewProductHandler(productSvc)
 	userHandler := handler.NewUserHandler(userSvc)
 	credentialHandler := handler.NewCredentialHandler(credentialSvc)
+	credentialLogHandler := handler.NewCredentialLogHandler(credentialLogSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -96,6 +99,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	productHandler.RegisterRoutes(protected)
 	userHandler.RegisterRoutes(protected)
 	credentialHandler.RegisterRoutes(protected)
+	credentialLogHandler.RegisterRoutes(protected)
 
 	return r
 }

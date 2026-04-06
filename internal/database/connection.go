@@ -10,6 +10,7 @@ import (
 	addressdb "i9pay/internal/database/dbgen/address"
 	authdb "i9pay/internal/database/dbgen/auth"
 	credentialdb "i9pay/internal/database/dbgen/credential"
+	credentiallogdb "i9pay/internal/database/dbgen/credentiallog"
 	customerdb "i9pay/internal/database/dbgen/customer"
 	organizationdb "i9pay/internal/database/dbgen/organization"
 	productdb "i9pay/internal/database/dbgen/product"
@@ -21,13 +22,14 @@ import (
 // DB wraps *sql.DB and exposes type-safe SQLC queries separated by domain.
 type DB struct {
 	*sql.DB
-	CustomerQ     customerdb.Querier
-	AddressQ      addressdb.Querier
-	UserQ         userdb.Querier
-	ProductQ      productdb.Querier
-	AuthQ         authdb.Querier
-	OrganizationQ organizationdb.Querier
-	CredentialQ   credentialdb.Querier
+	CustomerQ      customerdb.Querier
+	AddressQ       addressdb.Querier
+	UserQ          userdb.Querier
+	ProductQ       productdb.Querier
+	AuthQ          authdb.Querier
+	OrganizationQ  organizationdb.Querier
+	CredentialQ    credentialdb.Querier
+	CredentialLogQ credentiallogdb.Querier
 }
 
 // New opens and verifies a database connection using the provided application config.
@@ -57,14 +59,15 @@ func New(cfg *config.Config) (*DB, error) {
 	}
 
 	return &DB{
-		DB:            db,
-		CustomerQ:     customerdb.New(db),
-		AddressQ:      addressdb.New(db),
-		UserQ:         userdb.New(db),
-		ProductQ:      productdb.New(db),
-		AuthQ:         authdb.New(db),
-		OrganizationQ: organizationdb.New(db),
-		CredentialQ:   credentialdb.New(db),
+		DB:             db,
+		CustomerQ:      customerdb.New(db),
+		AddressQ:       addressdb.New(db),
+		UserQ:          userdb.New(db),
+		ProductQ:       productdb.New(db),
+		AuthQ:          authdb.New(db),
+		OrganizationQ:  organizationdb.New(db),
+		CredentialQ:    credentialdb.New(db),
+		CredentialLogQ: credentiallogdb.New(db),
 	}, nil
 }
 

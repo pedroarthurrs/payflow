@@ -308,3 +308,28 @@ func customerExistsMock() func(ctx context.Context, organizationID, customerID u
 		return &domain.Customer{ID: customerID, OrganizationID: organizationID}, nil
 	}
 }
+
+// ============================================================
+// Mock CredentialLogRepository
+// ============================================================
+
+type mockCredentialLogRepo struct {
+	listFn    func(ctx context.Context, orgID uuid.UUID, input domain.ListCredentialLogsInput) ([]domain.CredentialLogRecord, error)
+	getByIDFn func(ctx context.Context, orgID, logID uuid.UUID) (*domain.CredentialLogRecord, error)
+}
+
+var _ domain.CredentialLogRepository = (*mockCredentialLogRepo)(nil)
+
+func (m *mockCredentialLogRepo) List(ctx context.Context, orgID uuid.UUID, input domain.ListCredentialLogsInput) ([]domain.CredentialLogRecord, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, orgID, input)
+	}
+	return nil, nil
+}
+
+func (m *mockCredentialLogRepo) GetByID(ctx context.Context, orgID, logID uuid.UUID) (*domain.CredentialLogRecord, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, orgID, logID)
+	}
+	return nil, domain.ErrCredentialLogNotFound
+}
