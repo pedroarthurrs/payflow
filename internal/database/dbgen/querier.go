@@ -19,6 +19,10 @@ type Querier interface {
 	// Customer
 	// =================================
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	// =================================
+	// Product
+	// =================================
+	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	// =================================
@@ -28,6 +32,7 @@ type Querier interface {
 	GetAddressByID(ctx context.Context, arg GetAddressByIDParams) (Address, error)
 	GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error)
 	GetOrganization(ctx context.Context, id uuid.UUID) (Organization, error)
+	GetProductByID(ctx context.Context, arg GetProductByIDParams) (Product, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// =================================
 	// User
@@ -35,15 +40,19 @@ type Querier interface {
 	GetUserByEmailAndOrganization(ctx context.Context, arg GetUserByEmailAndOrganizationParams) (User, error)
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
 	HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error
+	HardDeleteProduct(ctx context.Context, arg HardDeleteProductParams) error
 	ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error)
 	ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Customer, error)
 	ListOrganizations(ctx context.Context) ([]Organization, error)
+	ListProductsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Product, error)
 	ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]User, error)
 	SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error
+	SoftDeleteProduct(ctx context.Context, arg SoftDeleteProductParams) error
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
 	UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 }
 

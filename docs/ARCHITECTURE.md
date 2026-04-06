@@ -65,7 +65,7 @@ Resposta JSON
 
 **DTOs** (`api/dto/`)
 - Structs compartilhadas entre handlers
-- `context.go`: extração de IDs do contexto Gin (`OrganizationID`, `CustomerID`)
+- `context.go`: extração de IDs do contexto Gin (`OrganizationID`, `CustomerID`, `ProductID`)
 - `request.go`: structs de requisição compartilhadas
 - `response.go`: structs de resposta compartilhadas
 
@@ -119,7 +119,12 @@ Resposta JSON
 - Depende de `domain.UserRepository`
 - Isolamento multi-organization
 
-Expansões planejadas:
+**ProductService** (`service/product.go`)
+- CRUD completo de produtos vinculados a organizations
+- Soft delete padrão (marca `deleted_at`)
+- Hard delete para remoção permanente (com log de auditoria via slog)
+- Depende de `domain.ProductRepository`
+- Isolamento multi-organization
 - `subscription.go` — lógica de assinaturas
 - `invoice.go` — geração de faturas
 
@@ -134,6 +139,7 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `user.go`: `UserRepository`, modelo User e roles (owner/admin/member)
 - `customer.go`: `CustomerRepository`, modelo Customer, inputs de criação e atualização
 - `address.go`: `AddressRepository`, modelo Address, inputs de criação e atualização
+- `product.go`: `ProductRepository`, modelo Product, ProductInput
 - `tx.go`: contratos transacionais (`TxManager`, `TxHandle`)
 - `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
 
@@ -284,6 +290,7 @@ Sem framework de injeção de dependências. Dependências são passadas explici
 tokenSvc := token.NewService(secret, ttl1, ttl2)
 customerRepo := repository.NewCustomerRepo(db.Queries)
 addressRepo := repository.NewAddressRepo(db.Queries)
+productRepo := repository.NewProductRepo(db.Queries)
 userRepo := repository.NewUserRepo(db.Queries)
 authRepo := repository.NewAuthRepo(db.Queries)
 txManager := repository.NewTxManager(db)
@@ -291,6 +298,7 @@ txManager := repository.NewTxManager(db)
 authSvc := service.NewAuthService(tokenSvc, authRepo)
 customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
 addressSvc := service.NewAddressService(customerRepo, addressRepo)
+productSvc := service.NewProductService(productRepo)
 userSvc := service.NewUserService(userRepo)
 
 authHandler := handler.NewAuthHandler(authSvc, loginRL)
@@ -299,6 +307,7 @@ authHandler := handler.NewAuthHandler(authSvc, loginRL)
 authHandler.RegisterRoutes(v1)
 customerHandler.RegisterRoutes(protected)
 addressHandler.RegisterRoutes(protected)
+productHandler.RegisterRoutes(protected)
 userHandler.RegisterRoutes(protected)
 ```
 

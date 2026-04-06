@@ -6,6 +6,7 @@ import "errors"
 var (
 	ErrOrganizationNotFound = errors.New("organization not found")
 	ErrCustomerNotFound     = errors.New("customer not found")
+	ErrProductNotFound      = errors.New("product not found")
 	ErrAddressNotFound      = errors.New("address not found")
 	ErrUnauthorized         = errors.New("invalid credentials")
 	ErrBadRequest           = errors.New("organization_id, email and password or api_key required")

@@ -45,6 +45,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	// Repositories
 	customerRepo := repository.NewCustomerRepo(db.Queries)
 	addressRepo := repository.NewAddressRepo(db.Queries)
+	productRepo := repository.NewProductRepo(db.Queries)
 	userRepo := repository.NewUserRepo(db.Queries)
 	authRepo := repository.NewAuthRepo(db.Queries)
 	txManager := repository.NewTxManager(db)
@@ -54,6 +55,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	authSvc := service.NewAuthService(tokenSvc, authRepo)
 	addressSvc := service.NewAddressService(customerRepo, addressRepo)
 	customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
+	productSvc := service.NewProductService(productRepo)
 	userSvc := service.NewUserService(userRepo)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
@@ -66,6 +68,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	meHandler := handler.NewMeHandler()
 	customerHandler := handler.NewCustomerHandler(customerSvc)
 	addressHandler := handler.NewAddressHandler(addressSvc)
+	productHandler := handler.NewProductHandler(productSvc)
 	userHandler := handler.NewUserHandler(userSvc)
 
 	// Rota raiz (fora do grupo de versão)
@@ -87,6 +90,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	meHandler.RegisterRoutes(protected)
 	customerHandler.RegisterRoutes(protected)
 	addressHandler.RegisterRoutes(protected)
+	productHandler.RegisterRoutes(protected)
 	userHandler.RegisterRoutes(protected)
 
 	return r

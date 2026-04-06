@@ -126,6 +126,37 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 	return i, err
 }
 
+const createProduct = `-- name: CreateProduct :one
+
+INSERT INTO products (organization_id, name, active)
+VALUES ($1, $2, $3)
+RETURNING id, organization_id, name, active, created_at, updated_at, deleted_at
+`
+
+type CreateProductParams struct {
+	OrganizationID uuid.UUID    `json:"organization_id"`
+	Name           string       `json:"name"`
+	Active         sql.NullBool `json:"active"`
+}
+
+// =================================
+// Product
+// =================================
+func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
+	row := q.db.QueryRowContext(ctx, createProduct, arg.OrganizationID, arg.Name, arg.Active)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Name,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (organization_id, name, email, password, role)
 VALUES ($1, $2, $3, $4, $5)
@@ -296,6 +327,32 @@ func (q *Queries) GetOrganization(ctx context.Context, id uuid.UUID) (Organizati
 	return i, err
 }
 
+const getProductByID = `-- name: GetProductByID :one
+SELECT id, organization_id, name, active, created_at, updated_at, deleted_at from products
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
+LIMIT 1
+`
+
+type GetProductByIDParams struct {
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+}
+
+func (q *Queries) GetProductByID(ctx context.Context, arg GetProductByIDParams) (Product, error) {
+	row := q.db.QueryRowContext(ctx, getProductByID, arg.ID, arg.OrganizationID)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Name,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1
 `
@@ -385,6 +442,21 @@ type HardDeleteCustomerParams struct {
 
 func (q *Queries) HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error {
 	_, err := q.db.ExecContext(ctx, hardDeleteCustomer, arg.ID, arg.OrganizationID)
+	return err
+}
+
+const hardDeleteProduct = `-- name: HardDeleteProduct :exec
+DELETE FROM products
+WHERE id = $1 AND organization_id = $2
+`
+
+type HardDeleteProductParams struct {
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+}
+
+func (q *Queries) HardDeleteProduct(ctx context.Context, arg HardDeleteProductParams) error {
+	_, err := q.db.ExecContext(ctx, hardDeleteProduct, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -518,6 +590,43 @@ func (q *Queries) ListOrganizations(ctx context.Context) ([]Organization, error)
 	return items, nil
 }
 
+const listProductsByOrganization = `-- name: ListProductsByOrganization :many
+SELECT id, organization_id, name, active, created_at, updated_at, deleted_at FROM products
+WHERE organization_id = $1 AND deleted_at is NULL
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListProductsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Product, error) {
+	rows, err := q.db.QueryContext(ctx, listProductsByOrganization, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Product
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.Name,
+			&i.Active,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsersByOrganization = `-- name: ListUsersByOrganization :many
 SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE organization_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC
 `
@@ -567,6 +676,21 @@ type SoftDeleteCustomerParams struct {
 
 func (q *Queries) SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error {
 	_, err := q.db.ExecContext(ctx, softDeleteCustomer, arg.ID, arg.OrganizationID)
+	return err
+}
+
+const softDeleteProduct = `-- name: SoftDeleteProduct :exec
+UPDATE products SET deleted_at = NOW()
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
+`
+
+type SoftDeleteProductParams struct {
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+}
+
+func (q *Queries) SoftDeleteProduct(ctx context.Context, arg SoftDeleteProductParams) error {
+	_, err := q.db.ExecContext(ctx, softDeleteProduct, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -698,6 +822,40 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 		&i.ExternalReference,
 		&i.Status,
 		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateProduct = `-- name: UpdateProduct :one
+UPDATE products
+SET name = $3, active = $4
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
+RETURNING id, organization_id, name, active, created_at, updated_at, deleted_at
+`
+
+type UpdateProductParams struct {
+	ID             uuid.UUID    `json:"id"`
+	OrganizationID uuid.UUID    `json:"organization_id"`
+	Name           string       `json:"name"`
+	Active         sql.NullBool `json:"active"`
+}
+
+func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error) {
+	row := q.db.QueryRowContext(ctx, updateProduct,
+		arg.ID,
+		arg.OrganizationID,
+		arg.Name,
+		arg.Active,
+	)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Name,
+		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,

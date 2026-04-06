@@ -461,6 +461,103 @@ Remove um endereço.
 
 ---
 
+### POST /v1/products
+
+Cria um novo produto para a organization autenticada.
+
+**Requisição:**
+```json
+{
+  "name": "Plano Básico",
+  "active": true
+}
+```
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440020",
+  "name": "Plano Básico",
+  "active": true,
+  "created_at": "2026-04-06T10:00:00Z",
+  "updated_at": "2026-04-06T10:00:00Z"
+}
+```
+
+---
+
+### GET /v1/products
+
+Lista todos os produtos ativos da organization autenticada.
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440020",
+    "name": "Plano Básico",
+    "active": true,
+    "created_at": "2026-04-06T10:00:00Z",
+    "updated_at": "2026-04-06T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/products/:product_id
+
+Retorna um produto pelo ID.
+
+**Resposta (200 OK):** mesmo formato do item da listagem acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "product not found"
+}
+```
+
+---
+
+### PUT /v1/products/:product_id
+
+Atualiza um produto. Todos os campos obrigatórios devem ser enviados.
+
+**Requisição:**
+```json
+{
+  "name": "Plano Básico Atualizado",
+  "active": false
+}
+```
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/products/:product_id`.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "product not found"
+}
+```
+
+---
+
+### DELETE /v1/products/:product_id
+
+Remove um produto (soft delete).
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "product not found"
+}
+```
+
+---
+
 ### POST /v1/users
 
 Cria um novo usuário na organization. Requer role `owner`. Apenas um `owner` é permitido por organization.
@@ -577,6 +674,11 @@ owner (3) > admin (2) > member (1)
 | `PUT /v1/users/:user_id` | owner |
 | `DELETE /v1/users/:user_id` | owner |
 | `GET /v1/users` | admin |
+| `POST /v1/products` | Qualquer role |
+| `GET /v1/products` | Qualquer role |
+| `GET /v1/products/:product_id` | Qualquer role |
+| `PUT /v1/products/:product_id` | Qualquer role |
+| `DELETE /v1/products/:product_id` | Qualquer role |
 | Demais rotas protegidas | Qualquer role (autenticação JWT válida) |
 
 Tokens gerados via API Key (`auth_type: "system"`) não possuem role e recebem `403 Forbidden` em endpoints que exigem role.

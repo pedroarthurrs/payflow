@@ -34,3 +34,13 @@ func CustomerID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// ProductID parses the ":product_id" path parameter as a UUID.
+func ProductID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("product_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid product id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}

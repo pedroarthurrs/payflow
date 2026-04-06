@@ -53,162 +53,186 @@ Ao adicionar novas features, preserve essa regra: a camada de serviço não deve
 
 ## Adicionando Nova Feature
 
-Exemplo: implementar CRUD de Produtos.
+Exemplo: implementar CRUD de Planos (Plans).
 
-### 1. Handler (`internal/api/handler/product.go`)
+### 1. Handler (`internal/api/handler/plan.go`)
 
 ```go
 package handler
 
 import (
+    "errors"
     "net/http"
 
     "github.com/gin-gonic/gin"
     "github.com/google/uuid"
 
+    "i9pay/internal/api/dto"
     apierr "i9pay/internal/api/err"
+    "i9pay/internal/domain"
     "i9pay/internal/service"
 )
 
-type ProductHandler struct {
-    productSvc *service.ProductService
+type PlanHandler struct {
+    planSvc *service.PlanService
 }
 
-func NewProductHandler(productSvc *service.ProductService) *ProductHandler {
-    return &ProductHandler{productSvc: productSvc}
+func NewPlanHandler(planSvc *service.PlanService) *PlanHandler {
+    return &PlanHandler{planSvc: planSvc}
 }
 
-// RegisterRoutes registra as rotas do handler no grupo fornecido.
-func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
-    products := rg.Group("/products")
-    products.POST("/", h.Create)
-    products.GET("/:id", h.Get)
+func (h *PlanHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    plans := rg.Group("/plans")
+    plans.POST("", h.Create)
+    plans.GET("", h.List)
+    plans.GET("/:plan_id", h.GetByID)
+    plans.PUT("/:plan_id", h.Update)
+    plans.DELETE("/:plan_id", h.Delete)
 }
 
-type createProductRequest struct {
-    Name  string `json:"name" binding:"required"`
-    Price int64  `json:"price" binding:"required,min=0"`
+type createPlanRequest struct {
+    Name        string `json:"name"         binding:"required"`
+    AmountCents int32  `json:"amount_cents" binding:"required,min=0"`
+    Interval    string `json:"interval"     binding:"required,oneof=monthly yearly"`
 }
 
-func (h *ProductHandler) Create(c *gin.Context) {
-    var req createProductRequest
+func (h *PlanHandler) Create(c *gin.Context) {
+    tid, ok := dto.OrganizationID(c)
+    if !ok {
+        return
+    }
+
+    var req createPlanRequest
     if err := c.ShouldBindJSON(&req); err != nil {
-        _ = c.Error(apierr.BadRequest(err.Error()))
+        _ = c.Error(err)
         return
     }
 
-    product, err := h.productSvc.Create(c.Request.Context(), req.Name, req.Price)
+    plan, err := h.planSvc.Create(c.Request.Context(), tid, domain.PlanInput{
+        Name:        req.Name,
+        AmountCents: req.AmountCents,
+        Interval:    req.Interval,
+    })
     if err != nil {
-        _ = c.Error(apierr.Internal(err.Error()))
+        _ = c.Error(err)
         return
     }
 
-    c.JSON(http.StatusCreated, product)
+    c.JSON(http.StatusCreated, plan)
 }
 
-func (h *ProductHandler) Get(c *gin.Context) {
-    id, err := uuid.Parse(c.Param("id"))
-    if err != nil {
-        _ = c.Error(apierr.BadRequest("invalid product id"))
+func (h *PlanHandler) GetByID(c *gin.Context) {
+    tid, ok := dto.OrganizationID(c)
+    if !ok {
         return
     }
 
-    product, err := h.productSvc.Get(c.Request.Context(), id)
+    id, err := uuid.Parse(c.Param("plan_id"))
     if err != nil {
-        _ = c.Error(apierr.NotFound("product not found"))
+        _ = c.Error(apierr.BadRequest("invalid plan id"))
         return
     }
 
-    c.JSON(http.StatusOK, product)
+    plan, err := h.planSvc.GetByID(c.Request.Context(), tid, id)
+    if err != nil {
+        if errors.Is(err, domain.ErrNotFound) {
+            _ = c.Error(apierr.NotFound("plan not found"))
+            return
+        }
+        _ = c.Error(err)
+        return
+    }
+
+    c.JSON(http.StatusOK, plan)
 }
 ```
 
-### 2. Service (`internal/service/product.go`)
+### 2. Service (`internal/service/plan.go`)
 
 ```go
 package service
 
 import (
     "context"
-    "time"
 
     "github.com/google/uuid"
 
     "i9pay/internal/domain"
 )
 
-type Product struct {
-    ID        uuid.UUID `json:"id"`
-    Name      string    `json:"name"`
-    Price     int64     `json:"price"`
-    CreatedAt time.Time `json:"created_at"`
+type PlanService struct {
+    plans domain.PlanRepository
 }
 
-type ProductService struct {
-    repo domain.ProductRepository
+func NewPlanService(plans domain.PlanRepository) *PlanService {
+    return &PlanService{plans: plans}
 }
 
-func NewProductService(repo domain.ProductRepository) *ProductService {
-    return &ProductService{repo: repo}
+func (s *PlanService) Create(ctx context.Context, organizationID uuid.UUID, input domain.PlanInput) (*domain.Plan, error) {
+    return s.plans.Create(ctx, organizationID, input)
 }
 
-func (s *ProductService) Create(ctx context.Context, name string, price int64) (*Product, error) {
-    // Use s.repo.Create() (implementado em database/repository)
-    return &Product{
-        ID:        uuid.New(),
-        Name:      name,
-        Price:     price,
-        CreatedAt: time.Now(),
-    }, nil
-}
-
-func (s *ProductService) Get(ctx context.Context, id uuid.UUID) (*Product, error) {
-    return s.repo.Get(ctx, id)
+func (s *PlanService) GetByID(ctx context.Context, organizationID, planID uuid.UUID) (*domain.Plan, error) {
+    return s.plans.GetByID(ctx, organizationID, planID)
 }
 ```
 
-### 3. Domain (`internal/domain/product.go`)
-
-Opcional. Use quando houver validação complexa ou modelos compartilhados entre camadas.
+### 3. Domain (`internal/domain/plan.go`)
 
 ```go
 package domain
 
-import "errors"
+import (
+    "context"
+    "time"
 
-var ErrInvalidPrice = errors.New("price must be positive")
+    "github.com/google/uuid"
+)
 
-type Product struct {
-    ID    string
-    Name  string
-    Price int64
+type PlanRepository interface {
+    Create(ctx context.Context, organizationID uuid.UUID, input PlanInput) (*Plan, error)
+    GetByID(ctx context.Context, organizationID, planID uuid.UUID) (*Plan, error)
+    List(ctx context.Context, organizationID uuid.UUID) ([]Plan, error)
+    Update(ctx context.Context, organizationID, planID uuid.UUID, input PlanInput) (*Plan, error)
+    SoftDelete(ctx context.Context, organizationID, planID uuid.UUID) error
 }
 
-func (p *Product) Validate() error {
-    if p.Price <= 0 {
-        return ErrInvalidPrice
-    }
-    return nil
+type Plan struct {
+    ID          uuid.UUID
+    ProductID   uuid.UUID
+    Name        string
+    AmountCents int32
+    Interval    string
+    Active      bool
+    CreatedAt   time.Time
+    UpdatedAt   time.Time
+}
+
+type PlanInput struct {
+    ProductID   uuid.UUID
+    Name        string
+    AmountCents int32
+    Interval    string
+    Active      bool
 }
 ```
 
 ### 4. SQL Queries (`internal/database/queries.sql`)
 
 ```sql
--- name: CreateProduct :one
-INSERT INTO products (id, organization_id, name, price, created_at)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, organization_id, name, price, created_at;
+-- name: CreatePlan :one
+INSERT INTO plans (organization_id, product_id, name, amount_cents, interval, active)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
 
--- name: GetProduct :one
-SELECT id, organization_id, name, price, created_at
-FROM products
-WHERE id = $1 AND organization_id = $2;
+-- name: GetPlanByID :one
+SELECT * FROM plans
+WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
+LIMIT 1;
 
--- name: ListProducts :many
-SELECT id, organization_id, name, price, created_at
-FROM products
-WHERE organization_id = $1
+-- name: ListPlansByOrganization :many
+SELECT * FROM plans
+WHERE organization_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC;
 ```
 
@@ -217,64 +241,55 @@ Gere o código:
 make sqlc
 ```
 
-### 5. Repository (`internal/database/repository/product_repo.go`)
+### 5. Repository (`internal/database/repository/plan.go`)
 
 ```go
 package repository
 
 import (
     "context"
+    "database/sql"
+    "errors"
 
     "github.com/google/uuid"
 
     "i9pay/internal/database/dbgen"
+    "i9pay/internal/domain"
 )
 
-type ProductRepo struct {
+type PlanRepo struct {
     q dbgen.Querier
 }
 
-func NewProductRepo(q dbgen.Querier) *ProductRepo {
-    return &ProductRepo{q: q}
+func NewPlanRepo(q dbgen.Querier) *PlanRepo {
+    return &PlanRepo{q: q}
 }
 
-func (r *ProductRepo) Get(ctx context.Context, id uuid.UUID) (*Product, error) {
-    row, err := r.q.GetProduct(ctx, id)
+func (r *PlanRepo) GetByID(ctx context.Context, organizationID, planID uuid.UUID) (*domain.Plan, error) {
+    row, err := r.q.GetPlanByID(ctx, dbgen.GetPlanByIDParams{
+        ID:             planID,
+        OrganizationID: organizationID,
+    })
     if err != nil {
-        return nil, err
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, domain.ErrNotFound
+        }
+        return nil, domain.ErrInternal
     }
-    return &Product{ID: row.ID, Name: row.Name, Price: row.Price}, nil
+    p := toDomainPlan(row)
+    return &p, nil
 }
+
+var _ domain.PlanRepository = (*PlanRepo)(nil)
 ```
 
 ### 6. Registrar no Router (`internal/api/router/router.go`)
 
-Cada handler implementa `RegisterRoutes()` para registrar suas rotas:
-
 ```go
-// O handler registra suas próprias rotas
-func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
-    products := rg.Group("/products")
-    products.POST("/", h.Create)
-    products.GET("/:id", h.Get)
-}
-
-// No router.go, basta chamar RegisterRoutes no grupo correto
-productRepo := repository.NewProductRepo(db.Queries)
-productSvc := service.NewProductService(productRepo)
-productHandler := handler.NewProductHandler(productSvc)
-productHandler.RegisterRoutes(protected)
-```
-
-Para endpoints que exigem role específico, use `middleware.RequireRole()`:
-
-```go
-func (h *ProductHandler) RegisterRoutes(rg *gin.RouterGroup) {
-    products := rg.Group("/products")
-    products.POST("/", middleware.RequireRole(domain.RoleAdmin), h.Create)
-    products.GET("/", h.List)
-    products.DELETE("/:id", middleware.RequireRole(domain.RoleOwner), h.Delete)
-}
+planRepo := repository.NewPlanRepo(db.Queries)
+planSvc := service.NewPlanService(planRepo)
+planHandler := handler.NewPlanHandler(planSvc)
+planHandler.RegisterRoutes(protected)
 ```
 
 ---

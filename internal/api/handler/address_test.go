@@ -143,6 +143,24 @@ func (m *mockQuerier) GetAPIKeyByHash(ctx context.Context, keyHash string) (dbge
 func (m *mockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
+func (m *mockQuerier) CreateProduct(ctx context.Context, arg dbgen.CreateProductParams) (dbgen.Product, error) {
+	return dbgen.Product{}, nil
+}
+func (m *mockQuerier) GetProductByID(ctx context.Context, arg dbgen.GetProductByIDParams) (dbgen.Product, error) {
+	return dbgen.Product{}, nil
+}
+func (m *mockQuerier) ListProductsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Product, error) {
+	return nil, nil
+}
+func (m *mockQuerier) UpdateProduct(ctx context.Context, arg dbgen.UpdateProductParams) (dbgen.Product, error) {
+	return dbgen.Product{}, nil
+}
+func (m *mockQuerier) SoftDeleteProduct(ctx context.Context, arg dbgen.SoftDeleteProductParams) error {
+	return nil
+}
+func (m *mockQuerier) HardDeleteProduct(ctx context.Context, arg dbgen.HardDeleteProductParams) error {
+	return nil
+}
 
 // withClaims injects JWT claims into the Gin context for testing.
 func withClaims(organizationID string) gin.HandlerFunc {
