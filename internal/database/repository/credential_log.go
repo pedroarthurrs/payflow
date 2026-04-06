@@ -10,6 +10,7 @@ import (
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
 
 // CredentialLogRepo implements domain.CredentialLogRepository backed by PostgreSQL via sqlc.
@@ -119,3 +120,45 @@ func toDomainCredentialLog(row credentiallogdb.CredentialLog) domain.CredentialL
 }
 
 var _ domain.CredentialLogRepository = (*CredentialLogRepo)(nil)
+
+// Create persists a new credential log entry.
+func (r *CredentialLogRepo) Create(ctx context.Context, input domain.CreateCredentialLogInput) error {
+	params := credentiallogdb.CreateCredentialLogParams{
+		OrganizationID: input.OrganizationID,
+	}
+	if input.CredentialID != nil {
+		params.CredentialID = uuid.NullUUID{UUID: *input.CredentialID, Valid: true}
+	}
+	if input.Method != nil {
+		params.Method = sql.NullString{String: *input.Method, Valid: true}
+	}
+	if input.Path != nil {
+		params.Path = sql.NullString{String: *input.Path, Valid: true}
+	}
+	if input.RequestBody != nil {
+		params.RequestBody = pqtype.NullRawMessage{RawMessage: input.RequestBody, Valid: true}
+	}
+	if input.ResponseBody != nil {
+		params.ResponseBody = pqtype.NullRawMessage{RawMessage: input.ResponseBody, Valid: true}
+	}
+	if input.StatusCode != nil {
+		params.StatusCode = sql.NullInt32{Int32: *input.StatusCode, Valid: true}
+	}
+	if input.LatencyMs != nil {
+		params.LatencyMs = sql.NullInt32{Int32: *input.LatencyMs, Valid: true}
+	}
+	if input.IPAddress != nil {
+		params.IpAddress = sql.NullString{String: *input.IPAddress, Valid: true}
+	}
+	if input.UserAgent != nil {
+		params.UserAgent = sql.NullString{String: *input.UserAgent, Valid: true}
+	}
+
+	if err := r.q.CreateCredentialLog(ctx, params); err != nil {
+		slog.Error("failed to create credential log", "organization_id", input.OrganizationID, "error", err)
+		return domain.ErrInternal
+	}
+	return nil
+}
+
+var _ domain.CredentialLogWriter = (*CredentialLogRepo)(nil)

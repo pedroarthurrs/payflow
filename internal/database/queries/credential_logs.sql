@@ -19,3 +19,14 @@ SELECT id, organization_id, credential_id, method, path,
        ip_address, user_agent, created_at
 FROM credential_logs
 WHERE organization_id = $1 AND id = $2;
+
+-- name: CreateCredentialLog :exec
+INSERT INTO credential_logs (
+    organization_id, credential_id, method, path,
+    request_body, response_body, status_code, latency_ms,
+    ip_address, user_agent
+) VALUES (
+    @organization_id, @credential_id, @method, @path,
+    @request_body, @response_body, @status_code, @latency_ms,
+    @ip_address, @user_agent
+);

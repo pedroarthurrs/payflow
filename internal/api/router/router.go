@@ -91,6 +91,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	// Rotas protegidas
 	protected := v1.Group("/")
 	protected.Use(middleware.Auth(tokenSvc))
+	protected.Use(middleware.CredentialLog(credentialLogRepo))
 	protected.Use(middleware.RateLimitByOrganization(organizationStore, cfg.RateLimitOrganizationMaxRequests, organizationWindow))
 
 	meHandler.RegisterRoutes(protected)

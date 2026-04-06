@@ -10,7 +10,49 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
+
+const createCredentialLog = `-- name: CreateCredentialLog :exec
+INSERT INTO credential_logs (
+    organization_id, credential_id, method, path,
+    request_body, response_body, status_code, latency_ms,
+    ip_address, user_agent
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7, $8,
+    $9, $10
+)
+`
+
+type CreateCredentialLogParams struct {
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	CredentialID   uuid.NullUUID         `json:"credential_id"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	RequestBody    pqtype.NullRawMessage `json:"request_body"`
+	ResponseBody   pqtype.NullRawMessage `json:"response_body"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+}
+
+func (q *Queries) CreateCredentialLog(ctx context.Context, arg CreateCredentialLogParams) error {
+	_, err := q.db.ExecContext(ctx, createCredentialLog,
+		arg.OrganizationID,
+		arg.CredentialID,
+		arg.Method,
+		arg.Path,
+		arg.RequestBody,
+		arg.ResponseBody,
+		arg.StatusCode,
+		arg.LatencyMs,
+		arg.IpAddress,
+		arg.UserAgent,
+	)
+	return err
+}
 
 const getCredentialLogByID = `-- name: GetCredentialLogByID :one
 SELECT id, organization_id, credential_id, method, path,

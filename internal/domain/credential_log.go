@@ -41,6 +41,25 @@ type ListCredentialLogsInput struct {
 	PathPrefix *string
 }
 
+// CreateCredentialLogInput carries all fields needed to persist a new credential log entry.
+type CreateCredentialLogInput struct {
+	OrganizationID uuid.UUID
+	CredentialID   *uuid.UUID
+	Method         *string
+	Path           *string
+	RequestBody    json.RawMessage
+	ResponseBody   json.RawMessage
+	StatusCode     *int32
+	LatencyMs      *int32
+	IPAddress      *string
+	UserAgent      *string
+}
+
+// CredentialLogWriter defines the write-only persistence operation for credential logs.
+type CredentialLogWriter interface {
+	Create(ctx context.Context, input CreateCredentialLogInput) error
+}
+
 // CredentialLogRepository defines read-only persistence operations for credential logs.
 type CredentialLogRepository interface {
 	List(ctx context.Context, orgID uuid.UUID, input ListCredentialLogsInput) ([]CredentialLogRecord, error)
