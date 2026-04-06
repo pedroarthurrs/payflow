@@ -65,3 +65,14 @@ sql:
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/credentials.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "credentialdb"
+        out: "internal/database/dbgen/credential"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true

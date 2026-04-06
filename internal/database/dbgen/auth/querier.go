@@ -11,7 +11,7 @@ import (
 )
 
 type Querier interface {
-	GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error)
+	GetAPIKeyByHash(ctx context.Context, keyHash string) (Credential, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error
 }

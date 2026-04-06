@@ -214,7 +214,7 @@ type Address struct {
 	DeletedAt      sql.NullTime    `json:"deleted_at"`
 }
 
-type ApiKey struct {
+type Credential struct {
 	ID             uuid.UUID       `json:"id"`
 	OrganizationID uuid.UUID       `json:"organization_id"`
 	Name           string          `json:"name"`
@@ -227,10 +227,10 @@ type ApiKey struct {
 	DeletedAt      sql.NullTime    `json:"deleted_at"`
 }
 
-type ApiLog struct {
+type CredentialLog struct {
 	ID             uuid.UUID             `json:"id"`
 	OrganizationID uuid.UUID             `json:"organization_id"`
-	ApiKeyID       uuid.NullUUID         `json:"api_key_id"`
+	CredentialID   uuid.NullUUID         `json:"credential_id"`
 	Method         sql.NullString        `json:"method"`
 	Path           sql.NullString        `json:"path"`
 	RequestBody    pqtype.NullRawMessage `json:"request_body"`

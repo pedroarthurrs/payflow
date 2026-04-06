@@ -12,15 +12,15 @@ import (
 )
 
 const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
-SELECT id, organization_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, deleted_at FROM api_keys
+SELECT id, organization_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, deleted_at FROM credentials
 WHERE key_hash = $1
   AND deleted_at IS NULL
   AND (expires_at IS NULL OR expires_at > NOW())
 `
 
-func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error) {
+func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (Credential, error) {
 	row := q.db.QueryRowContext(ctx, getAPIKeyByHash, keyHash)
-	var i ApiKey
+	var i Credential
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
@@ -58,7 +58,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const updateAPIKeyLastUsed = `-- name: UpdateAPIKeyLastUsed :exec
-UPDATE api_keys SET last_used_at = NOW() WHERE id = $1
+UPDATE credentials SET last_used_at = NOW() WHERE id = $1
 `
 
 func (q *Queries) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {

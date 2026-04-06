@@ -8,6 +8,7 @@ var (
 	ErrCustomerNotFound     = errors.New("customer not found")
 	ErrProductNotFound      = errors.New("product not found")
 	ErrAddressNotFound      = errors.New("address not found")
+	ErrCredentialNotFound   = errors.New("credential not found")
 	ErrUnauthorized         = errors.New("invalid credentials")
 	ErrBadRequest           = errors.New("organization_id, email and password or api_key required")
 	ErrNotFound             = errors.New("not found")

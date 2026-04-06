@@ -9,6 +9,7 @@ import (
 	"i9pay/internal/config"
 	addressdb "i9pay/internal/database/dbgen/address"
 	authdb "i9pay/internal/database/dbgen/auth"
+	credentialdb "i9pay/internal/database/dbgen/credential"
 	customerdb "i9pay/internal/database/dbgen/customer"
 	organizationdb "i9pay/internal/database/dbgen/organization"
 	productdb "i9pay/internal/database/dbgen/product"
@@ -26,6 +27,7 @@ type DB struct {
 	ProductQ      productdb.Querier
 	AuthQ         authdb.Querier
 	OrganizationQ organizationdb.Querier
+	CredentialQ   credentialdb.Querier
 }
 
 // New opens and verifies a database connection using the provided application config.
@@ -62,6 +64,7 @@ func New(cfg *config.Config) (*DB, error) {
 		ProductQ:      productdb.New(db),
 		AuthQ:         authdb.New(db),
 		OrganizationQ: organizationdb.New(db),
+		CredentialQ:   credentialdb.New(db),
 	}, nil
 }
 

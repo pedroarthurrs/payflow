@@ -229,8 +229,9 @@ func (m *mockTxManager) WithTx(ctx context.Context, fn func(tx domain.TxHandle) 
 // ============================================================
 
 type mockTxHandle struct {
-	customers domain.CustomerRepository
-	addresses domain.AddressRepository
+	customers   domain.CustomerRepository
+	addresses   domain.AddressRepository
+	credentials domain.CredentialRepository
 }
 
 var _ domain.TxHandle = (*mockTxHandle)(nil)
@@ -247,6 +248,54 @@ func (m *mockTxHandle) AddressRepo() domain.AddressRepository {
 		return m.addresses
 	}
 	return &mockAddressRepo{}
+}
+
+func (m *mockTxHandle) CredentialRepo() domain.CredentialRepository {
+	if m.credentials != nil {
+		return m.credentials
+	}
+	return &mockCredentialRepo{}
+}
+
+// ============================================================
+// Mock CredentialRepository
+// ============================================================
+
+type mockCredentialRepo struct {
+	createFn     func(ctx context.Context, orgID uuid.UUID, input domain.CreateCredentialInput) (*domain.CredentialRecord, error)
+	getByIDFn    func(ctx context.Context, orgID, credentialID uuid.UUID) (*domain.CredentialRecord, error)
+	listFn       func(ctx context.Context, orgID uuid.UUID) ([]domain.CredentialRecord, error)
+	softDeleteFn func(ctx context.Context, orgID, credentialID uuid.UUID) error
+}
+
+var _ domain.CredentialRepository = (*mockCredentialRepo)(nil)
+
+func (m *mockCredentialRepo) Create(ctx context.Context, orgID uuid.UUID, input domain.CreateCredentialInput) (*domain.CredentialRecord, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, orgID, input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockCredentialRepo) GetByID(ctx context.Context, orgID, credentialID uuid.UUID) (*domain.CredentialRecord, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, orgID, credentialID)
+	}
+	return nil, domain.ErrCredentialNotFound
+}
+
+func (m *mockCredentialRepo) List(ctx context.Context, orgID uuid.UUID) ([]domain.CredentialRecord, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, orgID)
+	}
+	return nil, nil
+}
+
+func (m *mockCredentialRepo) SoftDelete(ctx context.Context, orgID, credentialID uuid.UUID) error {
+	if m.softDeleteFn != nil {
+		return m.softDeleteFn(ctx, orgID, credentialID)
+	}
+	return nil
 }
 
 // ============================================================

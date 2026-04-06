@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS organization_configs (
 );
 
 -- Gerenciamento de acesso por ambiente.
-CREATE TABLE IF NOT EXISTS api_keys (
+CREATE TABLE IF NOT EXISTS credentials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL,
@@ -74,14 +74,14 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
-    CONSTRAINT unique_api_key_organization_id UNIQUE (organization_id, id)
+    CONSTRAINT unique_credential_organization_id UNIQUE (organization_id, id)
 );
 
 -- Monitoramento e debug do sistema.
-CREATE TABLE IF NOT EXISTS api_logs (
+CREATE TABLE IF NOT EXISTS credential_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    api_key_id UUID,       -- Chave de API utilizada na requisição.
+    credential_id UUID,    -- Credencial utilizada na requisição.
     method VARCHAR(10),    -- Método HTTP da requisição.
     path TEXT,             -- Path da rota acessada.
     request_body JSONB,
@@ -92,9 +92,9 @@ CREATE TABLE IF NOT EXISTS api_logs (
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_api_logs_api_key_organization
-        FOREIGN KEY (organization_id, api_key_id)
-        REFERENCES api_keys (organization_id, id) ON DELETE SET NULL
+    CONSTRAINT fk_credential_logs_credential_organization
+        FOREIGN KEY (organization_id, credential_id)
+        REFERENCES credentials (organization_id, id) ON DELETE SET NULL
 );
 
 -- Configuração dos webhooks.

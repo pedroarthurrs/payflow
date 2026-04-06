@@ -33,6 +33,9 @@ type Config struct {
 	// Rate limiting — Organization (protected routes)
 	RateLimitOrganizationWindowSeconds int
 	RateLimitOrganizationMaxRequests   int
+
+	// API Keys
+	APIKeyPepper string
 }
 
 // envInt reads an environment variable and converts it to int.
@@ -71,5 +74,7 @@ func Load() *Config {
 		RateLimitLoginMaxRequests:          envInt("RATE_LIMIT_LOGIN_MAX_REQUESTS", 5),
 		RateLimitOrganizationWindowSeconds: envInt("RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS", 60),
 		RateLimitOrganizationMaxRequests:   envInt("RATE_LIMIT_ORGANIZATION_MAX_REQUESTS", 200),
+
+		APIKeyPepper: os.Getenv("API_KEY_PEPPER"),
 	}
 }

@@ -13,4 +13,5 @@ type TxManager interface {
 type TxHandle interface {
 	CustomerRepo() CustomerRepository
 	AddressRepo() AddressRepository
+	CredentialRepo() CredentialRepository
 }

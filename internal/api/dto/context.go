@@ -44,3 +44,13 @@ func ProductID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// CredentialID parses the ":credential_id" path parameter as a UUID.
+func CredentialID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("credential_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid credential id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}
