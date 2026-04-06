@@ -88,13 +88,13 @@ Gera:
 
 ### `make sqlc`
 
-Gera código Go a partir das queries SQL em `internal/database/queries.sql`.
+Gera código Go a partir das queries SQL em `internal/database/queries/`.
 
 ```bash
 make sqlc
 ```
 
-Atualiza `internal/database/dbgen/*.go`. Execute sempre que escrever uma nova query ou alterar o schema.
+Atualiza `internal/database/dbgen/<domain>/*.go`. Cada domínio tem seu próprio subpacote. Execute sempre que escrever uma nova query ou alterar o schema.
 
 ---
 
@@ -230,7 +230,7 @@ make migrate-create name=add_products_table
 # 4. Aplique a migration
 make migrate-up
 
-# 5. Escreva a query em internal/database/queries.sql
+# 5. Escreva a query em internal/database/queries/<domain>.sql
 
 # 6. Gere o código Go
 make sqlc

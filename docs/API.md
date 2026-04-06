@@ -558,6 +558,166 @@ Remove um produto (soft delete).
 
 ---
 
+### POST /v1/credentials
+
+Cria uma nova API Key para a organization autenticada. Requer role `admin` ou superior.
+
+A chave bruta (`raw_key`) é retornada **apenas nesta resposta** e nunca é armazenada. Guarde-a imediatamente.
+
+**Requisição:**
+```json
+{
+  "name": "Integração ERP",
+  "environment": "production",
+  "expires_at": "2027-01-01T00:00:00Z"
+}
+```
+
+`environment` deve ser `test` ou `production`. `expires_at` é opcional.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440030",
+  "name": "Integração ERP",
+  "key_prefix": "I9LIVE_abc",
+  "environment": "production",
+  "expires_at": "2027-01-01T00:00:00Z",
+  "created_at": "2026-04-06T10:00:00Z",
+  "raw_key": "I9LIVE_abc123...",
+  "warning": "Guarde esta chave agora. Ela não poderá ser recuperada novamente."
+}
+```
+
+---
+
+### GET /v1/credentials
+
+Lista todas as credenciais ativas da organization. Requer role `admin` ou superior.
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440030",
+    "name": "Integração ERP",
+    "key_prefix": "I9LIVE_abc",
+    "environment": "production",
+    "last_used_at": "2026-04-06T09:00:00Z",
+    "expires_at": "2027-01-01T00:00:00Z",
+    "created_at": "2026-04-06T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/credentials/:credential_id
+
+Retorna uma credencial pelo ID. Requer role `admin` ou superior.
+
+**Resposta (200 OK):** mesmo formato de um item da listagem acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "credential not found"
+}
+```
+
+---
+
+### DELETE /v1/credentials/:credential_id
+
+Revoga uma credencial (soft delete). Requer role `owner`.
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "credential not found"
+}
+```
+
+---
+
+### POST /v1/credentials/:credential_id/rotate
+
+Revoga a credencial atual e emite uma nova com os mesmos metadados, atomicamente. Requer role `owner`.
+
+**Resposta (201 Created):** mesmo formato do `POST /v1/credentials`, incluindo `raw_key` e `warning`.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "credential not found"
+}
+```
+
+---
+
+### GET /v1/credentials/logs
+
+Lista os logs de requisições autenticadas via API Key da organization. Requer role `admin` ou superior.
+
+Suporta paginação por cursor e filtros opcionais.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `cursor` | string | Cursor opaco da página anterior |
+| `from` | string | Timestamp ISO 8601 (início do intervalo) |
+| `to` | string | Timestamp ISO 8601 (fim do intervalo) |
+| `status_code` | int | Filtrar por código de status HTTP |
+| `method` | string | Filtrar por método HTTP (GET, POST, etc.) |
+| `path` | string | Filtrar por prefixo de path |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440040",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "credential_id": "550e8400-e29b-41d4-a716-446655440030",
+      "method": "POST",
+      "path": "/v1/customers",
+      "request_body": { "name": "João" },
+      "response_body": { "id": "..." },
+      "status_code": 201,
+      "latency_ms": 42,
+      "ip_address": "203.0.113.1",
+      "user_agent": "MyApp/1.0",
+      "created_at": "2026-04-06T10:05:00Z"
+    }
+  ],
+  "next_cursor": "eyJ0IjoiMjAyNi0wNC0wNlQxMDowNTowMFoiLCJpIjoiNTUwZTg0MDAifQ",
+  "limit": 20
+}
+```
+
+Quando não há próxima página, `next_cursor` é `null`.
+
+---
+
+### GET /v1/credentials/logs/:log_id
+
+Retorna um log específico pelo ID. Requer role `admin` ou superior.
+
+**Resposta (200 OK):** mesmo formato de um item do array `data` acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "credential log not found"
+}
+```
+
+---
+
 ### POST /v1/users
 
 Cria um novo usuário na organization. Requer role `owner`. Apenas um `owner` é permitido por organization.
@@ -674,6 +834,13 @@ owner (3) > admin (2) > member (1)
 | `PUT /v1/users/:user_id` | owner |
 | `DELETE /v1/users/:user_id` | owner |
 | `GET /v1/users` | admin |
+| `POST /v1/credentials` | admin |
+| `GET /v1/credentials` | admin |
+| `GET /v1/credentials/:credential_id` | admin |
+| `DELETE /v1/credentials/:credential_id` | owner |
+| `POST /v1/credentials/:credential_id/rotate` | owner |
+| `GET /v1/credentials/logs` | admin |
+| `GET /v1/credentials/logs/:log_id` | admin |
 | `POST /v1/products` | Qualquer role |
 | `GET /v1/products` | Qualquer role |
 | `GET /v1/products/:product_id` | Qualquer role |
@@ -865,6 +1032,20 @@ curl http://localhost:8080/v1/me \
 curl -X POST http://localhost:8080/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refresh_token": "$REFRESH_TOKEN"}'
+```
+
+### Criar credencial
+```bash
+curl -X POST http://localhost:8080/v1/credentials \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Integração ERP", "environment": "production"}'
+```
+
+### Listar logs de credencial
+```bash
+curl "http://localhost:8080/v1/credentials/logs?limit=20" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ### Extraindo tokens com jq

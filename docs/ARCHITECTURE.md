@@ -71,6 +71,7 @@ Resposta JSON
 
 **Middleware** (`api/middleware/`)
 - `auth.go`: valida JWT e extrai claims
+- `credential_log.go`: intercepta requisições autenticadas via API Key e persiste log assíncrono
 - `errors.go`: transforma erros de domínio em respostas HTTP
 - `ratelimit.go`: rate limiting por IP e organization
 - `requestid.go`: gera e propaga UUID v4 por requisição
@@ -125,8 +126,23 @@ Resposta JSON
 - Hard delete para remoção permanente (com log de auditoria via slog)
 - Depende de `domain.ProductRepository`
 - Isolamento multi-organization
-- `subscription.go` — lógica de assinaturas
-- `invoice.go` — geração de faturas
+
+**CredentialService** (`service/credential.go`)
+- Criação de API Keys com geração de chave aleatória (prefixo `sk_test_` / `sk_live_`)
+- Armazena apenas o hash SHA-256 da chave (raw key nunca persiste)
+- Rotação de credencial: invalida a anterior e emite nova chave
+- Revogação (soft delete) por organization
+- Listagem e consulta por ID
+- Depende de `domain.CredentialRepository`
+- Isolamento multi-organization
+
+**CredentialLogService** (`service/credential_log.go`)
+- Listagem paginada de logs com keyset pagination (cursor-based)
+- Filtros: `from`, `to`, `status_code`, `method`, `path`
+- Consulta por ID
+- Codificação/decodificação de cursor opaco (base64 + JSON)
+- Depende de `domain.CredentialLogRepository`
+- Isolamento multi-organization
 
 ---
 
@@ -140,6 +156,8 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `customer.go`: `CustomerRepository`, modelo Customer, inputs de criação e atualização
 - `address.go`: `AddressRepository`, modelo Address, inputs de criação e atualização
 - `product.go`: `ProductRepository`, modelo Product, ProductInput
+- `credential.go`: `CredentialRepository`, `CredentialRecord`, `CreateCredentialInput`
+- `credential_log.go`: `CredentialLogRepository`, `CredentialLogWriter`, `CredentialLogRecord`, `CreateCredentialLogInput`, `ListCredentialLogsInput`, `CursorToken`
 - `tx.go`: contratos transacionais (`TxManager`, `TxHandle`)
 - `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
 
@@ -161,17 +179,30 @@ owner (3) > admin (2) > member (1)
 - Expõe interface para queries via SQLC
 
 **Código gerado pelo SQLC** (`database/dbgen/`)
-- `db.go`: configuração do banco
-- `models.go`: structs geradas a partir do schema
-- `queries.sql.go`: implementação type-safe das queries
+
+Cada domínio possui seu próprio subpacote gerado, mantendo isolamento e evitando conflitos de nomes:
+
+| Subpacote | Domínio |
+|-----------|---------|
+| `dbgen/address` | Endereços |
+| `dbgen/auth` | Autenticação |
+| `dbgen/credential` | Credenciais (API Keys) |
+| `dbgen/credentiallog` | Logs de credenciais |
+| `dbgen/customer` | Clientes |
+| `dbgen/organization` | Organizations |
+| `dbgen/product` | Produtos |
+| `dbgen/user` | Usuários |
+
+Cada subpacote contém: `db.go`, `models.go`, `querier.go` e `<domain>.sql.go`.
 
 **Repositórios** (`database/repository/`)
 - Implementam os contratos da camada de domínio
 - Encapsulam acesso ao SQLC e mapeamento de erros
 - Incluem gerenciador transacional (`TxManager`) para casos atômicos
 
-**SQL** (`database/queries.sql`)
-- Queries neste arquivo geram código Go via `make sqlc`
+**SQL** (`database/queries/`)
+- Um arquivo `.sql` por domínio (ex: `credentials.sql`, `credential_logs.sql`)
+- Queries geram código Go via `make sqlc`
 - Versionadas junto com as migrations
 
 ---
@@ -213,11 +244,13 @@ A ordem de middleware é crítica para segurança e observabilidade:
 1. Recovery()                    — captura panics
 2. RequestID()                   — gera/propaga X-Request-ID (UUID v4)
 3. StructuredLogger()            — registra requisição com slog
-4. Errors()                      — serializa erros para JSON
-5. RateLimitByIP()               — limita por IP (grupo v1)
-6. Auth()                        — valida JWT (grupo protegido)
-7. RateLimitByOrganization()     — limita por organization (grupo protegido)
-8. RequireRole()                 — RBAC por endpoint (onde aplicável)
+4. Maintenance()                 — bloqueia tráfego em modo manutenção
+5. Errors()                      — serializa erros para JSON
+6. RateLimitByIP()               — limita por IP (grupo v1)
+7. Auth()                        — valida JWT (grupo protegido)
+8. CredentialLog()               — persiste log assíncrono para auth_type=system
+9. RateLimitByOrganization()     — limita por organization (grupo protegido)
+10. RequireRole()                — RBAC por endpoint (onde aplicável)
 ```
 
 ### RBAC (Role-Based Access Control)
@@ -288,11 +321,13 @@ Sem framework de injeção de dependências. Dependências são passadas explici
 
 ```go
 tokenSvc := token.NewService(secret, ttl1, ttl2)
-customerRepo := repository.NewCustomerRepo(db.Queries)
-addressRepo := repository.NewAddressRepo(db.Queries)
-productRepo := repository.NewProductRepo(db.Queries)
-userRepo := repository.NewUserRepo(db.Queries)
-authRepo := repository.NewAuthRepo(db.Queries)
+customerRepo := repository.NewCustomerRepo(db.CustomerQ)
+addressRepo := repository.NewAddressRepo(db.AddressQ)
+productRepo := repository.NewProductRepo(db.ProductQ)
+userRepo := repository.NewUserRepo(db.UserQ)
+authRepo := repository.NewAuthRepo(db.AuthQ)
+credentialRepo := repository.NewCredentialRepo(db.CredentialQ)
+credentialLogRepo := repository.NewCredentialLogRepo(db.CredentialLogQ)
 txManager := repository.NewTxManager(db)
 
 authSvc := service.NewAuthService(tokenSvc, authRepo)
@@ -300,8 +335,8 @@ customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
 addressSvc := service.NewAddressService(customerRepo, addressRepo)
 productSvc := service.NewProductService(productRepo)
 userSvc := service.NewUserService(userRepo)
-
-authHandler := handler.NewAuthHandler(authSvc, loginRL)
+credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
+credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
 
 // Cada handler registra suas próprias rotas
 authHandler.RegisterRoutes(v1)
@@ -309,6 +344,8 @@ customerHandler.RegisterRoutes(protected)
 addressHandler.RegisterRoutes(protected)
 productHandler.RegisterRoutes(protected)
 userHandler.RegisterRoutes(protected)
+credentialHandler.RegisterRoutes(protected)
+credentialLogHandler.RegisterRoutes(protected)
 ```
 
 ### Tratamento de Erros
@@ -344,10 +381,10 @@ internal/
 
 ### Usando queries geradas pelo SQLC
 
-1. Escreva a query em `internal/database/queries.sql`:
+1. Escreva a query no arquivo correspondente em `internal/database/queries/` (ex: `plans.sql`):
 ```sql
--- name: GetProduct :one
-SELECT id, name, price FROM products WHERE id = $1;
+-- name: GetPlan :one
+SELECT id, name FROM plans WHERE id = $1;
 ```
 
 2. Gere o código:
@@ -355,18 +392,18 @@ SELECT id, name, price FROM products WHERE id = $1;
 make sqlc
 ```
 
-3. Implemente o repositório em `internal/database/repository/` usando o código gerado:
+3. Implemente o repositório em `internal/database/repository/` usando o subpacote gerado:
 ```go
-type ProductRepo struct {
-    q dbgen.Querier
+type PlanRepo struct {
+    q plandb.Querier
 }
 
-func (r *ProductRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
-    row, err := r.q.GetProduct(ctx, id)
+func (r *PlanRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Plan, error) {
+    row, err := r.q.GetPlan(ctx, id)
     if err != nil {
         return nil, err
     }
-    return &domain.Product{ID: row.ID, Name: row.Name}, nil
+    return &domain.Plan{ID: row.ID, Name: row.Name}, nil
 }
 ```
 
@@ -382,8 +419,10 @@ func (r *ProductRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Produc
 - Middleware `Recovery` captura panics
 - RBAC com hierarquia de roles (owner > admin > member)
 - Senhas armazenadas com bcrypt (cost 12)
-- API Keys validadas via hash SHA-256
+- API Keys validadas via hash SHA-256 com pepper (`API_KEY_PEPPER`)
+- Raw key nunca persiste — apenas o hash é armazenado
 - Bloqueio de criação de segundo owner por organization
+- Audit trail assíncrono para todas as requisições autenticadas via API Key
 
 ---
 

@@ -4,12 +4,13 @@ Documentação das capacidades de segurança e observabilidade implementadas na 
 
 ## Visão Geral
 
-Três capacidades transversais são aplicadas via middleware:
+Cinco capacidades transversais são aplicadas via middleware:
 
 1. Rate Limiting — proteção contra abuso e força bruta com 3 tiers configuráveis
 2. Logging Estruturado — logs com `log/slog` (JSON em produção, texto em desenvolvimento)
 3. Tradução de Erros de Validação — mensagens legíveis para erros de entrada
 4. RBAC — controle de acesso baseado em roles (owner > admin > member)
+5. Credential Log — audit trail assíncrono para requisições autenticadas via API Key
 
 ---
 
@@ -245,11 +246,13 @@ A ordem de middleware é crítica para segurança e observabilidade:
 1. Recovery()                    — captura panics
 2. RequestID()                   — gera/propaga X-Request-ID
 3. StructuredLogger()            — registra requisição
-4. Errors()                      — serializa erros para JSON
-5. RateLimitByIP()               — limita por IP (grupo v1)
-6. Auth()                        — valida JWT (grupo protegido)
-7. RateLimitByOrganization()     — limita por organization (grupo protegido)
-8. RequireRole()                 — RBAC por endpoint (onde aplicável)
+4. Maintenance()                 — bloqueia tráfego em modo manutenção
+5. Errors()                      — serializa erros para JSON
+6. RateLimitByIP()               — limita por IP (grupo v1)
+7. Auth()                        — valida JWT (grupo protegido)
+8. CredentialLog()               — persiste log assíncrono para auth_type=system
+9. RateLimitByOrganization()     — limita por organization (grupo protegido)
+10. RequireRole()                — RBAC por endpoint (onde aplicável)
 ```
 
 ---
@@ -287,6 +290,13 @@ O middleware `RequireRole(minRole)` verifica:
 | `PUT /v1/users/:user_id` | owner |
 | `DELETE /v1/users/:user_id` | owner |
 | `GET /v1/users` | admin |
+| `POST /v1/credentials` | admin |
+| `GET /v1/credentials` | admin |
+| `GET /v1/credentials/:credential_id` | admin |
+| `DELETE /v1/credentials/:credential_id` | owner |
+| `POST /v1/credentials/:credential_id/rotate` | owner |
+| `GET /v1/credentials/logs` | admin |
+| `GET /v1/credentials/logs/:log_id` | admin |
 
 ### Respostas de Erro
 
@@ -313,6 +323,51 @@ O middleware `RequireRole(minRole)` verifica:
 
 ---
 
+## Credential Log (Audit Trail)
+
+### Propósito
+
+Registrar todas as requisições autenticadas via API Key (`auth_type: "system"`) para auditoria e rastreabilidade.
+
+### Funcionamento
+
+**Arquivo:** `internal/api/middleware/credential_log.go`
+
+O middleware `CredentialLog(writer)` é aplicado no grupo protegido, após `Auth()`:
+
+1. Verifica se `auth_type == "system"` nos claims JWT — ignora requisições de usuário
+2. Captura método, path, IP, User-Agent e corpo da requisição (até 64 KB, somente JSON válido)
+3. Envolve o `ResponseWriter` para capturar o corpo da resposta
+4. Após `c.Next()`, coleta status code, latência e corpo da resposta
+5. Persiste o log **assincronamente** via goroutine — sem impacto na latência da requisição
+
+### Campos Registrados
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `organization_id` | UUID | Organization autenticada |
+| `credential_id` | UUID? | ID da credencial usada (extraído do claim `sub`) |
+| `method` | string? | Método HTTP |
+| `path` | string? | Path da requisição |
+| `request_body` | JSON? | Corpo da requisição (máx 64 KB) |
+| `response_body` | JSON? | Corpo da resposta (máx 64 KB) |
+| `status_code` | int? | Código de status HTTP |
+| `latency_ms` | int? | Latência em milissegundos |
+| `ip_address` | string? | IP do cliente |
+| `user_agent` | string? | User-Agent do cliente |
+
+### Consulta dos Logs
+
+Os logs são acessíveis via `GET /v1/credentials/logs` com suporte a:
+- Paginação por cursor (keyset pagination — cursor opaco base64+JSON)
+- Filtros: `from`, `to`, `status_code`, `method`, `path`
+
+### Configuração
+
+Nenhuma variável de ambiente adicional. O middleware é ativado automaticamente para todas as rotas protegidas quando a aplicação inicia.
+
+---
+
 ## Configuração Completa
 
 ```env
@@ -327,6 +382,9 @@ RATE_LIMIT_LOGIN_MAX_REQUESTS=5
 # Rate Limiting — Organization (rotas protegidas)
 RATE_LIMIT_ORGANIZATION_WINDOW_SECONDS=60
 RATE_LIMIT_ORGANIZATION_MAX_REQUESTS=200
+
+# Segurança de API Keys
+API_KEY_PEPPER=your-pepper-secret-change-me
 ```
 
 ---
@@ -345,6 +403,9 @@ go test ./internal/api/middleware -run TestRequestID
 
 # Logger
 go test ./internal/api/middleware -run TestStructuredLogger
+
+# Credential Log
+go test ./internal/api/middleware -run TestCredentialLog
 
 # RBAC
 go test ./internal/api/middleware -run TestRequireRole

@@ -217,7 +217,7 @@ type PlanInput struct {
 }
 ```
 
-### 4. SQL Queries (`internal/database/queries.sql`)
+### 4. SQL Queries (`internal/database/queries/plan.sql`)
 
 ```sql
 -- name: CreatePlan :one
@@ -253,20 +253,20 @@ import (
 
     "github.com/google/uuid"
 
-    "i9pay/internal/database/dbgen"
+    plandb "i9pay/internal/database/dbgen/plan"
     "i9pay/internal/domain"
 )
 
 type PlanRepo struct {
-    q dbgen.Querier
+    q plandb.Querier
 }
 
-func NewPlanRepo(q dbgen.Querier) *PlanRepo {
+func NewPlanRepo(q plandb.Querier) *PlanRepo {
     return &PlanRepo{q: q}
 }
 
 func (r *PlanRepo) GetByID(ctx context.Context, organizationID, planID uuid.UUID) (*domain.Plan, error) {
-    row, err := r.q.GetPlanByID(ctx, dbgen.GetPlanByIDParams{
+    row, err := r.q.GetPlanByID(ctx, plandb.GetPlanByIDParams{
         ID:             planID,
         OrganizationID: organizationID,
     })
@@ -286,7 +286,7 @@ var _ domain.PlanRepository = (*PlanRepo)(nil)
 ### 6. Registrar no Router (`internal/api/router/router.go`)
 
 ```go
-planRepo := repository.NewPlanRepo(db.Queries)
+planRepo := repository.NewPlanRepo(db.PlanQ)
 planSvc := service.NewPlanService(planRepo)
 planHandler := handler.NewPlanHandler(planSvc)
 planHandler.RegisterRoutes(protected)
