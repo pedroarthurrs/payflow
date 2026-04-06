@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"i9pay/internal/database/dbgen"
+	addressdb "i9pay/internal/database/dbgen/address"
 
 	"github.com/sqlc-dev/pqtype"
 )
@@ -33,10 +33,10 @@ func toNullRawMessage(data json.RawMessage) pqtype.NullRawMessage {
 	return pqtype.NullRawMessage{RawMessage: data, Valid: true}
 }
 
-// toNullAddressType converts a *string to dbgen.NullAddressType.
-func toNullAddressType(s *string) dbgen.NullAddressType {
+// toNullAddressType converts a *string to addressdb.NullAddressType.
+func toNullAddressType(s *string) addressdb.NullAddressType {
 	if s == nil {
-		return dbgen.NullAddressType{}
+		return addressdb.NullAddressType{}
 	}
-	return dbgen.NullAddressType{AddressType: dbgen.AddressType(*s), Valid: true}
+	return addressdb.NullAddressType{AddressType: addressdb.AddressType(*s), Valid: true}
 }

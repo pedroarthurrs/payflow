@@ -7,15 +7,25 @@ import (
 	"time"
 
 	"i9pay/internal/config"
-	"i9pay/internal/database/dbgen"
+	addressdb "i9pay/internal/database/dbgen/address"
+	authdb "i9pay/internal/database/dbgen/auth"
+	customerdb "i9pay/internal/database/dbgen/customer"
+	organizationdb "i9pay/internal/database/dbgen/organization"
+	productdb "i9pay/internal/database/dbgen/product"
+	userdb "i9pay/internal/database/dbgen/user"
 
 	_ "github.com/lib/pq"
 )
 
-// DB wraps *sql.DB and exposes type-safe SQLC queries via the Queries field.
+// DB wraps *sql.DB and exposes type-safe SQLC queries separated by domain.
 type DB struct {
 	*sql.DB
-	Queries dbgen.Querier
+	CustomerQ     customerdb.Querier
+	AddressQ      addressdb.Querier
+	UserQ         userdb.Querier
+	ProductQ      productdb.Querier
+	AuthQ         authdb.Querier
+	OrganizationQ organizationdb.Querier
 }
 
 // New opens and verifies a database connection using the provided application config.
@@ -45,8 +55,13 @@ func New(cfg *config.Config) (*DB, error) {
 	}
 
 	return &DB{
-		DB:      db,
-		Queries: dbgen.New(db),
+		DB:            db,
+		CustomerQ:     customerdb.New(db),
+		AddressQ:      addressdb.New(db),
+		UserQ:         userdb.New(db),
+		ProductQ:      productdb.New(db),
+		AuthQ:         authdb.New(db),
+		OrganizationQ: organizationdb.New(db),
 	}, nil
 }
 

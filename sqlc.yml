@@ -1,12 +1,67 @@
 version: "2"
 sql:
-  - schema: "migrations"
-    queries: "internal/database/queries.sql"
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/organization.sql"
     engine: "postgresql"
     gen:
       go:
-        package: "dbgen"
-        out: "internal/database/dbgen"
+        package: "organizationdb"
+        out: "internal/database/dbgen/organization"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/customer.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "customerdb"
+        out: "internal/database/dbgen/customer"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/address.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "addressdb"
+        out: "internal/database/dbgen/address"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/user.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "userdb"
+        out: "internal/database/dbgen/user"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/product.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "productdb"
+        out: "internal/database/dbgen/product"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/auth.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "authdb"
+        out: "internal/database/dbgen/auth"
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true

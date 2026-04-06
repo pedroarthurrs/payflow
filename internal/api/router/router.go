@@ -43,11 +43,11 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	organizationWindow := time.Duration(cfg.RateLimitOrganizationWindowSeconds) * time.Second
 
 	// Repositories
-	customerRepo := repository.NewCustomerRepo(db.Queries)
-	addressRepo := repository.NewAddressRepo(db.Queries)
-	productRepo := repository.NewProductRepo(db.Queries)
-	userRepo := repository.NewUserRepo(db.Queries)
-	authRepo := repository.NewAuthRepo(db.Queries)
+	customerRepo := repository.NewCustomerRepo(db.CustomerQ)
+	addressRepo := repository.NewAddressRepo(db.AddressQ)
+	productRepo := repository.NewProductRepo(db.ProductQ)
+	userRepo := repository.NewUserRepo(db.UserQ)
+	authRepo := repository.NewAuthRepo(db.AuthQ)
 	txManager := repository.NewTxManager(db)
 
 	// Services

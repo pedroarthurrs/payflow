@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.30.0
 
-package dbgen
+package organizationdb
 
 import (
 	"context"

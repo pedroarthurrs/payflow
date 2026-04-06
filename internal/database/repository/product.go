@@ -6,7 +6,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"i9pay/internal/database/dbgen"
+	productdb "i9pay/internal/database/dbgen/product"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -15,17 +15,17 @@ import (
 
 // ProductRepo implements domain.ProductRepository backed by PostgreSQL via sqlc.
 type ProductRepo struct {
-	q dbgen.Querier
+	q productdb.Querier
 }
 
 // NewProductRepo creates a ProductRepo.
-func NewProductRepo(q dbgen.Querier) *ProductRepo {
+func NewProductRepo(q productdb.Querier) *ProductRepo {
 	return &ProductRepo{q: q}
 }
 
 // Create persists a new product in an organization.
 func (r *ProductRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.ProductInput) (*domain.Product, error) {
-	row, err := r.q.CreateProduct(ctx, dbgen.CreateProductParams{
+	row, err := r.q.CreateProduct(ctx, productdb.CreateProductParams{
 		OrganizationID: organizationID,
 		Name:           input.Name,
 		Active:         sql.NullBool{Bool: input.Active, Valid: true},
@@ -53,7 +53,7 @@ func (r *ProductRepo) List(ctx context.Context, organizationID uuid.UUID) ([]dom
 
 // GetByID retrieves a product by ID scoped to an organization.
 func (r *ProductRepo) GetByID(ctx context.Context, organizationID, productID uuid.UUID) (*domain.Product, error) {
-	row, err := r.q.GetProductByID(ctx, dbgen.GetProductByIDParams{
+	row, err := r.q.GetProductByID(ctx, productdb.GetProductByIDParams{
 		ID:             productID,
 		OrganizationID: organizationID,
 	})
@@ -70,7 +70,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, organizationID, productID uui
 
 // Update updates a product scoped to an organization.
 func (r *ProductRepo) Update(ctx context.Context, organizationID, productID uuid.UUID, input domain.ProductInput) (*domain.Product, error) {
-	row, err := r.q.UpdateProduct(ctx, dbgen.UpdateProductParams{
+	row, err := r.q.UpdateProduct(ctx, productdb.UpdateProductParams{
 		ID:             productID,
 		OrganizationID: organizationID,
 		Name:           input.Name,
@@ -89,7 +89,7 @@ func (r *ProductRepo) Update(ctx context.Context, organizationID, productID uuid
 // SoftDelete marks a product as deleted without removing the record.
 func (r *ProductRepo) SoftDelete(ctx context.Context, organizationID, productID uuid.UUID) error {
 	// Verify existence first (SoftDeleteProduct is :exec)
-	_, err := r.q.GetProductByID(ctx, dbgen.GetProductByIDParams{
+	_, err := r.q.GetProductByID(ctx, productdb.GetProductByIDParams{
 		ID:             productID,
 		OrganizationID: organizationID,
 	})
@@ -101,7 +101,7 @@ func (r *ProductRepo) SoftDelete(ctx context.Context, organizationID, productID 
 		return domain.ErrInternal
 	}
 
-	if err := r.q.SoftDeleteProduct(ctx, dbgen.SoftDeleteProductParams{
+	if err := r.q.SoftDeleteProduct(ctx, productdb.SoftDeleteProductParams{
 		ID:             productID,
 		OrganizationID: organizationID,
 	}); err != nil {
@@ -113,7 +113,7 @@ func (r *ProductRepo) SoftDelete(ctx context.Context, organizationID, productID 
 
 // HardDelete permanently removes a product from the organization.
 func (r *ProductRepo) HardDelete(ctx context.Context, organizationID, productID uuid.UUID) error {
-	if err := r.q.HardDeleteProduct(ctx, dbgen.HardDeleteProductParams{
+	if err := r.q.HardDeleteProduct(ctx, productdb.HardDeleteProductParams{
 		ID:             productID,
 		OrganizationID: organizationID,
 	}); err != nil {
@@ -134,8 +134,8 @@ func mapProductWriteError(err error) error {
 	return domain.ErrInternal
 }
 
-// toDomainProduct converts a dbgen.Product to a domain.Product.
-func toDomainProduct(row dbgen.Product) domain.Product {
+// toDomainProduct converts a productdb.Product to a domain.Product.
+func toDomainProduct(row productdb.Product) domain.Product {
 	c := domain.Product{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

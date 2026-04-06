@@ -7,7 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"i9pay/internal/database/dbgen"
+	customerdb "i9pay/internal/database/dbgen/customer"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -16,17 +16,17 @@ import (
 
 // CustomerRepo implements domain.CustomerRepository backed by PostgreSQL via sqlc.
 type CustomerRepo struct {
-	q dbgen.Querier
+	q customerdb.Querier
 }
 
 // NewCustomerRepo creates a CustomerRepo.
-func NewCustomerRepo(q dbgen.Querier) *CustomerRepo {
+func NewCustomerRepo(q customerdb.Querier) *CustomerRepo {
 	return &CustomerRepo{q: q}
 }
 
 // Create persists a new customer in an organization.
 func (r *CustomerRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
-	row, err := r.q.CreateCustomer(ctx, dbgen.CreateCustomerParams{
+	row, err := r.q.CreateCustomer(ctx, customerdb.CreateCustomerParams{
 		OrganizationID: organizationID,
 		Name:           input.Name,
 		Email:          input.Email,
@@ -44,7 +44,7 @@ func (r *CustomerRepo) Create(ctx context.Context, organizationID uuid.UUID, inp
 
 // GetByID retrieves a customer by ID scoped to an organization.
 func (r *CustomerRepo) GetByID(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.Customer, error) {
-	row, err := r.q.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
+	row, err := r.q.GetCustomerByID(ctx, customerdb.GetCustomerByIDParams{
 		ID:             customerID,
 		OrganizationID: organizationID,
 	})
@@ -75,7 +75,7 @@ func (r *CustomerRepo) List(ctx context.Context, organizationID uuid.UUID) ([]do
 
 // Update updates a customer scoped to an organization.
 func (r *CustomerRepo) Update(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error) {
-	row, err := r.q.UpdateCustomer(ctx, dbgen.UpdateCustomerParams{
+	row, err := r.q.UpdateCustomer(ctx, customerdb.UpdateCustomerParams{
 		ID:             customerID,
 		OrganizationID: organizationID,
 		Name:           input.Name,
@@ -98,7 +98,7 @@ func (r *CustomerRepo) Update(ctx context.Context, organizationID, customerID uu
 // SoftDelete marks a customer as deleted without removing the record.
 func (r *CustomerRepo) SoftDelete(ctx context.Context, organizationID, customerID uuid.UUID) error {
 	// Verify existence first (SoftDeleteCustomer is :exec)
-	_, err := r.q.GetCustomerByID(ctx, dbgen.GetCustomerByIDParams{
+	_, err := r.q.GetCustomerByID(ctx, customerdb.GetCustomerByIDParams{
 		ID:             customerID,
 		OrganizationID: organizationID,
 	})
@@ -110,7 +110,7 @@ func (r *CustomerRepo) SoftDelete(ctx context.Context, organizationID, customerI
 		return domain.ErrInternal
 	}
 
-	if err := r.q.SoftDeleteCustomer(ctx, dbgen.SoftDeleteCustomerParams{
+	if err := r.q.SoftDeleteCustomer(ctx, customerdb.SoftDeleteCustomerParams{
 		ID:             customerID,
 		OrganizationID: organizationID,
 	}); err != nil {
@@ -122,7 +122,7 @@ func (r *CustomerRepo) SoftDelete(ctx context.Context, organizationID, customerI
 
 // HardDelete permanently removes a customer from the organization.
 func (r *CustomerRepo) HardDelete(ctx context.Context, organizationID, customerID uuid.UUID) error {
-	if err := r.q.HardDeleteCustomer(ctx, dbgen.HardDeleteCustomerParams{
+	if err := r.q.HardDeleteCustomer(ctx, customerdb.HardDeleteCustomerParams{
 		ID:             customerID,
 		OrganizationID: organizationID,
 	}); err != nil {
@@ -148,8 +148,8 @@ func mapCustomerWriteError(err error) error {
 	return domain.ErrInternal
 }
 
-// toDomainCustomer converts a dbgen.Customer to a domain.Customer.
-func toDomainCustomer(row dbgen.Customer) domain.Customer {
+// toDomainCustomer converts a customerdb.Customer to a domain.Customer.
+func toDomainCustomer(row customerdb.Customer) domain.Customer {
 	c := domain.Customer{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

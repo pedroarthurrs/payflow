@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"i9pay/internal/database/dbgen"
+	authdb "i9pay/internal/database/dbgen/auth"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -13,11 +13,11 @@ import (
 
 // AuthRepo implements domain.AuthRepository backed by PostgreSQL via sqlc.
 type AuthRepo struct {
-	q dbgen.Querier
+	q authdb.Querier
 }
 
 // NewAuthRepo creates an AuthRepo.
-func NewAuthRepo(q dbgen.Querier) *AuthRepo {
+func NewAuthRepo(q authdb.Querier) *AuthRepo {
 	return &AuthRepo{q: q}
 }
 

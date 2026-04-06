@@ -14,7 +14,8 @@ import (
 	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
 	"i9pay/internal/auth/token"
-	"i9pay/internal/database/dbgen"
+	addressdb "i9pay/internal/database/dbgen/address"
+	customerdb "i9pay/internal/database/dbgen/customer"
 	"i9pay/internal/database/repository"
 	"i9pay/internal/service"
 
@@ -23,142 +24,90 @@ import (
 	"pgregory.net/rapid"
 )
 
-// mockQuerier implements dbgen.Querier for handler tests.
+// mockQuerier implements customerdb.Querier and addressdb.Querier for handler tests.
 type mockQuerier struct {
-	createAddressFn               func(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error)
-	deleteAddressFn               func(ctx context.Context, arg dbgen.DeleteAddressParams) error
-	getAddressByIDFn              func(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error)
-	listAddressesByCustomerFn     func(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error)
-	updateAddressFn               func(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error)
-	getCustomerByIDFn             func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error)
-	createCustomerFn              func(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error)
-	getOrganizationFn             func(ctx context.Context, id uuid.UUID) (dbgen.Organization, error)
-	listCustomersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error)
-	softDeleteCustomerFn          func(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error
-	updateCustomerFn              func(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error)
-	hardDeleteCustomerFn          func(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error
+	// address methods
+	createAddressFn           func(ctx context.Context, arg addressdb.CreateAddressParams) (addressdb.Address, error)
+	deleteAddressFn           func(ctx context.Context, arg addressdb.DeleteAddressParams) error
+	getAddressByIDFn          func(ctx context.Context, arg addressdb.GetAddressByIDParams) (addressdb.Address, error)
+	listAddressesByCustomerFn func(ctx context.Context, arg addressdb.ListAddressesByCustomerParams) ([]addressdb.Address, error)
+	updateAddressFn           func(ctx context.Context, arg addressdb.UpdateAddressParams) (addressdb.Address, error)
+	// customer methods
+	createCustomerFn              func(ctx context.Context, arg customerdb.CreateCustomerParams) (customerdb.Customer, error)
+	getCustomerByIDFn             func(ctx context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error)
+	listCustomersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]customerdb.Customer, error)
+	softDeleteCustomerFn          func(ctx context.Context, arg customerdb.SoftDeleteCustomerParams) error
+	updateCustomerFn              func(ctx context.Context, arg customerdb.UpdateCustomerParams) (customerdb.Customer, error)
+	hardDeleteCustomerFn          func(ctx context.Context, arg customerdb.HardDeleteCustomerParams) error
 }
 
-func (m *mockQuerier) CreateAddress(ctx context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
+// addressdb.Querier methods
+func (m *mockQuerier) CreateAddress(ctx context.Context, arg addressdb.CreateAddressParams) (addressdb.Address, error) {
 	if m.createAddressFn != nil {
 		return m.createAddressFn(ctx, arg)
 	}
-	return dbgen.Address{}, nil
+	return addressdb.Address{}, nil
 }
-func (m *mockQuerier) DeleteAddress(ctx context.Context, arg dbgen.DeleteAddressParams) error {
+func (m *mockQuerier) DeleteAddress(ctx context.Context, arg addressdb.DeleteAddressParams) error {
 	if m.deleteAddressFn != nil {
 		return m.deleteAddressFn(ctx, arg)
 	}
 	return nil
 }
-func (m *mockQuerier) GetAddressByID(ctx context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
+func (m *mockQuerier) GetAddressByID(ctx context.Context, arg addressdb.GetAddressByIDParams) (addressdb.Address, error) {
 	if m.getAddressByIDFn != nil {
 		return m.getAddressByIDFn(ctx, arg)
 	}
-	return dbgen.Address{}, sql.ErrNoRows
+	return addressdb.Address{}, sql.ErrNoRows
 }
-func (m *mockQuerier) ListAddressesByCustomer(ctx context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
+func (m *mockQuerier) ListAddressesByCustomer(ctx context.Context, arg addressdb.ListAddressesByCustomerParams) ([]addressdb.Address, error) {
 	if m.listAddressesByCustomerFn != nil {
 		return m.listAddressesByCustomerFn(ctx, arg)
 	}
 	return nil, nil
 }
-func (m *mockQuerier) UpdateAddress(ctx context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
+func (m *mockQuerier) UpdateAddress(ctx context.Context, arg addressdb.UpdateAddressParams) (addressdb.Address, error) {
 	if m.updateAddressFn != nil {
 		return m.updateAddressFn(ctx, arg)
 	}
-	return dbgen.Address{}, sql.ErrNoRows
-}
-func (m *mockQuerier) GetCustomerByID(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-	if m.getCustomerByIDFn != nil {
-		return m.getCustomerByIDFn(ctx, arg)
-	}
-	return dbgen.Customer{}, nil
+	return addressdb.Address{}, sql.ErrNoRows
 }
 
-// Stub/delegating methods to satisfy dbgen.Querier interface.
-func (m *mockQuerier) CreateCustomer(ctx context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
+// customerdb.Querier methods
+func (m *mockQuerier) CreateCustomer(ctx context.Context, arg customerdb.CreateCustomerParams) (customerdb.Customer, error) {
 	if m.createCustomerFn != nil {
 		return m.createCustomerFn(ctx, arg)
 	}
-	return dbgen.Customer{}, nil
+	return customerdb.Customer{}, nil
 }
-func (m *mockQuerier) GetOrganization(ctx context.Context, id uuid.UUID) (dbgen.Organization, error) {
-	if m.getOrganizationFn != nil {
-		return m.getOrganizationFn(ctx, id)
+func (m *mockQuerier) GetCustomerByID(ctx context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+	if m.getCustomerByIDFn != nil {
+		return m.getCustomerByIDFn(ctx, arg)
 	}
-	return dbgen.Organization{}, nil
+	return customerdb.Customer{}, nil
 }
-func (m *mockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Customer, error) {
+func (m *mockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]customerdb.Customer, error) {
 	if m.listCustomersByOrganizationFn != nil {
 		return m.listCustomersByOrganizationFn(ctx, organizationID)
 	}
 	return nil, nil
 }
-func (m *mockQuerier) ListOrganizations(ctx context.Context) ([]dbgen.Organization, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SoftDeleteCustomer(ctx context.Context, arg dbgen.SoftDeleteCustomerParams) error {
+func (m *mockQuerier) SoftDeleteCustomer(ctx context.Context, arg customerdb.SoftDeleteCustomerParams) error {
 	if m.softDeleteCustomerFn != nil {
 		return m.softDeleteCustomerFn(ctx, arg)
 	}
 	return nil
 }
-func (m *mockQuerier) UpdateCustomer(ctx context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
+func (m *mockQuerier) UpdateCustomer(ctx context.Context, arg customerdb.UpdateCustomerParams) (customerdb.Customer, error) {
 	if m.updateCustomerFn != nil {
 		return m.updateCustomerFn(ctx, arg)
 	}
-	return dbgen.Customer{}, nil
+	return customerdb.Customer{}, nil
 }
-func (m *mockQuerier) HardDeleteCustomer(ctx context.Context, arg dbgen.HardDeleteCustomerParams) error {
+func (m *mockQuerier) HardDeleteCustomer(ctx context.Context, arg customerdb.HardDeleteCustomerParams) error {
 	if m.hardDeleteCustomerFn != nil {
 		return m.hardDeleteCustomerFn(ctx, arg)
 	}
-	return nil
-}
-func (m *mockQuerier) CreateUser(ctx context.Context, arg dbgen.CreateUserParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetUserByEmailAndOrganization(ctx context.Context, arg dbgen.GetUserByEmailAndOrganizationParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetUserByID(ctx context.Context, arg dbgen.GetUserByIDParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.User, error) {
-	return nil, nil
-}
-func (m *mockQuerier) SoftDeleteUser(ctx context.Context, arg dbgen.SoftDeleteUserParams) error {
-	return nil
-}
-func (m *mockQuerier) UpdateUser(ctx context.Context, arg dbgen.UpdateUserParams) (dbgen.User, error) {
-	return dbgen.User{}, nil
-}
-func (m *mockQuerier) GetAPIKeyByHash(ctx context.Context, keyHash string) (dbgen.ApiKey, error) {
-	return dbgen.ApiKey{}, nil
-}
-func (m *mockQuerier) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-func (m *mockQuerier) CreateProduct(ctx context.Context, arg dbgen.CreateProductParams) (dbgen.Product, error) {
-	return dbgen.Product{}, nil
-}
-func (m *mockQuerier) GetProductByID(ctx context.Context, arg dbgen.GetProductByIDParams) (dbgen.Product, error) {
-	return dbgen.Product{}, nil
-}
-func (m *mockQuerier) ListProductsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]dbgen.Product, error) {
-	return nil, nil
-}
-func (m *mockQuerier) UpdateProduct(ctx context.Context, arg dbgen.UpdateProductParams) (dbgen.Product, error) {
-	return dbgen.Product{}, nil
-}
-func (m *mockQuerier) SoftDeleteProduct(ctx context.Context, arg dbgen.SoftDeleteProductParams) error {
-	return nil
-}
-func (m *mockQuerier) HardDeleteProduct(ctx context.Context, arg dbgen.HardDeleteProductParams) error {
 	return nil
 }
 
@@ -192,9 +141,9 @@ func setupAddressRouter(mock *mockQuerier, organizationID string) *gin.Engine {
 }
 
 // customerExistsMock returns a mock that always finds the customer.
-func customerExistsMock() func(ctx context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-	return func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-		return dbgen.Customer{ID: arg.ID, OrganizationID: arg.OrganizationID}, nil
+func customerExistsMock() func(ctx context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+	return func(_ context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+		return customerdb.Customer{ID: arg.ID, OrganizationID: arg.OrganizationID}, nil
 	}
 }
 
@@ -311,8 +260,8 @@ func TestProperty_CustomerNotFound_Returns404(t *testing.T) {
 		customerID := uuid.New().String()
 
 		mock := &mockQuerier{
-			getCustomerByIDFn: func(_ context.Context, _ dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-				return dbgen.Customer{}, sql.ErrNoRows
+			getCustomerByIDFn: func(_ context.Context, _ customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+				return customerdb.Customer{}, sql.ErrNoRows
 			},
 		}
 		router := setupAddressRouter(mock, organizationID)
@@ -471,10 +420,10 @@ func TestCreate_ValidPayload_Returns201(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-			return dbgen.Address{
+		createAddressFn: func(_ context.Context, arg addressdb.CreateAddressParams) (addressdb.Address, error) {
+			return addressdb.Address{
 				ID: addressID, OrganizationID: organizationID, CustomerID: customerID,
-				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+				Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 				PostalCode: arg.PostalCode, Street: arg.Street, City: arg.City, State: arg.State,
 				Country:   sql.NullString{String: "BR", Valid: true},
 				IsMain:    sql.NullBool{Bool: true, Valid: true},
@@ -533,8 +482,8 @@ func TestList_Empty_Returns200(t *testing.T) {
 	customerID := uuid.New().String()
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		listAddressesByCustomerFn: func(_ context.Context, _ dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
-			return []dbgen.Address{}, nil
+		listAddressesByCustomerFn: func(_ context.Context, _ addressdb.ListAddressesByCustomerParams) ([]addressdb.Address, error) {
+			return []addressdb.Address{}, nil
 		},
 	}
 	router := setupAddressRouter(mock, organizationID)
@@ -562,16 +511,16 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		listAddressesByCustomerFn: func(_ context.Context, _ dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
-			return []dbgen.Address{
+		listAddressesByCustomerFn: func(_ context.Context, _ addressdb.ListAddressesByCustomerParams) ([]addressdb.Address, error) {
+			return []addressdb.Address{
 				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
-					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+					Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 					PostalCode: "11111", Street: "St A", City: "City A", State: "AA",
 					Country:   sql.NullString{String: "BR", Valid: true},
 					IsMain:    sql.NullBool{Bool: true, Valid: true},
 					CreatedAt: sql.NullTime{Time: now, Valid: true}},
 				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
-					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeShipping, Valid: true},
+					Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeShipping, Valid: true},
 					PostalCode: "22222", Street: "St B", City: "City B", State: "BB",
 					Country:   sql.NullString{String: "US", Valid: true},
 					IsMain:    sql.NullBool{Bool: false, Valid: true},
@@ -605,10 +554,10 @@ func TestGetByID_Found_Returns200(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-			return dbgen.Address{
+		getAddressByIDFn: func(_ context.Context, _ addressdb.GetAddressByIDParams) (addressdb.Address, error) {
+			return addressdb.Address{
 				ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
-				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+				Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 				PostalCode: "12345", Street: "Main St", City: "City", State: "ST",
 				Country:   sql.NullString{String: "BR", Valid: true},
 				IsMain:    sql.NullBool{Bool: true, Valid: true},
@@ -641,8 +590,8 @@ func TestGetByID_NotFound_Returns404(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-			return dbgen.Address{}, sql.ErrNoRows
+		getAddressByIDFn: func(_ context.Context, _ addressdb.GetAddressByIDParams) (addressdb.Address, error) {
+			return addressdb.Address{}, sql.ErrNoRows
 		},
 	}
 	router := setupAddressRouter(mock, organizationID)
@@ -693,8 +642,8 @@ func TestUpdate_ValidPayload_Returns200(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
-			return dbgen.Address{
+		updateAddressFn: func(_ context.Context, arg addressdb.UpdateAddressParams) (addressdb.Address, error) {
+			return addressdb.Address{
 				ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 				Type: arg.Type, PostalCode: arg.PostalCode, Street: arg.Street,
 				City: arg.City, State: arg.State,
@@ -740,8 +689,8 @@ func TestUpdate_NotFound_Returns404(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		updateAddressFn: func(_ context.Context, _ dbgen.UpdateAddressParams) (dbgen.Address, error) {
-			return dbgen.Address{}, sql.ErrNoRows
+		updateAddressFn: func(_ context.Context, _ addressdb.UpdateAddressParams) (addressdb.Address, error) {
+			return addressdb.Address{}, sql.ErrNoRows
 		},
 	}
 	router := setupAddressRouter(mock, organizationID)
@@ -771,14 +720,14 @@ func TestDelete_Found_Returns204(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-			return dbgen.Address{
+		getAddressByIDFn: func(_ context.Context, _ addressdb.GetAddressByIDParams) (addressdb.Address, error) {
+			return addressdb.Address{
 				ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 				PostalCode: "12345", Street: "St", City: "C", State: "ST",
 				CreatedAt: sql.NullTime{Time: now, Valid: true},
 			}, nil
 		},
-		deleteAddressFn: func(_ context.Context, _ dbgen.DeleteAddressParams) error {
+		deleteAddressFn: func(_ context.Context, _ addressdb.DeleteAddressParams) error {
 			return nil
 		},
 	}
@@ -800,8 +749,8 @@ func TestDelete_NotFound_Returns404(t *testing.T) {
 
 	mock := &mockQuerier{
 		getCustomerByIDFn: customerExistsMock(),
-		getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
-			return dbgen.Address{}, sql.ErrNoRows
+		getAddressByIDFn: func(_ context.Context, _ addressdb.GetAddressByIDParams) (addressdb.Address, error) {
+			return addressdb.Address{}, sql.ErrNoRows
 		},
 	}
 	router := setupAddressRouter(mock, organizationID)
@@ -849,8 +798,8 @@ func TestCreate_CustomerNotFound_Returns404(t *testing.T) {
 	customerID := uuid.New().String()
 
 	mock := &mockQuerier{
-		getCustomerByIDFn: func(_ context.Context, _ dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-			return dbgen.Customer{}, sql.ErrNoRows
+		getCustomerByIDFn: func(_ context.Context, _ customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+			return customerdb.Customer{}, sql.ErrNoRows
 		},
 	}
 	router := setupAddressRouter(mock, organizationID)
@@ -883,11 +832,11 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 
 		n := rapid.IntRange(1, 10).Draw(t, "n")
 		baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-		addresses := make([]dbgen.Address, n)
+		addresses := make([]addressdb.Address, n)
 		for i := 0; i < n; i++ {
-			addresses[i] = dbgen.Address{
+			addresses[i] = addressdb.Address{
 				ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
-				Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+				Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 				PostalCode: rapid.StringMatching(`[0-9]{5}`).Draw(t, "pc"),
 				Street:     rapid.StringMatching(`[A-Za-z ]{5,20}`).Draw(t, "st"),
 				City:       rapid.StringMatching(`[A-Za-z]{3,15}`).Draw(t, "ci"),
@@ -899,14 +848,14 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 		}
 
 		// Shuffle to simulate DB returning in DESC order after we sort
-		shuffled := make([]dbgen.Address, n)
+		shuffled := make([]addressdb.Address, n)
 		perm := rapid.Permutation(make([]int, n)).Draw(t, "perm")
 		for i, p := range perm {
 			shuffled[i] = addresses[p]
 		}
 
 		// Sort DESC by created_at (mock simulates DB ORDER BY)
-		sorted := make([]dbgen.Address, n)
+		sorted := make([]addressdb.Address, n)
 		copy(sorted, addresses)
 		for i, j := 0, n-1; i < j; i, j = i+1, j-1 {
 			sorted[i], sorted[j] = sorted[j], sorted[i]
@@ -914,7 +863,7 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 
 		mock := &mockQuerier{
 			getCustomerByIDFn: customerExistsMock(),
-			listAddressesByCustomerFn: func(_ context.Context, _ dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
+			listAddressesByCustomerFn: func(_ context.Context, _ addressdb.ListAddressesByCustomerParams) ([]addressdb.Address, error) {
 				return sorted, nil
 			},
 		}
@@ -960,12 +909,12 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 		types := []string{"billing", "shipping", "home"}
 		newType := types[rapid.IntRange(0, 2).Draw(t, "type_idx")]
 
-		var updatedRow dbgen.Address
+		var updatedRow addressdb.Address
 
 		mock := &mockQuerier{
 			getCustomerByIDFn: customerExistsMock(),
-			updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
-				updatedRow = dbgen.Address{
+			updateAddressFn: func(_ context.Context, arg addressdb.UpdateAddressParams) (addressdb.Address, error) {
+				updatedRow = addressdb.Address{
 					ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
 					Type:       arg.Type,
 					PostalCode: arg.PostalCode, Street: arg.Street,
@@ -976,7 +925,7 @@ func TestProperty_UpdateReflectsNewValues(t *testing.T) {
 				}
 				return updatedRow, nil
 			},
-			getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
+			getAddressByIDFn: func(_ context.Context, _ addressdb.GetAddressByIDParams) (addressdb.Address, error) {
 				return updatedRow, nil
 			},
 		}
@@ -1041,20 +990,20 @@ func TestProperty_DeleteRemovesAddress(t *testing.T) {
 
 		mock := &mockQuerier{
 			getCustomerByIDFn: customerExistsMock(),
-			getAddressByIDFn: func(_ context.Context, _ dbgen.GetAddressByIDParams) (dbgen.Address, error) {
+			getAddressByIDFn: func(_ context.Context, _ addressdb.GetAddressByIDParams) (addressdb.Address, error) {
 				if deleted {
-					return dbgen.Address{}, sql.ErrNoRows
+					return addressdb.Address{}, sql.ErrNoRows
 				}
-				return dbgen.Address{
+				return addressdb.Address{
 					ID: addrID, OrganizationID: organizationID, CustomerID: customerID,
-					Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+					Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 					PostalCode: "12345", Street: "St", City: "City", State: "ST",
 					Country:   sql.NullString{String: "BR", Valid: true},
 					IsMain:    sql.NullBool{Bool: true, Valid: true},
 					CreatedAt: sql.NullTime{Time: now, Valid: true},
 				}, nil
 			},
-			deleteAddressFn: func(_ context.Context, _ dbgen.DeleteAddressParams) error {
+			deleteAddressFn: func(_ context.Context, _ addressdb.DeleteAddressParams) error {
 				deleted = true
 				return nil
 			},
@@ -1104,15 +1053,15 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
 
 		mock := &mockQuerier{
-			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
+			getCustomerByIDFn: func(_ context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
 				// Customer only exists for organization A
 				if arg.OrganizationID == organizationA {
-					return dbgen.Customer{ID: arg.ID, OrganizationID: organizationA}, nil
+					return customerdb.Customer{ID: arg.ID, OrganizationID: organizationA}, nil
 				}
-				return dbgen.Customer{}, sql.ErrNoRows
+				return customerdb.Customer{}, sql.ErrNoRows
 			},
-			createAddressFn: func(_ context.Context, arg dbgen.CreateAddressParams) (dbgen.Address, error) {
-				return dbgen.Address{
+			createAddressFn: func(_ context.Context, arg addressdb.CreateAddressParams) (addressdb.Address, error) {
+				return addressdb.Address{
 					ID: addrID, OrganizationID: arg.OrganizationID, CustomerID: arg.CustomerID,
 					Type:       arg.Type,
 					PostalCode: arg.PostalCode, Street: arg.Street, City: arg.City, State: arg.State,
@@ -1121,45 +1070,45 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 					CreatedAt: sql.NullTime{Time: now, Valid: true},
 				}, nil
 			},
-			getAddressByIDFn: func(_ context.Context, arg dbgen.GetAddressByIDParams) (dbgen.Address, error) {
+			getAddressByIDFn: func(_ context.Context, arg addressdb.GetAddressByIDParams) (addressdb.Address, error) {
 				// Address only visible to organization A
 				if arg.OrganizationID == organizationA {
-					return dbgen.Address{
+					return addressdb.Address{
 						ID: addrID, OrganizationID: organizationA, CustomerID: customerID,
-						Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+						Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 						PostalCode: "12345", Street: "St", City: "City", State: "ST",
 						Country:   sql.NullString{String: "BR", Valid: true},
 						IsMain:    sql.NullBool{Bool: true, Valid: true},
 						CreatedAt: sql.NullTime{Time: now, Valid: true},
 					}, nil
 				}
-				return dbgen.Address{}, sql.ErrNoRows
+				return addressdb.Address{}, sql.ErrNoRows
 			},
-			listAddressesByCustomerFn: func(_ context.Context, arg dbgen.ListAddressesByCustomerParams) ([]dbgen.Address, error) {
+			listAddressesByCustomerFn: func(_ context.Context, arg addressdb.ListAddressesByCustomerParams) ([]addressdb.Address, error) {
 				if arg.OrganizationID == organizationA {
-					return []dbgen.Address{{
+					return []addressdb.Address{{
 						ID: addrID, OrganizationID: organizationA, CustomerID: customerID,
-						Type:       dbgen.NullAddressType{AddressType: dbgen.AddressTypeBilling, Valid: true},
+						Type:       addressdb.NullAddressType{AddressType: addressdb.AddressTypeBilling, Valid: true},
 						PostalCode: "12345", Street: "St", City: "City", State: "ST",
 						Country:   sql.NullString{String: "BR", Valid: true},
 						IsMain:    sql.NullBool{Bool: true, Valid: true},
 						CreatedAt: sql.NullTime{Time: now, Valid: true},
 					}}, nil
 				}
-				return []dbgen.Address{}, nil
+				return []addressdb.Address{}, nil
 			},
-			updateAddressFn: func(_ context.Context, arg dbgen.UpdateAddressParams) (dbgen.Address, error) {
+			updateAddressFn: func(_ context.Context, arg addressdb.UpdateAddressParams) (addressdb.Address, error) {
 				if arg.OrganizationID == organizationA {
-					return dbgen.Address{
+					return addressdb.Address{
 						ID: addrID, OrganizationID: organizationA, CustomerID: customerID,
 						Type: arg.Type, PostalCode: arg.PostalCode, Street: arg.Street,
 						City: arg.City, State: arg.State, Country: arg.Country, IsMain: arg.IsMain,
 						CreatedAt: sql.NullTime{Time: now, Valid: true},
 					}, nil
 				}
-				return dbgen.Address{}, sql.ErrNoRows
+				return addressdb.Address{}, sql.ErrNoRows
 			},
-			deleteAddressFn: func(_ context.Context, arg dbgen.DeleteAddressParams) error {
+			deleteAddressFn: func(_ context.Context, arg addressdb.DeleteAddressParams) error {
 				return nil
 			},
 		}

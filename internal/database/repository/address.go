@@ -6,7 +6,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"i9pay/internal/database/dbgen"
+	addressdb "i9pay/internal/database/dbgen/address"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -14,17 +14,17 @@ import (
 
 // AddressRepo implements domain.AddressRepository backed by PostgreSQL via sqlc.
 type AddressRepo struct {
-	q dbgen.Querier
+	q addressdb.Querier
 }
 
 // NewAddressRepo creates an AddressRepo.
-func NewAddressRepo(q dbgen.Querier) *AddressRepo {
+func NewAddressRepo(q addressdb.Querier) *AddressRepo {
 	return &AddressRepo{q: q}
 }
 
 // Create persists a new address for a customer in an organization.
 func (r *AddressRepo) Create(ctx context.Context, organizationID, customerID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
-	row, err := r.q.CreateAddress(ctx, dbgen.CreateAddressParams{
+	row, err := r.q.CreateAddress(ctx, addressdb.CreateAddressParams{
 		OrganizationID: organizationID,
 		CustomerID:     customerID,
 		Type:           toNullAddressType(input.Type),
@@ -48,7 +48,7 @@ func (r *AddressRepo) Create(ctx context.Context, organizationID, customerID uui
 
 // GetByID retrieves an address by ID scoped to organization and customer.
 func (r *AddressRepo) GetByID(ctx context.Context, organizationID, customerID, addressID uuid.UUID) (*domain.Address, error) {
-	row, err := r.q.GetAddressByID(ctx, dbgen.GetAddressByIDParams{
+	row, err := r.q.GetAddressByID(ctx, addressdb.GetAddressByIDParams{
 		ID:             addressID,
 		CustomerID:     customerID,
 		OrganizationID: organizationID,
@@ -66,7 +66,7 @@ func (r *AddressRepo) GetByID(ctx context.Context, organizationID, customerID, a
 
 // List returns all addresses for a customer in an organization.
 func (r *AddressRepo) List(ctx context.Context, organizationID, customerID uuid.UUID) ([]domain.Address, error) {
-	rows, err := r.q.ListAddressesByCustomer(ctx, dbgen.ListAddressesByCustomerParams{
+	rows, err := r.q.ListAddressesByCustomer(ctx, addressdb.ListAddressesByCustomerParams{
 		CustomerID:     customerID,
 		OrganizationID: organizationID,
 	})
@@ -83,7 +83,7 @@ func (r *AddressRepo) List(ctx context.Context, organizationID, customerID uuid.
 
 // Update updates an existing address scoped to organization and customer.
 func (r *AddressRepo) Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.AddressInput) (*domain.Address, error) {
-	row, err := r.q.UpdateAddress(ctx, dbgen.UpdateAddressParams{
+	row, err := r.q.UpdateAddress(ctx, addressdb.UpdateAddressParams{
 		ID:             addressID,
 		CustomerID:     customerID,
 		OrganizationID: organizationID,
@@ -112,7 +112,7 @@ func (r *AddressRepo) Update(ctx context.Context, organizationID, customerID, ad
 // Delete removes an address scoped to organization and customer.
 func (r *AddressRepo) Delete(ctx context.Context, organizationID, customerID, addressID uuid.UUID) error {
 	// Verify existence first (DeleteAddress is :exec)
-	_, err := r.q.GetAddressByID(ctx, dbgen.GetAddressByIDParams{
+	_, err := r.q.GetAddressByID(ctx, addressdb.GetAddressByIDParams{
 		ID:             addressID,
 		CustomerID:     customerID,
 		OrganizationID: organizationID,
@@ -125,7 +125,7 @@ func (r *AddressRepo) Delete(ctx context.Context, organizationID, customerID, ad
 		return domain.ErrInternal
 	}
 
-	if err := r.q.DeleteAddress(ctx, dbgen.DeleteAddressParams{
+	if err := r.q.DeleteAddress(ctx, addressdb.DeleteAddressParams{
 		ID:             addressID,
 		CustomerID:     customerID,
 		OrganizationID: organizationID,
@@ -136,8 +136,8 @@ func (r *AddressRepo) Delete(ctx context.Context, organizationID, customerID, ad
 	return nil
 }
 
-// toDomainAddress converts a dbgen.Address to a domain.Address.
-func toDomainAddress(row dbgen.Address) domain.Address {
+// toDomainAddress converts a addressdb.Address to a domain.Address.
+func toDomainAddress(row addressdb.Address) domain.Address {
 	a := domain.Address{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

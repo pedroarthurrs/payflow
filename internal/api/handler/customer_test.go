@@ -14,7 +14,7 @@ import (
 
 	apierr "i9pay/internal/api/err"
 	"i9pay/internal/api/middleware"
-	"i9pay/internal/database/dbgen"
+	customerdb "i9pay/internal/database/dbgen/customer"
 	"i9pay/internal/database/repository"
 	"i9pay/internal/service"
 
@@ -223,8 +223,8 @@ func TestCustomerDelete_InvalidUUID_Returns400(t *testing.T) {
 func TestCustomerGetByID_NotFound_Returns404(t *testing.T) {
 	organizationID := uuid.New().String()
 	mock := &mockQuerier{
-		getCustomerByIDFn: func(_ context.Context, _ dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-			return dbgen.Customer{}, sql.ErrNoRows
+		getCustomerByIDFn: func(_ context.Context, _ customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+			return customerdb.Customer{}, sql.ErrNoRows
 		},
 	}
 	router := setupCustomerRouter(mock, organizationID)
@@ -256,9 +256,9 @@ func TestCustomerDelete_Success_Returns204(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 
 	mock := &mockQuerier{
-		getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
+		getCustomerByIDFn: func(_ context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
 			if arg.ID == customerID {
-				return dbgen.Customer{
+				return customerdb.Customer{
 					ID:             customerID,
 					OrganizationID: organizationID,
 					Name:           "Alice",
@@ -271,9 +271,9 @@ func TestCustomerDelete_Success_Returns204(t *testing.T) {
 					UpdatedAt:      sql.NullTime{Time: now, Valid: true},
 				}, nil
 			}
-			return dbgen.Customer{}, sql.ErrNoRows
+			return customerdb.Customer{}, sql.ErrNoRows
 		},
-		softDeleteCustomerFn: func(_ context.Context, _ dbgen.SoftDeleteCustomerParams) error {
+		softDeleteCustomerFn: func(_ context.Context, _ customerdb.SoftDeleteCustomerParams) error {
 			return nil
 		},
 	}
@@ -742,15 +742,15 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 
 		// In-memory store simulating soft delete behavior.
 		type storedCustomer struct {
-			customer  dbgen.Customer
+			customer  customerdb.Customer
 			deletedAt sql.NullTime
 		}
 		store := make(map[uuid.UUID]*storedCustomer)
 
 		mock := &mockQuerier{
-			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
+			createCustomerFn: func(_ context.Context, arg customerdb.CreateCustomerParams) (customerdb.Customer, error) {
 				id := uuid.New()
-				c := dbgen.Customer{
+				c := customerdb.Customer{
 					ID:             id,
 					OrganizationID: arg.OrganizationID,
 					Name:           arg.Name,
@@ -766,15 +766,15 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 				store[id] = &storedCustomer{customer: c}
 				return c, nil
 			},
-			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
+			getCustomerByIDFn: func(_ context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
 				sc, ok := store[arg.ID]
 				if !ok || sc.deletedAt.Valid || arg.OrganizationID != sc.customer.OrganizationID {
-					return dbgen.Customer{}, sql.ErrNoRows
+					return customerdb.Customer{}, sql.ErrNoRows
 				}
 				return sc.customer, nil
 			},
-			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) {
-				var result []dbgen.Customer
+			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]customerdb.Customer, error) {
+				var result []customerdb.Customer
 				for _, sc := range store {
 					if sc.customer.OrganizationID == tid && !sc.deletedAt.Valid {
 						result = append(result, sc.customer)
@@ -782,17 +782,17 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 				}
 				return result, nil
 			},
-			softDeleteCustomerFn: func(_ context.Context, arg dbgen.SoftDeleteCustomerParams) error {
+			softDeleteCustomerFn: func(_ context.Context, arg customerdb.SoftDeleteCustomerParams) error {
 				sc, ok := store[arg.ID]
 				if ok && sc.customer.OrganizationID == arg.OrganizationID && !sc.deletedAt.Valid {
 					sc.deletedAt = sql.NullTime{Time: time.Now(), Valid: true}
 				}
 				return nil
 			},
-			updateCustomerFn: func(_ context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
+			updateCustomerFn: func(_ context.Context, arg customerdb.UpdateCustomerParams) (customerdb.Customer, error) {
 				sc, ok := store[arg.ID]
 				if !ok || sc.deletedAt.Valid || arg.OrganizationID != sc.customer.OrganizationID {
-					return dbgen.Customer{}, sql.ErrNoRows
+					return customerdb.Customer{}, sql.ErrNoRows
 				}
 				sc.customer.Name = arg.Name
 				sc.customer.Email = arg.Email
@@ -967,12 +967,12 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 		createTime := time.Now().Truncate(time.Second)
 
 		// In-memory store simulating create, update, and get behavior.
-		store := make(map[uuid.UUID]dbgen.Customer)
+		store := make(map[uuid.UUID]customerdb.Customer)
 
 		mock := &mockQuerier{
-			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
+			createCustomerFn: func(_ context.Context, arg customerdb.CreateCustomerParams) (customerdb.Customer, error) {
 				id := uuid.New()
-				c := dbgen.Customer{
+				c := customerdb.Customer{
 					ID:             id,
 					OrganizationID: arg.OrganizationID,
 					Name:           arg.Name,
@@ -988,10 +988,10 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 				store[id] = c
 				return c, nil
 			},
-			updateCustomerFn: func(_ context.Context, arg dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
+			updateCustomerFn: func(_ context.Context, arg customerdb.UpdateCustomerParams) (customerdb.Customer, error) {
 				c, ok := store[arg.ID]
 				if !ok || arg.OrganizationID != c.OrganizationID {
-					return dbgen.Customer{}, sql.ErrNoRows
+					return customerdb.Customer{}, sql.ErrNoRows
 				}
 				// Simulate DB trigger: updated_at advances on update.
 				newUpdatedAt := time.Now().Truncate(time.Second)
@@ -1005,10 +1005,10 @@ func TestCustomerProperty_UpdateAndReadRoundTrip(t *testing.T) {
 				store[arg.ID] = c
 				return c, nil
 			},
-			getCustomerByIDFn: func(_ context.Context, arg dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
+			getCustomerByIDFn: func(_ context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
 				c, ok := store[arg.ID]
 				if !ok || arg.OrganizationID != c.OrganizationID {
-					return dbgen.Customer{}, sql.ErrNoRows
+					return customerdb.Customer{}, sql.ErrNoRows
 				}
 				return c, nil
 			},
@@ -1161,19 +1161,19 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 
 		// In-memory store: customers keyed by ID.
 		type storedCustomer struct {
-			dbCustomer dbgen.Customer
+			dbCustomer customerdb.Customer
 		}
 		var createdOrder []uuid.UUID
 		store := make(map[uuid.UUID]storedCustomer)
 		createCounter := 0
 
 		mock := &mockQuerier{
-			createCustomerFn: func(_ context.Context, arg dbgen.CreateCustomerParams) (dbgen.Customer, error) {
+			createCustomerFn: func(_ context.Context, arg customerdb.CreateCustomerParams) (customerdb.Customer, error) {
 				id := uuid.New()
 				// Each customer gets an incrementing timestamp so they have distinct created_at values.
 				ts := baseTime.Add(time.Duration(createCounter) * time.Minute)
 				createCounter++
-				c := dbgen.Customer{
+				c := customerdb.Customer{
 					ID:             id,
 					OrganizationID: arg.OrganizationID,
 					Name:           arg.Name,
@@ -1190,9 +1190,9 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 				createdOrder = append(createdOrder, id)
 				return c, nil
 			},
-			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]dbgen.Customer, error) {
+			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]customerdb.Customer, error) {
 				// Collect active customers for this organization.
-				var customers []dbgen.Customer
+				var customers []customerdb.Customer
 				for _, sc := range store {
 					if sc.dbCustomer.OrganizationID == tid {
 						customers = append(customers, sc.dbCustomer)
@@ -1323,13 +1323,13 @@ func TestCustomerProperty_NonExistentCustomerReturns404(t *testing.T) {
 
 		// Mock always returns sql.ErrNoRows for GetCustomerByID (no customer exists).
 		mock := &mockQuerier{
-			getCustomerByIDFn: func(_ context.Context, _ dbgen.GetCustomerByIDParams) (dbgen.Customer, error) {
-				return dbgen.Customer{}, sql.ErrNoRows
+			getCustomerByIDFn: func(_ context.Context, _ customerdb.GetCustomerByIDParams) (customerdb.Customer, error) {
+				return customerdb.Customer{}, sql.ErrNoRows
 			},
-			updateCustomerFn: func(_ context.Context, _ dbgen.UpdateCustomerParams) (dbgen.Customer, error) {
-				return dbgen.Customer{}, sql.ErrNoRows
+			updateCustomerFn: func(_ context.Context, _ customerdb.UpdateCustomerParams) (customerdb.Customer, error) {
+				return customerdb.Customer{}, sql.ErrNoRows
 			},
-			softDeleteCustomerFn: func(_ context.Context, _ dbgen.SoftDeleteCustomerParams) error {
+			softDeleteCustomerFn: func(_ context.Context, _ customerdb.SoftDeleteCustomerParams) error {
 				return sql.ErrNoRows
 			},
 		}
