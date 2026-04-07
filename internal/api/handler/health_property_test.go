@@ -24,7 +24,7 @@ func TestProperty_ReadinessResponseDeterministicFromState(t *testing.T) {
 		svc.SetDatabaseOKForTest(ok)
 
 		gin.SetMode(gin.TestMode)
-		h := NewHealthHandler(svc, middleware.NewMaintenanceProvider())
+		h := NewHealthHandler(svc, middleware.NewMaintenanceProvider(false))
 		r := gin.New()
 		h.RegisterRoutes(&r.RouterGroup)
 

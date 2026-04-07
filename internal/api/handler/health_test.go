@@ -15,7 +15,7 @@ import (
 
 func setupHealthRouter(svc *database.HealthChecker) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	h := NewHealthHandler(svc, middleware.NewMaintenanceProvider())
+	h := NewHealthHandler(svc, middleware.NewMaintenanceProvider(false))
 	r := gin.New()
 	h.RegisterRoutes(&r.RouterGroup)
 	return r
@@ -98,7 +98,7 @@ func TestReady_ServiceFalse_Returns503Unavailable(t *testing.T) {
 func TestStatus_ReturnsMaintenance(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := database.NewHealthChecker(nil)
-	mp := middleware.NewMaintenanceProvider()
+	mp := middleware.NewMaintenanceProvider(false)
 	h := NewHealthHandler(svc, mp)
 	r := gin.New()
 	h.RegisterRoutes(&r.RouterGroup)

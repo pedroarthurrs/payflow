@@ -20,14 +20,10 @@ type MaintenanceProvider struct {
 	state atomic.Value
 }
 
-// maintenanceEnabled controls whether maintenance mode is active.
-// Set to true to enable maintenance mode manually.
-const maintenanceEnabled = false
-
-// NewMaintenanceProvider returns a MaintenanceProvider initialized with maintenanceEnabled.
-func NewMaintenanceProvider() *MaintenanceProvider {
+// NewMaintenanceProvider returns a MaintenanceProvider with the given initial enabled state.
+func NewMaintenanceProvider(enabled bool) *MaintenanceProvider {
 	p := &MaintenanceProvider{}
-	p.state.Store(MaintenanceConfig{Enabled: maintenanceEnabled})
+	p.state.Store(MaintenanceConfig{Enabled: enabled})
 	return p
 }
 

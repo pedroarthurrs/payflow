@@ -21,11 +21,17 @@ const refreshTokenTTL = 7 * 24 * time.Hour
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
 func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker) *gin.Engine {
+	// Feature flags — backed by env vars by default; swap for AWS AppConfig or
+	// any other store by passing a different config.FlagProvider implementation.
+	flags := config.NewEnvFlagProvider(
+		config.FlagMaintenance,
+	)
+
 	// Stores
 	ipStore := middleware.NewRateLimiterStore()
 	loginStore := middleware.NewRateLimiterStore()
 	organizationStore := middleware.NewRateLimiterStore()
-	maintenanceProvider := middleware.NewMaintenanceProvider()
+	maintenanceProvider := middleware.NewMaintenanceProvider(flags.IsEnabled(config.FlagMaintenance))
 
 	r := gin.New()
 	r.RedirectTrailingSlash = false
