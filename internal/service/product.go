@@ -25,8 +25,8 @@ func (s *ProductService) Create(ctx context.Context, organizationID uuid.UUID, i
 }
 
 // List returns all active products for the given organization.
-func (s *ProductService) List(ctx context.Context, organizationID uuid.UUID) ([]domain.Product, error) {
-	return s.products.List(ctx, organizationID)
+func (s *ProductService) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Product, error) {
+	return s.products.List(ctx, organizationID, params)
 }
 
 // GetByID returns a single product by ID for the given organization.

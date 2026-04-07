@@ -6,15 +6,13 @@ package userdb
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetUserByEmailAndOrganization(ctx context.Context, arg GetUserByEmailAndOrganizationParams) (User, error)
 	GetUserByID(ctx context.Context, arg GetUserByIDParams) (User, error)
-	ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]User, error)
+	ListUsersByOrganization(ctx context.Context, arg ListUsersByOrganizationParams) ([]User, error)
 	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 }

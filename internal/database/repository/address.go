@@ -65,10 +65,12 @@ func (r *AddressRepo) GetByID(ctx context.Context, organizationID, customerID, a
 }
 
 // List returns all addresses for a customer in an organization.
-func (r *AddressRepo) List(ctx context.Context, organizationID, customerID uuid.UUID) ([]domain.Address, error) {
+func (r *AddressRepo) List(ctx context.Context, organizationID, customerID uuid.UUID, params domain.ListParams) ([]domain.Address, error) {
 	rows, err := r.q.ListAddressesByCustomer(ctx, addressdb.ListAddressesByCustomerParams{
 		CustomerID:     customerID,
 		OrganizationID: organizationID,
+		Limit:          params.Limit,
+		Offset:         params.Offset,
 	})
 	if err != nil {
 		slog.Error("failed to list addresses", "organization_id", organizationID, "customer_id", customerID, "error", err)

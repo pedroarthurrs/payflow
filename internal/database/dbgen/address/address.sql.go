@@ -126,15 +126,18 @@ const listAddressesByCustomer = `-- name: ListAddressesByCustomer :many
 SELECT id, organization_id, customer_id, type, postal_code, street, number, complement, neighborhood, city, state, country, is_main, created_at, updated_at, deleted_at FROM addresses
 WHERE customer_id = $1 AND organization_id = $2 AND deleted_at IS NULL
 ORDER BY created_at DESC
+LIMIT $3 OFFSET $4
 `
 
 type ListAddressesByCustomerParams struct {
 	CustomerID     uuid.UUID `json:"customer_id"`
 	OrganizationID uuid.UUID `json:"organization_id"`
+	Limit          int32     `json:"limit"`
+	Offset         int32     `json:"offset"`
 }
 
 func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error) {
-	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer, arg.CustomerID, arg.OrganizationID)
+	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer, arg.CustomerID, arg.OrganizationID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

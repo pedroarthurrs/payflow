@@ -70,7 +70,7 @@ func TestCredentialCreate_TestEnvironment_Prefix(t *testing.T) {
 func TestCredentialList_Success(t *testing.T) {
 	orgID := uuid.New()
 	repo := &mockCredentialRepo{
-		listFn: func(_ context.Context, o uuid.UUID) ([]domain.CredentialRecord, error) {
+		listFn: func(_ context.Context, o uuid.UUID, _ domain.ListParams) ([]domain.CredentialRecord, error) {
 			return []domain.CredentialRecord{
 				{ID: uuid.New(), OrganizationID: o, Name: "Key 1", Environment: "test"},
 				{ID: uuid.New(), OrganizationID: o, Name: "Key 2", Environment: "production"},
@@ -78,7 +78,7 @@ func TestCredentialList_Success(t *testing.T) {
 		},
 	}
 	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
-	keys, err := svc.List(context.Background(), orgID)
+	keys, err := svc.List(context.Background(), orgID, domain.ListParams{Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -90,12 +90,12 @@ func TestCredentialList_Success(t *testing.T) {
 func TestCredentialList_Empty(t *testing.T) {
 	orgID := uuid.New()
 	repo := &mockCredentialRepo{
-		listFn: func(_ context.Context, _ uuid.UUID) ([]domain.CredentialRecord, error) {
+		listFn: func(_ context.Context, _ uuid.UUID, _ domain.ListParams) ([]domain.CredentialRecord, error) {
 			return []domain.CredentialRecord{}, nil
 		},
 	}
 	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
-	keys, err := svc.List(context.Background(), orgID)
+	keys, err := svc.List(context.Background(), orgID, domain.ListParams{Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

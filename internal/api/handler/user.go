@@ -106,7 +106,12 @@ func (h *UserHandler) List(c *gin.Context) {
 		return
 	}
 
-	users, err := h.userSvc.List(c.Request.Context(), tid.String())
+	pag, ok := dto.ParseOffsetPagination(c)
+	if !ok {
+		return
+	}
+
+	users, err := h.userSvc.List(c.Request.Context(), tid.String(), pag.ToListParams())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -117,7 +122,11 @@ func (h *UserHandler) List(c *gin.Context) {
 		resp[i] = toUserResponse(&users[i])
 	}
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, dto.PagedResponse[userResponse]{
+		Data:   resp,
+		Limit:  pag.Limit,
+		Offset: pag.Offset,
+	})
 }
 
 // GetByID handles GET /v1/users/:user_id.

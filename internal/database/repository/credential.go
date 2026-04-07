@@ -59,8 +59,12 @@ func (r *CredentialRepo) GetByID(ctx context.Context, orgID, credentialID uuid.U
 }
 
 // List returns all active credentials for an organization.
-func (r *CredentialRepo) List(ctx context.Context, orgID uuid.UUID) ([]domain.CredentialRecord, error) {
-	rows, err := r.q.ListCredentials(ctx, orgID)
+func (r *CredentialRepo) List(ctx context.Context, orgID uuid.UUID, params domain.ListParams) ([]domain.CredentialRecord, error) {
+	rows, err := r.q.ListCredentials(ctx, credentialdb.ListCredentialsParams{
+		OrganizationID: orgID,
+		Limit:          params.Limit,
+		Offset:         params.Offset,
+	})
 	if err != nil {
 		slog.Error("failed to list credentials", "organization_id", orgID, "error", err)
 		return nil, domain.ErrInternal

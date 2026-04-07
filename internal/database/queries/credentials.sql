@@ -12,7 +12,8 @@ WHERE organization_id = $1 AND id = $2 AND deleted_at IS NULL;
 SELECT id, organization_id, name, key_prefix, environment, last_used_at, expires_at, created_at
 FROM credentials
 WHERE organization_id = $1 AND deleted_at IS NULL
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
 
 -- name: SoftDeleteCredential :exec
 UPDATE credentials

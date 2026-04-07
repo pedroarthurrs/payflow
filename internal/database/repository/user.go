@@ -70,8 +70,12 @@ func (r *UserRepo) GetByEmailAndOrg(ctx context.Context, organizationID uuid.UUI
 }
 
 // List returns all users for an organization.
-func (r *UserRepo) List(ctx context.Context, organizationID uuid.UUID) ([]domain.User, error) {
-	rows, err := r.q.ListUsersByOrganization(ctx, organizationID)
+func (r *UserRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.User, error) {
+	rows, err := r.q.ListUsersByOrganization(ctx, userdb.ListUsersByOrganizationParams{
+		OrganizationID: organizationID,
+		Limit:          params.Limit,
+		Offset:         params.Offset,
+	})
 	if err != nil {
 		return nil, err
 	}

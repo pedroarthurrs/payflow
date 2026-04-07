@@ -322,13 +322,13 @@ func TestAddressList_Empty(t *testing.T) {
 		getByIDFn: customerExistsMock(),
 	}
 	addresses := &mockAddressRepo{
-		listFn: func(_ context.Context, _, _ uuid.UUID) ([]domain.Address, error) {
+		listFn: func(_ context.Context, _, _ uuid.UUID, _ domain.ListParams) ([]domain.Address, error) {
 			return []domain.Address{}, nil
 		},
 	}
 
 	svc := NewAddressService(customers, addresses)
-	list, err := svc.List(context.Background(), organizationID, customerID)
+	list, err := svc.List(context.Background(), organizationID, customerID, domain.ListParams{Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -346,7 +346,7 @@ func TestAddressList_Multiple(t *testing.T) {
 		getByIDFn: customerExistsMock(),
 	}
 	addresses := &mockAddressRepo{
-		listFn: func(_ context.Context, _, _ uuid.UUID) ([]domain.Address, error) {
+		listFn: func(_ context.Context, _, _ uuid.UUID, _ domain.ListParams) ([]domain.Address, error) {
 			return []domain.Address{
 				{ID: uuid.New(), OrganizationID: organizationID, CustomerID: customerID,
 					Type: "billing", PostalCode: "11111", Street: "St A", City: "City A", State: "AA",
@@ -359,7 +359,7 @@ func TestAddressList_Multiple(t *testing.T) {
 	}
 
 	svc := NewAddressService(customers, addresses)
-	list, err := svc.List(context.Background(), organizationID, customerID)
+	list, err := svc.List(context.Background(), organizationID, customerID, domain.ListParams{Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -550,7 +550,7 @@ func TestAddressList_CustomerNotFound(t *testing.T) {
 	}
 
 	svc := NewAddressService(customers, &mockAddressRepo{})
-	_, err := svc.List(context.Background(), uuid.New(), uuid.New())
+	_, err := svc.List(context.Background(), uuid.New(), uuid.New(), domain.ListParams{Limit: 20})
 	if !errors.Is(err, domain.ErrCustomerNotFound) {
 		t.Fatalf("expected ErrCustomerNotFound, got %v", err)
 	}

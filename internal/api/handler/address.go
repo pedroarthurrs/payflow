@@ -97,7 +97,12 @@ func (h *AddressHandler) List(c *gin.Context) {
 		return
 	}
 
-	addresses, err := h.addressSvc.List(c.Request.Context(), tid, cid)
+	pag, ok := dto.ParseOffsetPagination(c)
+	if !ok {
+		return
+	}
+
+	addresses, err := h.addressSvc.List(c.Request.Context(), tid, cid, pag.ToListParams())
 	if err != nil {
 		if errors.Is(err, domain.ErrCustomerNotFound) {
 			_ = c.Error(apierr.NotFound("customer not found"))
@@ -112,7 +117,11 @@ func (h *AddressHandler) List(c *gin.Context) {
 		resp[i] = dto.ToAddressResponse(&addresses[i])
 	}
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, dto.PagedResponse[*dto.AddressResponse]{
+		Data:   resp,
+		Limit:  pag.Limit,
+		Offset: pag.Offset,
+	})
 }
 
 // GetByID handles GET /v1/customers/:customer_id/addresses/:id.

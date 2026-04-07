@@ -6,15 +6,13 @@ package customerdb
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type Querier interface {
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
 	GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams) (Customer, error)
 	HardDeleteCustomer(ctx context.Context, arg HardDeleteCustomerParams) error
-	ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Customer, error)
+	ListCustomersByOrganization(ctx context.Context, arg ListCustomersByOrganizationParams) ([]Customer, error)
 	SoftDeleteCustomer(ctx context.Context, arg SoftDeleteCustomerParams) error
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
 }

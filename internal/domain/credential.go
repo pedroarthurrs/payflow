@@ -32,6 +32,6 @@ type CreateCredentialInput struct {
 type CredentialRepository interface {
 	Create(ctx context.Context, orgID uuid.UUID, input CreateCredentialInput) (*CredentialRecord, error)
 	GetByID(ctx context.Context, orgID, credentialID uuid.UUID) (*CredentialRecord, error)
-	List(ctx context.Context, orgID uuid.UUID) ([]CredentialRecord, error)
+	List(ctx context.Context, orgID uuid.UUID, params ListParams) ([]CredentialRecord, error)
 	SoftDelete(ctx context.Context, orgID, credentialID uuid.UUID) error
 }

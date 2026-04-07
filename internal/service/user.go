@@ -57,7 +57,7 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 
 	// Block creation of a second owner
 	if req.Role == domain.RoleOwner {
-		existing, listErr := s.users.List(ctx, tid)
+		existing, listErr := s.users.List(ctx, tid, domain.ListParams{Limit: 1000, Offset: 0})
 		if listErr != nil {
 			return nil, listErr
 		}
@@ -82,12 +82,12 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 }
 
 // List returns all active users for an organization, without password fields.
-func (s *UserService) List(ctx context.Context, organizationID string) ([]domain.User, error) {
+func (s *UserService) List(ctx context.Context, organizationID string, params domain.ListParams) ([]domain.User, error) {
 	tid, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
-	return s.users.List(ctx, tid)
+	return s.users.List(ctx, tid, params)
 }
 
 // GetByID returns a single user in an organization.

@@ -6,15 +6,13 @@ package productdb
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type Querier interface {
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	GetProductByID(ctx context.Context, arg GetProductByIDParams) (Product, error)
 	HardDeleteProduct(ctx context.Context, arg HardDeleteProductParams) error
-	ListProductsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Product, error)
+	ListProductsByOrganization(ctx context.Context, arg ListProductsByOrganizationParams) ([]Product, error)
 	SoftDeleteProduct(ctx context.Context, arg SoftDeleteProductParams) error
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 }

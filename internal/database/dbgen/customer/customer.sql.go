@@ -111,10 +111,17 @@ const listCustomersByOrganization = `-- name: ListCustomersByOrganization :many
 SELECT id, organization_id, name, email, phone, document, document_type, external_reference, status, metadata, created_at, updated_at, deleted_at FROM customers
 WHERE organization_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Customer, error) {
-	rows, err := q.db.QueryContext(ctx, listCustomersByOrganization, organizationID)
+type ListCustomersByOrganizationParams struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Limit          int32     `json:"limit"`
+	Offset         int32     `json:"offset"`
+}
+
+func (q *Queries) ListCustomersByOrganization(ctx context.Context, arg ListCustomersByOrganizationParams) ([]Customer, error) {
+	rows, err := q.db.QueryContext(ctx, listCustomersByOrganization, arg.OrganizationID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

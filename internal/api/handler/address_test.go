@@ -35,7 +35,7 @@ type mockQuerier struct {
 	// customer methods
 	createCustomerFn              func(ctx context.Context, arg customerdb.CreateCustomerParams) (customerdb.Customer, error)
 	getCustomerByIDFn             func(ctx context.Context, arg customerdb.GetCustomerByIDParams) (customerdb.Customer, error)
-	listCustomersByOrganizationFn func(ctx context.Context, organizationID uuid.UUID) ([]customerdb.Customer, error)
+	listCustomersByOrganizationFn func(ctx context.Context, arg customerdb.ListCustomersByOrganizationParams) ([]customerdb.Customer, error)
 	softDeleteCustomerFn          func(ctx context.Context, arg customerdb.SoftDeleteCustomerParams) error
 	updateCustomerFn              func(ctx context.Context, arg customerdb.UpdateCustomerParams) (customerdb.Customer, error)
 	hardDeleteCustomerFn          func(ctx context.Context, arg customerdb.HardDeleteCustomerParams) error
@@ -86,9 +86,9 @@ func (m *mockQuerier) GetCustomerByID(ctx context.Context, arg customerdb.GetCus
 	}
 	return customerdb.Customer{}, nil
 }
-func (m *mockQuerier) ListCustomersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]customerdb.Customer, error) {
+func (m *mockQuerier) ListCustomersByOrganization(ctx context.Context, arg customerdb.ListCustomersByOrganizationParams) ([]customerdb.Customer, error) {
 	if m.listCustomersByOrganizationFn != nil {
-		return m.listCustomersByOrganizationFn(ctx, organizationID)
+		return m.listCustomersByOrganizationFn(ctx, arg)
 	}
 	return nil, nil
 }
@@ -495,10 +495,11 @@ func TestList_Empty_Returns200(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp []*dto.AddressResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	var pagedResp dto.PagedResponse[*dto.AddressResponse]
+	if err := json.Unmarshal(w.Body.Bytes(), &pagedResp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
+	resp := pagedResp.Data
 	if len(resp) != 0 {
 		t.Fatalf("expected empty array, got %d items", len(resp))
 	}
@@ -537,10 +538,11 @@ func TestList_WithAddresses_Returns200(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp []*dto.AddressResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+	var pagedResp dto.PagedResponse[*dto.AddressResponse]
+	if err := json.Unmarshal(w.Body.Bytes(), &pagedResp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
+	resp := pagedResp.Data
 	if len(resp) != 2 {
 		t.Fatalf("expected 2 addresses, got %d", len(resp))
 	}
@@ -877,10 +879,11 @@ func TestProperty_ListingOrderedByCreatedAtDesc(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 
-		var resp []*dto.AddressResponse
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		var pagedResp dto.PagedResponse[*dto.AddressResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &pagedResp); err != nil {
 			t.Fatalf("failed to parse response: %v", err)
 		}
+		resp := pagedResp.Data
 		if len(resp) != n {
 			t.Fatalf("expected %d addresses, got %d", n, len(resp))
 		}

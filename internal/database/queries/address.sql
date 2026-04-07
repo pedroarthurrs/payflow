@@ -6,7 +6,8 @@ RETURNING *;
 -- name: ListAddressesByCustomer :many
 SELECT * FROM addresses
 WHERE customer_id = $1 AND organization_id = $2 AND deleted_at IS NULL
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT $3 OFFSET $4;
 
 -- name: GetAddressByID :one
 SELECT * FROM addresses

@@ -12,7 +12,7 @@ import (
 type CustomerRepository interface {
 	Create(ctx context.Context, organizationID uuid.UUID, input CustomerInput) (*Customer, error)
 	GetByID(ctx context.Context, organizationID, customerID uuid.UUID) (*Customer, error)
-	List(ctx context.Context, organizationID uuid.UUID) ([]Customer, error)
+	List(ctx context.Context, organizationID uuid.UUID, params ListParams) ([]Customer, error)
 	Update(ctx context.Context, organizationID, customerID uuid.UUID, input CustomerInput) (*Customer, error)
 	SoftDelete(ctx context.Context, organizationID, customerID uuid.UUID) error
 	HardDelete(ctx context.Context, organizationID, customerID uuid.UUID) error

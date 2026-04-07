@@ -11,7 +11,7 @@ import (
 type ProductRepository interface {
 	Create(ctx context.Context, organizationID uuid.UUID, input ProductInput) (*Product, error)
 	GetByID(ctx context.Context, organizationID, productID uuid.UUID) (*Product, error)
-	List(ctx context.Context, organizationID uuid.UUID) ([]Product, error)
+	List(ctx context.Context, organizationID uuid.UUID, params ListParams) ([]Product, error)
 	Update(ctx context.Context, organizationID, productID uuid.UUID, input ProductInput) (*Product, error)
 	SoftDelete(ctx context.Context, organizationID, productID uuid.UUID) error
 	HardDelete(ctx context.Context, organizationID, productID uuid.UUID) error

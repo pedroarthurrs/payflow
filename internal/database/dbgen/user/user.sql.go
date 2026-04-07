@@ -102,10 +102,17 @@ func (q *Queries) GetUserByID(ctx context.Context, arg GetUserByIDParams) (User,
 
 const listUsersByOrganization = `-- name: ListUsersByOrganization :many
 SELECT id, organization_id, email, name, password, role, created_at, updated_at, deleted_at FROM users WHERE organization_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC
+LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) ListUsersByOrganization(ctx context.Context, organizationID uuid.UUID) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsersByOrganization, organizationID)
+type ListUsersByOrganizationParams struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Limit          int32     `json:"limit"`
+	Offset         int32     `json:"offset"`
+}
+
+func (q *Queries) ListUsersByOrganization(ctx context.Context, arg ListUsersByOrganizationParams) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, listUsersByOrganization, arg.OrganizationID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

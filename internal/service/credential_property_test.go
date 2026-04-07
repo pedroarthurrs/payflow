@@ -170,12 +170,12 @@ func TestProperty_Credential_ListReturnsOnlyActive(t *testing.T) {
 			}
 		}
 		repo := &mockCredentialRepo{
-			listFn: func(_ context.Context, _ uuid.UUID) ([]domain.CredentialRecord, error) {
+			listFn: func(_ context.Context, _ uuid.UUID, _ domain.ListParams) ([]domain.CredentialRecord, error) {
 				return records, nil
 			},
 		}
 		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
-		keys, err := svc.List(context.Background(), orgID)
+		keys, err := svc.List(context.Background(), orgID, domain.ListParams{})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -199,7 +199,7 @@ func TestProperty_Credential_SoftDeleteRemovesFromList(t *testing.T) {
 				}
 				return nil
 			},
-			listFn: func(_ context.Context, _ uuid.UUID) ([]domain.CredentialRecord, error) {
+			listFn: func(_ context.Context, _ uuid.UUID, _ domain.ListParams) ([]domain.CredentialRecord, error) {
 				if deleted {
 					return []domain.CredentialRecord{}, nil
 				}
@@ -218,7 +218,7 @@ func TestProperty_Credential_SoftDeleteRemovesFromList(t *testing.T) {
 		if err := svc.Revoke(context.Background(), orgID, credID); err != nil {
 			t.Fatalf("unexpected revoke error: %v", err)
 		}
-		keys, err := svc.List(context.Background(), orgID)
+		keys, err := svc.List(context.Background(), orgID, domain.ListParams{})
 		if err != nil {
 			t.Fatalf("unexpected list error: %v", err)
 		}

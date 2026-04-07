@@ -11,7 +11,7 @@ type UserRepository interface {
 	Create(ctx context.Context, organizationID uuid.UUID, input CreateUserInput) (*User, error)
 	GetByID(ctx context.Context, organizationID, userID uuid.UUID) (*User, error)
 	GetByEmailAndOrg(ctx context.Context, organizationID uuid.UUID, email string) (*User, error)
-	List(ctx context.Context, organizationID uuid.UUID) ([]User, error)
+	List(ctx context.Context, organizationID uuid.UUID, params ListParams) ([]User, error)
 	Update(ctx context.Context, organizationID, userID uuid.UUID, input UpdateUserInput) (*User, error)
 	SoftDelete(ctx context.Context, organizationID, userID uuid.UUID) error
 }

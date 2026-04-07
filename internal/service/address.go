@@ -29,11 +29,11 @@ func (s *AddressService) Create(ctx context.Context, organizationID, customerID 
 }
 
 // List returns all addresses for the given customer.
-func (s *AddressService) List(ctx context.Context, organizationID, customerID uuid.UUID) ([]domain.Address, error) {
+func (s *AddressService) List(ctx context.Context, organizationID, customerID uuid.UUID, params domain.ListParams) ([]domain.Address, error) {
 	if err := s.ensureCustomerExists(ctx, organizationID, customerID); err != nil {
 		return nil, err
 	}
-	return s.addresses.List(ctx, organizationID, customerID)
+	return s.addresses.List(ctx, organizationID, customerID, params)
 }
 
 // GetByID returns a single address by ID.

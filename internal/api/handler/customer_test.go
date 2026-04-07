@@ -773,10 +773,10 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 				}
 				return sc.customer, nil
 			},
-			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]customerdb.Customer, error) {
+			listCustomersByOrganizationFn: func(_ context.Context, arg customerdb.ListCustomersByOrganizationParams) ([]customerdb.Customer, error) {
 				var result []customerdb.Customer
 				for _, sc := range store {
-					if sc.customer.OrganizationID == tid && !sc.deletedAt.Valid {
+					if sc.customer.OrganizationID == arg.OrganizationID && !sc.deletedAt.Valid {
 						result = append(result, sc.customer)
 					}
 				}
@@ -852,13 +852,15 @@ func TestCustomerProperty_SoftDeleteHidesCustomer(t *testing.T) {
 			return false
 		}
 
-		var listed []any
-		if err := json.Unmarshal(wList.Body.Bytes(), &listed); err != nil {
+		var pagedResp struct {
+			Data []any `json:"data"`
+		}
+		if err := json.Unmarshal(wList.Body.Bytes(), &pagedResp); err != nil {
 			t.Logf("LIST: failed to parse response: %v", err)
 			return false
 		}
-		if len(listed) != 0 {
-			t.Logf("LIST: expected empty array, got %d items", len(listed))
+		if len(pagedResp.Data) != 0 {
+			t.Logf("LIST: expected empty array, got %d items", len(pagedResp.Data))
 			return false
 		}
 
@@ -1190,11 +1192,11 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 				createdOrder = append(createdOrder, id)
 				return c, nil
 			},
-			listCustomersByOrganizationFn: func(_ context.Context, tid uuid.UUID) ([]customerdb.Customer, error) {
+			listCustomersByOrganizationFn: func(_ context.Context, arg customerdb.ListCustomersByOrganizationParams) ([]customerdb.Customer, error) {
 				// Collect active customers for this organization.
 				var customers []customerdb.Customer
 				for _, sc := range store {
-					if sc.dbCustomer.OrganizationID == tid {
+					if sc.dbCustomer.OrganizationID == arg.OrganizationID {
 						customers = append(customers, sc.dbCustomer)
 					}
 				}
@@ -1245,11 +1247,14 @@ func TestCustomerProperty_ListingOrderByCreatedAtDescending(t *testing.T) {
 		}
 
 		// Step 3: Parse the response array.
-		var listed []map[string]any
-		if err := json.Unmarshal(wList.Body.Bytes(), &listed); err != nil {
+		var pagedResp struct {
+			Data []map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal(wList.Body.Bytes(), &pagedResp); err != nil {
 			t.Logf("LIST: failed to parse response: %v", err)
 			return false
 		}
+		listed := pagedResp.Data
 
 		if len(listed) != numCustomers {
 			t.Logf("LIST: expected %d customers, got %d", numCustomers, len(listed))

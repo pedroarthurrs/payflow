@@ -38,8 +38,12 @@ func (r *ProductRepo) Create(ctx context.Context, organizationID uuid.UUID, inpu
 }
 
 // List returns all products for an organization.
-func (r *ProductRepo) List(ctx context.Context, organizationID uuid.UUID) ([]domain.Product, error) {
-	rows, err := r.q.ListProductsByOrganization(ctx, organizationID)
+func (r *ProductRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Product, error) {
+	rows, err := r.q.ListProductsByOrganization(ctx, productdb.ListProductsByOrganizationParams{
+		OrganizationID: organizationID,
+		Limit:          params.Limit,
+		Offset:         params.Offset,
+	})
 	if err != nil {
 		slog.Error("failed to list products", "organization_id", organizationID, "error", err)
 		return nil, domain.ErrInternal

@@ -6,7 +6,8 @@ RETURNING *;
 -- name: ListCustomersByOrganization :many
 SELECT * FROM customers
 WHERE organization_id = $1 AND deleted_at IS NULL
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
 
 -- name: GetCustomerByID :one
 SELECT * FROM customers

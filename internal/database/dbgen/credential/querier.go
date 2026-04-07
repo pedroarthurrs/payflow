@@ -6,14 +6,12 @@ package credentialdb
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type Querier interface {
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (CreateCredentialRow, error)
 	GetCredentialByID(ctx context.Context, arg GetCredentialByIDParams) (GetCredentialByIDRow, error)
-	ListCredentials(ctx context.Context, organizationID uuid.UUID) ([]ListCredentialsRow, error)
+	ListCredentials(ctx context.Context, arg ListCredentialsParams) ([]ListCredentialsRow, error)
 	SoftDeleteCredential(ctx context.Context, arg SoftDeleteCredentialParams) error
 }
 

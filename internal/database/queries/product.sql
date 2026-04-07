@@ -6,7 +6,8 @@ RETURNING *;
 -- name: ListProductsByOrganization :many
 SELECT * FROM products
 WHERE organization_id = $1 AND deleted_at is NULL
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
 
 -- name: GetProductByID :one
 SELECT * from products

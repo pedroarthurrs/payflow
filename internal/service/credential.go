@@ -74,8 +74,8 @@ func (s *CredentialService) Create(ctx context.Context, orgID uuid.UUID, input d
 }
 
 // List returns all active credentials for the given organization.
-func (s *CredentialService) List(ctx context.Context, orgID uuid.UUID) ([]domain.CredentialRecord, error) {
-	return s.repo.List(ctx, orgID)
+func (s *CredentialService) List(ctx context.Context, orgID uuid.UUID, params domain.ListParams) ([]domain.CredentialRecord, error) {
+	return s.repo.List(ctx, orgID, params)
 }
 
 // GetByID returns a single credential by ID for the given organization.

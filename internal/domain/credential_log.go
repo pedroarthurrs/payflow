@@ -30,6 +30,12 @@ type CursorToken struct {
 	ID        uuid.UUID
 }
 
+// ListParams holds common offset pagination parameters for list queries.
+type ListParams struct {
+	Limit  int32
+	Offset int32
+}
+
 // ListCredentialLogsInput carries all filter and pagination parameters for listing logs.
 type ListCredentialLogsInput struct {
 	Limit      int

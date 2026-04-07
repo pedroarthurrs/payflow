@@ -10,7 +10,8 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: ListUsersByOrganization :many
-SELECT * FROM users WHERE organization_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC;
+SELECT * FROM users WHERE organization_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC
+LIMIT $2 OFFSET $3;
 
 -- name: UpdateUser :one
 UPDATE users SET name = $1, role = $2, updated_at = NOW()

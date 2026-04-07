@@ -11,7 +11,7 @@ import (
 type AddressRepository interface {
 	Create(ctx context.Context, organizationID, customerID uuid.UUID, input AddressInput) (*Address, error)
 	GetByID(ctx context.Context, organizationID, customerID, addressID uuid.UUID) (*Address, error)
-	List(ctx context.Context, organizationID, customerID uuid.UUID) ([]Address, error)
+	List(ctx context.Context, organizationID, customerID uuid.UUID, params ListParams) ([]Address, error)
 	Update(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input AddressInput) (*Address, error)
 	Delete(ctx context.Context, organizationID, customerID, addressID uuid.UUID) error
 }

@@ -107,7 +107,11 @@ func (h *CredentialHandler) List(c *gin.Context) {
 	if !ok {
 		return
 	}
-	creds, err := h.credentialSvc.List(c.Request.Context(), orgID)
+	pag, ok := dto.ParseOffsetPagination(c)
+	if !ok {
+		return
+	}
+	creds, err := h.credentialSvc.List(c.Request.Context(), orgID, pag.ToListParams())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -116,7 +120,11 @@ func (h *CredentialHandler) List(c *gin.Context) {
 	for i := range creds {
 		resp[i] = toCredentialResponse(&creds[i])
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, dto.PagedResponse[credentialResponse]{
+		Data:   resp,
+		Limit:  pag.Limit,
+		Offset: pag.Offset,
+	})
 }
 
 // GetByID handles GET /v1/credentials/:credential_id.

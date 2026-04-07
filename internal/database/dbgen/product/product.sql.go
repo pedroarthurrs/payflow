@@ -84,10 +84,17 @@ const listProductsByOrganization = `-- name: ListProductsByOrganization :many
 SELECT id, organization_id, name, active, created_at, updated_at, deleted_at FROM products
 WHERE organization_id = $1 AND deleted_at is NULL
 ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) ListProductsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Product, error) {
-	rows, err := q.db.QueryContext(ctx, listProductsByOrganization, organizationID)
+type ListProductsByOrganizationParams struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Limit          int32     `json:"limit"`
+	Offset         int32     `json:"offset"`
+}
+
+func (q *Queries) ListProductsByOrganization(ctx context.Context, arg ListProductsByOrganizationParams) ([]Product, error) {
+	rows, err := q.db.QueryContext(ctx, listProductsByOrganization, arg.OrganizationID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

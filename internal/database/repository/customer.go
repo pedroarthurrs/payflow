@@ -60,8 +60,12 @@ func (r *CustomerRepo) GetByID(ctx context.Context, organizationID, customerID u
 }
 
 // List returns all customers for an organization.
-func (r *CustomerRepo) List(ctx context.Context, organizationID uuid.UUID) ([]domain.Customer, error) {
-	rows, err := r.q.ListCustomersByOrganization(ctx, organizationID)
+func (r *CustomerRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Customer, error) {
+	rows, err := r.q.ListCustomersByOrganization(ctx, customerdb.ListCustomersByOrganizationParams{
+		OrganizationID: organizationID,
+		Limit:          params.Limit,
+		Offset:         params.Offset,
+	})
 	if err != nil {
 		slog.Error("failed to list customers", "organization_id", organizationID, "error", err)
 		return nil, domain.ErrInternal

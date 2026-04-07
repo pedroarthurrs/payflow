@@ -50,7 +50,7 @@ func TestProperty_UserMultiOrganizationIsolation(t *testing.T) {
 		}
 
 		users := &mockUserRepo{
-			listFn: func(_ context.Context, organizationID uuid.UUID) ([]domain.User, error) {
+			listFn: func(_ context.Context, organizationID uuid.UUID, _ domain.ListParams) ([]domain.User, error) {
 				if organizationID == organizationA {
 					return usersA, nil
 				}
@@ -63,7 +63,7 @@ func TestProperty_UserMultiOrganizationIsolation(t *testing.T) {
 
 		svc := NewUserService(users)
 
-		results, err := svc.List(context.Background(), organizationA.String())
+		results, err := svc.List(context.Background(), organizationA.String(), domain.ListParams{})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -99,13 +99,13 @@ func TestProperty_UserListNoPassword(t *testing.T) {
 		}
 
 		users := &mockUserRepo{
-			listFn: func(_ context.Context, _ uuid.UUID) ([]domain.User, error) {
+			listFn: func(_ context.Context, _ uuid.UUID, _ domain.ListParams) ([]domain.User, error) {
 				return domainUsers, nil
 			},
 		}
 
 		svc := NewUserService(users)
-		results, err := svc.List(context.Background(), organizationID.String())
+		results, err := svc.List(context.Background(), organizationID.String(), domain.ListParams{})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

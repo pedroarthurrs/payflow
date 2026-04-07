@@ -392,7 +392,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 				store[orgID] = append(store[orgID], c)
 				return c, nil
 			},
-			listFn: func(_ context.Context, orgID uuid.UUID) ([]domain.Customer, error) {
+			listFn: func(_ context.Context, orgID uuid.UUID, _ domain.ListParams) ([]domain.Customer, error) {
 				result := make([]domain.Customer, len(store[orgID]))
 				for i, c := range store[orgID] {
 					result[i] = *c
@@ -431,7 +431,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		if err != nil {
 			return false
 		}
-		listB, _ := svc.List(ctx, organizationB)
+		listB, _ := svc.List(ctx, organizationB, domain.ListParams{})
 		if len(listB) != 0 {
 			return false
 		}
@@ -447,7 +447,7 @@ func TestProperty_MultiOrganizationIsolation(t *testing.T) {
 		if !errors.Is(err, domain.ErrCustomerNotFound) {
 			return false
 		}
-		listA, _ := svc.List(ctx, organizationA)
+		listA, _ := svc.List(ctx, organizationA, domain.ListParams{})
 		if len(listA) != 1 || listA[0].ID != created.ID {
 			return false
 		}

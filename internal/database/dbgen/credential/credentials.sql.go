@@ -104,7 +104,14 @@ SELECT id, organization_id, name, key_prefix, environment, last_used_at, expires
 FROM credentials
 WHERE organization_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
 `
+
+type ListCredentialsParams struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Limit          int32     `json:"limit"`
+	Offset         int32     `json:"offset"`
+}
 
 type ListCredentialsRow struct {
 	ID             uuid.UUID       `json:"id"`
@@ -117,8 +124,8 @@ type ListCredentialsRow struct {
 	CreatedAt      sql.NullTime    `json:"created_at"`
 }
 
-func (q *Queries) ListCredentials(ctx context.Context, organizationID uuid.UUID) ([]ListCredentialsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listCredentials, organizationID)
+func (q *Queries) ListCredentials(ctx context.Context, arg ListCredentialsParams) ([]ListCredentialsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCredentials, arg.OrganizationID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

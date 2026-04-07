@@ -8,6 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// PagedResponse is a generic paginated list response for offset-based pagination.
+type PagedResponse[T any] struct {
+	Data   []T   `json:"data"`
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
 // AddressResponse is the response DTO for an address.
 type AddressResponse struct {
 	ID           uuid.UUID `json:"id"`

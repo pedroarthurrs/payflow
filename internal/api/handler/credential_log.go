@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"i9pay/internal/api/dto"
@@ -79,11 +78,6 @@ func toCredentialLogResponse(r domain.CredentialLogRecord) credentialLogResponse
 	return resp
 }
 
-const (
-	defaultLimit = 20
-	maxLimit     = 100
-)
-
 // List handles GET /v1/credentials/logs.
 func (h *CredentialLogHandler) List(c *gin.Context) {
 	orgID, ok := dto.OrganizationID(c)
@@ -91,80 +85,29 @@ func (h *CredentialLogHandler) List(c *gin.Context) {
 		return
 	}
 
-	// Parse limit.
-	limit := defaultLimit
-	if raw := c.Query("limit"); raw != "" {
-		v, err := strconv.Atoi(raw)
-		if err != nil || v < 1 || v > maxLimit {
-			_ = c.Error(apierr.BadRequest("limit must be an integer between 1 and 100"))
-			return
-		}
-		limit = v
-	}
-
-	// Parse cursor.
-	var cursorToken *domain.CursorToken
-	if raw := c.Query("cursor"); raw != "" {
-		ct, err := service.DecodeCursor(raw)
-		if err != nil {
-			_ = c.Error(apierr.BadRequest("invalid cursor"))
-			return
-		}
-		cursorToken = ct
-	}
-
-	// Parse from/to timestamps.
-	var from, to *time.Time
-	if raw := c.Query("from"); raw != "" {
-		t, err := time.Parse(time.RFC3339, raw)
-		if err != nil {
-			_ = c.Error(apierr.BadRequest("from must be a valid ISO 8601 timestamp"))
-			return
-		}
-		from = &t
-	}
-	if raw := c.Query("to"); raw != "" {
-		t, err := time.Parse(time.RFC3339, raw)
-		if err != nil {
-			_ = c.Error(apierr.BadRequest("to must be a valid ISO 8601 timestamp"))
-			return
-		}
-		to = &t
-	}
-	if from != nil && to != nil && from.After(*to) {
-		_ = c.Error(apierr.BadRequest("from must not be after to"))
+	pag, ok := dto.ParsePagination(c)
+	if !ok {
 		return
 	}
 
-	// Parse status_code.
-	var statusCode *int32
-	if raw := c.Query("status_code"); raw != "" {
-		v, err := strconv.Atoi(raw)
-		if err != nil {
-			_ = c.Error(apierr.BadRequest("status_code must be a valid integer"))
-			return
-		}
-		sc := int32(v)
-		statusCode = &sc
+	dates, ok := dto.ParseDateRange(c)
+	if !ok {
+		return
 	}
 
-	// Parse method and path.
-	var method, pathPrefix *string
-	if raw := c.Query("method"); raw != "" {
-		method = &raw
-	}
-	if raw := c.Query("path"); raw != "" {
-		pathPrefix = &raw
+	statusCode, ok := dto.ParseInt32(c, "status_code")
+	if !ok {
+		return
 	}
 
 	input := domain.ListCredentialLogsInput{
-		Limit:      limit,
-		Cursor:     cursorToken,
-		From:       from,
-		To:         to,
+		Limit:      pag.Limit,
+		Cursor:     pag.Cursor,
+		From:       dates.From,
+		To:         dates.To,
 		StatusCode: statusCode,
-		Method:     method,
-		PathPrefix: pathPrefix,
+		Method:     dto.ParseString(c, "method"),
+		PathPrefix: dto.ParseString(c, "path"),
 	}
 
 	records, nextCursor, err := h.svc.List(c.Request.Context(), orgID, input)
@@ -181,7 +124,7 @@ func (h *CredentialLogHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, listCredentialLogsResponse{
 		Data:       data,
 		NextCursor: nextCursor,
-		Limit:      limit,
+		Limit:      pag.Limit,
 	})
 }
 

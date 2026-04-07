@@ -57,8 +57,8 @@ func (s *CustomerService) Create(ctx context.Context, organizationID uuid.UUID, 
 }
 
 // List returns all active customers for the given organization.
-func (s *CustomerService) List(ctx context.Context, organizationID uuid.UUID) ([]domain.Customer, error) {
-	return s.customers.List(ctx, organizationID)
+func (s *CustomerService) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Customer, error) {
+	return s.customers.List(ctx, organizationID, params)
 }
 
 // GetByID returns a single customer by ID for the given organization.

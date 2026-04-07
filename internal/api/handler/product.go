@@ -91,7 +91,12 @@ func (h *ProductHandler) List(c *gin.Context) {
 		return
 	}
 
-	products, err := h.productSvc.List(c.Request.Context(), tid)
+	pag, ok := dto.ParseOffsetPagination(c)
+	if !ok {
+		return
+	}
+
+	products, err := h.productSvc.List(c.Request.Context(), tid, pag.ToListParams())
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -102,7 +107,11 @@ func (h *ProductHandler) List(c *gin.Context) {
 		resp[i] = toProductResponse(&products[i])
 	}
 
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, dto.PagedResponse[productResponse]{
+		Data:   resp,
+		Limit:  pag.Limit,
+		Offset: pag.Offset,
+	})
 }
 
 // GetByID handles GET /v1/products/:product_id.

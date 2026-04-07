@@ -16,7 +16,7 @@ import (
 type mockCustomerRepo struct {
 	createFn     func(ctx context.Context, organizationID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error)
 	getByIDFn    func(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.Customer, error)
-	listFn       func(ctx context.Context, organizationID uuid.UUID) ([]domain.Customer, error)
+	listFn       func(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Customer, error)
 	updateFn     func(ctx context.Context, organizationID, customerID uuid.UUID, input domain.CustomerInput) (*domain.Customer, error)
 	softDeleteFn func(ctx context.Context, organizationID, customerID uuid.UUID) error
 	hardDeleteFn func(ctx context.Context, organizationID, customerID uuid.UUID) error
@@ -38,9 +38,9 @@ func (m *mockCustomerRepo) GetByID(ctx context.Context, organizationID, customer
 	return nil, errors.New("not implemented")
 }
 
-func (m *mockCustomerRepo) List(ctx context.Context, organizationID uuid.UUID) ([]domain.Customer, error) {
+func (m *mockCustomerRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Customer, error) {
 	if m.listFn != nil {
-		return m.listFn(ctx, organizationID)
+		return m.listFn(ctx, organizationID, params)
 	}
 	return nil, nil
 }
@@ -73,7 +73,7 @@ func (m *mockCustomerRepo) HardDelete(ctx context.Context, organizationID, custo
 type mockAddressRepo struct {
 	createFn  func(ctx context.Context, organizationID, customerID uuid.UUID, input domain.AddressInput) (*domain.Address, error)
 	getByIDFn func(ctx context.Context, organizationID, customerID, addressID uuid.UUID) (*domain.Address, error)
-	listFn    func(ctx context.Context, organizationID, customerID uuid.UUID) ([]domain.Address, error)
+	listFn    func(ctx context.Context, organizationID, customerID uuid.UUID, params domain.ListParams) ([]domain.Address, error)
 	updateFn  func(ctx context.Context, organizationID, customerID, addressID uuid.UUID, input domain.AddressInput) (*domain.Address, error)
 	deleteFn  func(ctx context.Context, organizationID, customerID, addressID uuid.UUID) error
 }
@@ -94,9 +94,9 @@ func (m *mockAddressRepo) GetByID(ctx context.Context, organizationID, customerI
 	return nil, domain.ErrAddressNotFound
 }
 
-func (m *mockAddressRepo) List(ctx context.Context, organizationID, customerID uuid.UUID) ([]domain.Address, error) {
+func (m *mockAddressRepo) List(ctx context.Context, organizationID, customerID uuid.UUID, params domain.ListParams) ([]domain.Address, error) {
 	if m.listFn != nil {
-		return m.listFn(ctx, organizationID, customerID)
+		return m.listFn(ctx, organizationID, customerID, params)
 	}
 	return nil, nil
 }
@@ -123,7 +123,7 @@ type mockUserRepo struct {
 	createFn           func(ctx context.Context, organizationID uuid.UUID, input domain.CreateUserInput) (*domain.User, error)
 	getByIDFn          func(ctx context.Context, organizationID, userID uuid.UUID) (*domain.User, error)
 	getByEmailAndOrgFn func(ctx context.Context, organizationID uuid.UUID, email string) (*domain.User, error)
-	listFn             func(ctx context.Context, organizationID uuid.UUID) ([]domain.User, error)
+	listFn             func(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.User, error)
 	updateFn           func(ctx context.Context, organizationID, userID uuid.UUID, input domain.UpdateUserInput) (*domain.User, error)
 	softDeleteFn       func(ctx context.Context, organizationID, userID uuid.UUID) error
 }
@@ -151,9 +151,9 @@ func (m *mockUserRepo) GetByEmailAndOrg(ctx context.Context, organizationID uuid
 	return nil, errors.New("not found")
 }
 
-func (m *mockUserRepo) List(ctx context.Context, organizationID uuid.UUID) ([]domain.User, error) {
+func (m *mockUserRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.User, error) {
 	if m.listFn != nil {
-		return m.listFn(ctx, organizationID)
+		return m.listFn(ctx, organizationID, params)
 	}
 	return nil, nil
 }
@@ -264,7 +264,7 @@ func (m *mockTxHandle) CredentialRepo() domain.CredentialRepository {
 type mockCredentialRepo struct {
 	createFn     func(ctx context.Context, orgID uuid.UUID, input domain.CreateCredentialInput) (*domain.CredentialRecord, error)
 	getByIDFn    func(ctx context.Context, orgID, credentialID uuid.UUID) (*domain.CredentialRecord, error)
-	listFn       func(ctx context.Context, orgID uuid.UUID) ([]domain.CredentialRecord, error)
+	listFn       func(ctx context.Context, orgID uuid.UUID, params domain.ListParams) ([]domain.CredentialRecord, error)
 	softDeleteFn func(ctx context.Context, orgID, credentialID uuid.UUID) error
 }
 
@@ -284,9 +284,9 @@ func (m *mockCredentialRepo) GetByID(ctx context.Context, orgID, credentialID uu
 	return nil, domain.ErrCredentialNotFound
 }
 
-func (m *mockCredentialRepo) List(ctx context.Context, orgID uuid.UUID) ([]domain.CredentialRecord, error) {
+func (m *mockCredentialRepo) List(ctx context.Context, orgID uuid.UUID, params domain.ListParams) ([]domain.CredentialRecord, error) {
 	if m.listFn != nil {
-		return m.listFn(ctx, orgID)
+		return m.listFn(ctx, orgID, params)
 	}
 	return nil, nil
 }
