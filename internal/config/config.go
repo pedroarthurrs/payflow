@@ -36,6 +36,11 @@ type Config struct {
 
 	// API Keys
 	APIKeyPepper string
+
+	// Webhook worker queue
+	WebhookQueueBufferSize int
+	WebhookWorkerCount     int
+	WebhookQueueDriver     string
 }
 
 // envInt reads an environment variable and converts it to int.
@@ -76,5 +81,9 @@ func Load() *Config {
 		RateLimitOrganizationMaxRequests:   envInt("RATE_LIMIT_ORGANIZATION_MAX_REQUESTS", 200),
 
 		APIKeyPepper: os.Getenv("API_KEY_PEPPER"),
+
+		WebhookQueueBufferSize: envInt("WEBHOOK_QUEUE_BUFFER_SIZE", 1000),
+		WebhookWorkerCount:     envInt("WEBHOOK_WORKER_COUNT", 5),
+		WebhookQueueDriver:     os.Getenv("WEBHOOK_QUEUE_DRIVER"),
 	}
 }

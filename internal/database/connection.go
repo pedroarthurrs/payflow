@@ -15,6 +15,8 @@ import (
 	organizationdb "i9pay/internal/database/dbgen/organization"
 	productdb "i9pay/internal/database/dbgen/product"
 	userdb "i9pay/internal/database/dbgen/user"
+	webhookdb "i9pay/internal/database/dbgen/webhook"
+	webhooklogdb "i9pay/internal/database/dbgen/webhooklog"
 
 	_ "github.com/lib/pq"
 )
@@ -30,6 +32,8 @@ type DB struct {
 	OrganizationQ  organizationdb.Querier
 	CredentialQ    credentialdb.Querier
 	CredentialLogQ credentiallogdb.Querier
+	WebhookQ       *webhookdb.Queries
+	WebhookLogQ    *webhooklogdb.Queries
 }
 
 // New opens and verifies a database connection using the provided application config.
@@ -68,6 +72,8 @@ func New(cfg *config.Config) (*DB, error) {
 		OrganizationQ:  organizationdb.New(db),
 		CredentialQ:    credentialdb.New(db),
 		CredentialLogQ: credentiallogdb.New(db),
+		WebhookQ:       webhookdb.New(db),
+		WebhookLogQ:    webhooklogdb.New(db),
 	}, nil
 }
 

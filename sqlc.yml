@@ -87,3 +87,25 @@ sql:
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/webhooks.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "webhookdb"
+        out: "internal/database/dbgen/webhook"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/webhook_logs.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "webhooklogdb"
+        out: "internal/database/dbgen/webhooklog"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true

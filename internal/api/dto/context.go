@@ -64,3 +64,13 @@ func LogID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// WebhookID parses the ":webhook_id" path parameter as a UUID.
+func WebhookID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("webhook_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid webhook id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}

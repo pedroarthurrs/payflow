@@ -137,7 +137,12 @@ type ListAddressesByCustomerParams struct {
 }
 
 func (q *Queries) ListAddressesByCustomer(ctx context.Context, arg ListAddressesByCustomerParams) ([]Address, error) {
-	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer, arg.CustomerID, arg.OrganizationID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listAddressesByCustomer,
+		arg.CustomerID,
+		arg.OrganizationID,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

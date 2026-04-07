@@ -1,13 +1,21 @@
 package main
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"i9pay/internal/api/router"
 	"i9pay/internal/config"
 	"i9pay/internal/database"
+	"i9pay/internal/database/repository"
 	"i9pay/internal/monitor"
+	"i9pay/internal/queue"
+	"i9pay/internal/worker"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,7 +58,16 @@ func run() error {
 	healthCheck := database.NewHealthChecker(db)
 	healthCheck.Start()
 
-	r := router.NewRouter(cfg, logger, db, healthCheck)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	q := queue.NewInMemoryQueue(cfg.WebhookQueueBufferSize)
+
+	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
+	wkr := worker.NewWebhookWorker(q, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, cfg.WebhookWorkerCount)
+	go wkr.Start(ctx)
+
+	r := router.NewRouter(cfg, logger, db, healthCheck, q)
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		logger.Error("server stopped", "error", err)

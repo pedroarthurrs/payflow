@@ -14,17 +14,19 @@ import (
 
 // domainStatusMap maps domain sentinel errors to HTTP status codes.
 var domainStatusMap = map[error]int{
-	domain.ErrNotFound:             http.StatusNotFound,
-	domain.ErrCustomerNotFound:     http.StatusNotFound,
-	domain.ErrAddressNotFound:      http.StatusNotFound,
-	domain.ErrOrganizationNotFound: http.StatusNotFound,
-	domain.ErrConflict:             http.StatusConflict,
-	domain.ErrDuplicateEmail:       http.StatusConflict,
-	domain.ErrDuplicateDocument:    http.StatusConflict,
-	domain.ErrUnauthorized:         http.StatusUnauthorized,
-	domain.ErrForbidden:            http.StatusForbidden,
-	domain.ErrBadRequest:           http.StatusBadRequest,
-	domain.ErrInternal:             http.StatusInternalServerError,
+	domain.ErrNotFound:                http.StatusNotFound,
+	domain.ErrCustomerNotFound:        http.StatusNotFound,
+	domain.ErrAddressNotFound:         http.StatusNotFound,
+	domain.ErrOrganizationNotFound:    http.StatusNotFound,
+	domain.ErrConflict:                http.StatusConflict,
+	domain.ErrDuplicateEmail:          http.StatusConflict,
+	domain.ErrDuplicateDocument:       http.StatusConflict,
+	domain.ErrUnauthorized:            http.StatusUnauthorized,
+	domain.ErrForbidden:               http.StatusForbidden,
+	domain.ErrBadRequest:              http.StatusBadRequest,
+	domain.ErrInternal:                http.StatusInternalServerError,
+	domain.ErrWebhookEndpointNotFound: http.StatusNotFound,
+	domain.ErrWebhookLogNotFound:      http.StatusNotFound,
 }
 
 // Errors reads errors attached via c.Error() after the handler chain runs and

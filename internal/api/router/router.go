@@ -11,6 +11,7 @@ import (
 	"i9pay/internal/database"
 	"i9pay/internal/database/repository"
 	"i9pay/internal/monitor"
+	"i9pay/internal/queue"
 	"i9pay/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,7 @@ const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
-func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker) *gin.Engine {
+func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker, q queue.Queue) *gin.Engine {
 	// Feature flags — backed by env vars by default; swap for AWS AppConfig or
 	// any other store by passing a different config.FlagProvider implementation.
 	flags := config.NewEnvFlagProvider(
@@ -56,6 +57,9 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	authRepo := repository.NewAuthRepo(db.AuthQ)
 	credentialRepo := repository.NewCredentialRepo(db.CredentialQ)
 	credentialLogRepo := repository.NewCredentialLogRepo(db.CredentialLogQ)
+	webhookRepo := repository.NewWebhookRepo(db.WebhookQ)
+	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
+	orgSecretReader := repository.NewOrganizationSecretReader(db.OrganizationQ)
 	txManager := repository.NewTxManager(db)
 
 	// Services
@@ -67,6 +71,9 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userSvc := service.NewUserService(userRepo)
 	credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
 	credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
+	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
+	dispatcher := service.NewWebhookDispatcher(webhookRepo, orgSecretReader, q)
+	_ = dispatcher // TODO: inject into handler that triggers webhook events
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -82,6 +89,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userHandler := handler.NewUserHandler(userSvc)
 	credentialHandler := handler.NewCredentialHandler(credentialSvc)
 	credentialLogHandler := handler.NewCredentialLogHandler(credentialLogSvc)
+	webhookHandler := handler.NewWebhookHandler(webhookSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -107,6 +115,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userHandler.RegisterRoutes(protected)
 	credentialHandler.RegisterRoutes(protected)
 	credentialLogHandler.RegisterRoutes(protected)
+	webhookHandler.RegisterRoutes(protected)
 
 	return r
 }
