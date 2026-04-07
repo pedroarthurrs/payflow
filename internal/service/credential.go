@@ -2,12 +2,9 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
 	"log/slog"
 
+	"i9pay/internal/crypto"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
@@ -15,9 +12,11 @@ import (
 
 // CredentialService handles credential business logic.
 type CredentialService struct {
-	repo   domain.CredentialRepository
-	txMgr  domain.TxManager
-	pepper string
+	repo         domain.CredentialRepository
+	txMgr        domain.TxManager
+	keyGenerator *crypto.KeyGenerator
+	hasher       *crypto.Hasher
+	pepper       string
 }
 
 // NewCredentialService creates a CredentialService.
@@ -26,38 +25,23 @@ func NewCredentialService(repo domain.CredentialRepository, txMgr domain.TxManag
 	if pepper == "" {
 		panic("CredentialService: pepper must not be empty")
 	}
-	return &CredentialService{repo: repo, txMgr: txMgr, pepper: pepper}
-}
-
-// generateRawKey generates a random credential key with an environment-specific prefix.
-// Format: "{ENV_PREFIX}_{hex(32 bytes)}"
-func generateRawKey(environment string) (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("generateRawKey: failed to read random bytes: %w", err)
+	return &CredentialService{
+		repo:         repo,
+		txMgr:        txMgr,
+		keyGenerator: crypto.NewKeyGenerator(),
+		hasher:       crypto.NewHasher(),
+		pepper:       pepper,
 	}
-	hexBytes := hex.EncodeToString(b)
-	prefix := "I9TEST_"
-	if environment == "production" {
-		prefix = "I9LIVE_"
-	}
-	return prefix + hexBytes, nil
-}
-
-// hashKey computes hex(SHA-256(pepper + rawKey)).
-func (s *CredentialService) hashKey(rawKey string) string {
-	h := sha256.Sum256([]byte(s.pepper + rawKey))
-	return hex.EncodeToString(h[:])
 }
 
 // Create generates a new credential for the given organization.
 // Returns the persisted record and the raw key (only available in memory, never stored).
 func (s *CredentialService) Create(ctx context.Context, orgID uuid.UUID, input domain.CreateCredentialInput) (*domain.CredentialRecord, string, error) {
-	rawKey, err := generateRawKey(input.Environment)
+	rawKey, err := s.keyGenerator.GenerateAPIKey(input.Environment)
 	if err != nil {
 		return nil, "", err
 	}
-	keyHash := s.hashKey(rawKey)
+	keyHash := s.hasher.SHA256WithPepper(s.pepper, rawKey)
 	keyPrefix := rawKey[:10]
 
 	record, err := s.repo.Create(ctx, orgID, domain.CreateCredentialInput{
@@ -105,12 +89,12 @@ func (s *CredentialService) Rotate(ctx context.Context, orgID, credentialID uuid
 			return err
 		}
 
-		rawKey, err := generateRawKey(existing.Environment)
+		rawKey, err := s.keyGenerator.GenerateAPIKey(existing.Environment)
 		if err != nil {
 			return err
 		}
 
-		keyHash := s.hashKey(rawKey)
+		keyHash := s.hasher.SHA256WithPepper(s.pepper, rawKey)
 		keyPrefix := rawKey[:10]
 
 		record, err := tx.CredentialRepo().Create(ctx, orgID, domain.CreateCredentialInput{

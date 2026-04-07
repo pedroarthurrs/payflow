@@ -2,13 +2,10 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
 
 	"i9pay/internal/auth/token"
+	"i9pay/internal/crypto"
 	"i9pay/internal/domain"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // TokenProvider defines the token operations required by AuthService.
@@ -21,13 +18,20 @@ type TokenProvider interface {
 
 // AuthService handles authentication logic.
 type AuthService struct {
-	tokenSvc TokenProvider
-	auth     domain.AuthRepository
+	tokenSvc       TokenProvider
+	auth           domain.AuthRepository
+	hasher         *crypto.Hasher
+	passwordHasher *crypto.PasswordHasher
 }
 
 // NewAuthService creates an AuthService with token provider and auth repository.
 func NewAuthService(tokenSvc TokenProvider, auth domain.AuthRepository) *AuthService {
-	return &AuthService{tokenSvc: tokenSvc, auth: auth}
+	return &AuthService{
+		tokenSvc:       tokenSvc,
+		auth:           auth,
+		hasher:         crypto.NewHasher(),
+		passwordHasher: crypto.NewPasswordHasher(12),
+	}
 }
 
 // Login authenticates via dynamic mode detection:
@@ -51,7 +55,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*token.Pair, error) {
 
 // loginByAPIKey authenticates via SHA-256 hash of the API key.
 func (s *AuthService) loginByAPIKey(ctx context.Context, apiKey string) (*token.Pair, error) {
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(apiKey)))
+	hash := s.hasher.SHA256(apiKey)
 
 	key, err := s.auth.GetAPIKeyByHash(ctx, hash)
 	if err != nil {
@@ -78,7 +82,7 @@ func (s *AuthService) loginByUser(ctx context.Context, email, password string) (
 		return nil, domain.ErrUnauthorized
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if err := s.passwordHasher.Compare(user.Password, password); err != nil {
 		return nil, domain.ErrUnauthorized
 	}
 

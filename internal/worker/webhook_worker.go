@@ -3,15 +3,13 @@ package worker
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"io"
 	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
+	"i9pay/internal/crypto"
 	"i9pay/internal/domain"
 	"i9pay/internal/queue"
 )
@@ -29,12 +27,19 @@ type WebhookWorker struct {
 	logRepo     domain.WebhookLogRepository
 	httpClient  *http.Client
 	workerCount int
+	hmacGen     *crypto.HMACGenerator
 }
 
 // NewWebhookWorker cria um WebhookWorker.
 // workerCount define o número de goroutines de consumo paralelas.
 func NewWebhookWorker(q queue.Queue, logRepo domain.WebhookLogRepository, httpClient *http.Client, workerCount int) *WebhookWorker {
-	return &WebhookWorker{queue: q, logRepo: logRepo, httpClient: httpClient, workerCount: workerCount}
+	return &WebhookWorker{
+		queue:       q,
+		logRepo:     logRepo,
+		httpClient:  httpClient,
+		workerCount: workerCount,
+		hmacGen:     crypto.NewHMACGenerator(),
+	}
 }
 
 // Start inicia workerCount goroutines de consumo e bloqueia até que o contexto seja cancelado.
@@ -158,7 +163,5 @@ func (w *WebhookWorker) deliver(ctx context.Context, job *queue.WebhookJob) *dom
 
 // sign computa HMAC-SHA256 do payload com o secret do job.
 func (w *WebhookWorker) sign(secret string, payload []byte) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(payload)
-	return hex.EncodeToString(mac.Sum(nil))
+	return w.hmacGen.HMACSHA256(secret, payload)
 }

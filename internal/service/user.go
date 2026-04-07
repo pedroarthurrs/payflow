@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 
+	"i9pay/internal/crypto"
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // CreateUserRequest holds the data needed to create a new user.
@@ -25,19 +25,19 @@ type UpdateUserRequest struct {
 
 // UserService handles user management logic.
 type UserService struct {
-	users      domain.UserRepository
-	bcryptCost int
+	users          domain.UserRepository
+	passwordHasher *crypto.PasswordHasher
 }
 
 // NewUserService creates a UserService with database access.
 // Uses bcrypt cost 12 by default (production-safe).
 func NewUserService(users domain.UserRepository) *UserService {
-	return &UserService{users: users, bcryptCost: 12}
+	return &UserService{users: users, passwordHasher: crypto.NewPasswordHasher(12)}
 }
 
 // newUserServiceWithCost creates a UserService with a custom bcrypt cost (for testing).
 func newUserServiceWithCost(users domain.UserRepository, cost int) *UserService {
-	return &UserService{users: users, bcryptCost: cost}
+	return &UserService{users: users, passwordHasher: crypto.NewPasswordHasher(cost)}
 }
 
 // Create creates a new user within an organization.
@@ -68,7 +68,7 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 		}
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), s.bcryptCost)
+	hash, err := s.passwordHasher.Hash(req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (s *UserService) Create(ctx context.Context, organizationID string, req Cre
 	return s.users.Create(ctx, tid, domain.CreateUserInput{
 		Name:         req.Name,
 		Email:        req.Email,
-		PasswordHash: string(hash),
+		PasswordHash: hash,
 		Role:         string(req.Role),
 	})
 }
