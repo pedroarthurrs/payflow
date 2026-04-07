@@ -4,7 +4,7 @@ API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-ten
 
 ## Visão Geral
 
-i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular em camadas e orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
+i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
 
 Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Docker
 
@@ -54,17 +54,20 @@ i9pay/
 ├── internal/
 │   ├── api/
 │   │   ├── handler/          — handlers consolidados (um arquivo por recurso)
-│   │   ├── middleware/       — auth, logging, rate limiting, errors
-│   │   ├── dto/              — Data Transfer Objects compartilhados
+│   │   ├── middleware/       — auth, logging, rate limiting, errors, maintenance
+│   │   ├── dto/              — Data Transfer Objects e query filter helpers
 │   │   ├── err/              — tipos de erro e tradução de validação
-│   │   └── router/           — roteador e inicialização
+│   │   └── router/           — roteador e composition root
 │   ├── auth/token/           — JWT service
+│   ├── config/               — configurações e feature flags
+│   ├── crypto/               — utilitários criptográficos centralizados
+│   ├── monitor/              — integração com Sentry
+│   ├── queue/                — interface de fila e implementação in-memory
 │   ├── service/              — lógica de negócio
-│   ├── domain/               — modelos e validações
-│   ├── config/               — configurações
-│   ├── monitor/              — monitoramento de saúde de dependências
+│   ├── domain/               — modelos, contratos e erros de domínio
+│   ├── worker/               — webhook worker com retry e backoff
 │   └── database/
-│       ├── repository/       — implementações de repositórios (persistência)
+│       ├── repository/       — implementações de repositórios
 │       └── dbgen/            — código gerado pelo SQLC
 ├── Makefile                  — comandos de build e desenvolvimento
 ├── go.mod / go.sum           — dependências
@@ -80,11 +83,18 @@ i9pay/
 - Gerenciamento de usuários (CRUD com controle de roles)
 - Gerenciamento de clientes (CRUD com soft/hard delete para LGPD/GDPR)
 - Gerenciamento de endereços (CRUD vinculado a clientes)
+- Gerenciamento de produtos (CRUD com soft/hard delete)
+- Gerenciamento de credenciais (API Keys: criar, rotacionar, revogar)
+- Audit trail de credenciais (log de requisições autenticadas via API Key)
+- Webhooks (endpoints CRUD, entrega assíncrona com retry, logs de entrega)
 - Arquitetura multi-organization com isolamento de dados
 - Health check com status de dependências (monitor em background)
 - Rate limiting com 3 tiers (IP, login, organization)
+- Feature flags plugáveis (env vars por padrão, extensível para AppConfig/etc.)
+- Monitoramento de erros com Sentry (opcional)
 - Logging estruturado com slog (JSON em produção, texto em desenvolvimento)
 - Validação de entrada com mensagens traduzidas
+- Criptografia centralizada em `internal/crypto` (bcrypt, SHA-256, HMAC-SHA256)
 - Queries type-safe geradas pelo SQLC
 - Migrations versionadas com golang-migrate
 - Docker para desenvolvimento e produção

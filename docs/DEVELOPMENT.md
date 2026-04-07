@@ -477,6 +477,9 @@ Configuração recomendada para VSCode (`.vscode/settings.json`):
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": "always"
+    },
+    "files.exclude": {
+        "**/*_test.go": true
     }
 }
 ```

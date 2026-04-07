@@ -9,8 +9,6 @@ Na prática, o projeto funciona como uma variação pragmática de Ports and Ada
 - A infraestrutura (`database/repository/`) implementa esses contratos e encapsula persistência.
 - A composição das dependências ocorre no `router` (composition root), mantendo o núcleo de negócio desacoplado.
 
-Ou seja: não é uma implementação "by the book" de Clean Architecture em círculos formais, mas a direção arquitetural real do código é clean-oriented.
-
 ```
 ┌─────────────────────────────────────────────┐
 │   Camada HTTP (router + middleware)         │
@@ -54,26 +52,30 @@ Resposta JSON
 ### Camada HTTP (`api/`)
 
 **Router** (`api/router/router.go`)
-- Definição de todas as rotas
-- Injeção de dependências (services, handlers)
-- Configuração da cadeia de middleware
+- Composition root: instancia todos os repositórios, services e handlers
+- Configura a cadeia de middleware
+- Registra rotas via `handler.RegisterRoutes()`
 
 **Handlers** (`api/handler/`)
-- Um arquivo por recurso, todos no mesmo pacote
-- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, `UserHandler`
-- Responsáveis por receber requisições HTTP e validar payload
+- Um arquivo por recurso, todos no mesmo pacote `handler`
+- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, `UserHandler`, `WebhookHandler`, etc.
+- Cada handler implementa `RegisterRoutes(rg *gin.RouterGroup)`
+- Responsáveis por receber requisições HTTP, validar payload e chamar services
 
 **DTOs** (`api/dto/`)
-- Structs compartilhadas entre handlers
+- Structs e helpers compartilhados entre handlers
 - `context.go`: extração de IDs do contexto Gin (`OrganizationID`, `CustomerID`, `ProductID`)
 - `request.go`: structs de requisição compartilhadas
 - `response.go`: structs de resposta compartilhadas
+- `filter.go`: helpers de parsing de query parameters (ver seção Query Filters)
 
 **Middleware** (`api/middleware/`)
 - `auth.go`: valida JWT e extrai claims
 - `credential_log.go`: intercepta requisições autenticadas via API Key e persiste log assíncrono
 - `errors.go`: transforma erros de domínio em respostas HTTP
+- `maintenance.go`: bloqueia tráfego quando modo manutenção está ativo
 - `ratelimit.go`: rate limiting por IP e organization
+- `rbac.go`: controle de acesso baseado em roles
 - `requestid.go`: gera e propaga UUID v4 por requisição
 - `logger.go`: logging estruturado com slog
 
@@ -87,68 +89,55 @@ Resposta JSON
 ### Camada de Serviço (`service/`)
 
 **AuthService** (`service/auth.go`)
-- Orquestra o fluxo de autenticação
 - Suporta dois modos: usuário (email + password) e sistema (API Key)
-- Login por usuário resolve a organization automaticamente a partir do registro
-- Login por API Key valida via hash SHA-256
-- Coordena o token service para emissão de pares access/refresh
-- Depende da interface `domain.AuthRepository` (sem acoplamento direto ao SQLC)
-- Lógica de negócio isolada da camada HTTP
+- Login por usuário resolve a organization a partir do registro do usuário
+- Login por API Key valida via `Hasher.SHA256` e busca por hash no banco
+- Verificação de senha via `PasswordHasher.Compare` (bcrypt)
+- Emite pares access/refresh via `TokenProvider`
 
 **CustomerService** (`service/customer.go`)
-- CRUD completo de clientes
-- Soft delete padrão (marca `deleted_at`)
-- Hard delete para conformidade legal (LGPD/GDPR)
-- Validação de unicidade (email, documento por organization)
-- Criação/atualização atômica de cliente + endereço via `domain.TxManager`
-- Depende de `domain.CustomerRepository` e `domain.AddressRepository`
-- Isolamento multi-organization
+- CRUD completo de clientes com isolamento por organization
+- Criação/atualização atômica de cliente + endereço via `TxManager`
+- Soft delete padrão; hard delete para conformidade LGPD/GDPR
 
 **AddressService** (`service/address.go`)
-- CRUD completo de endereços vinculados a clientes
-- Validação de existência do cliente antes de operações
-- Depende de `domain.CustomerRepository` e `domain.AddressRepository`
+- CRUD de endereços vinculados a clientes
 - Defaults automáticos: tipo `billing`, país `BR`, `is_main: true`
-- Isolamento multi-organization
 
 **UserService** (`service/user.go`)
-- CRUD de usuários dentro de uma organization
-- Soft delete (marca `deleted_at`)
-- Hash de senha com bcrypt (cost 12)
-- Validação de unicidade de email por organization
+- CRUD de usuários com validação de unicidade de email por organization
+- Hash de senha via `PasswordHasher.Hash` (bcrypt cost 12)
 - Bloqueio de criação de segundo `owner` por organization
-- Depende de `domain.UserRepository`
-- Isolamento multi-organization
 
 **ProductService** (`service/product.go`)
-- CRUD completo de produtos vinculados a organizations
-- Soft delete padrão (marca `deleted_at`)
-- Hard delete para remoção permanente (com log de auditoria via slog)
-- Depende de `domain.ProductRepository`
-- Isolamento multi-organization
+- CRUD de produtos com soft/hard delete
 
 **CredentialService** (`service/credential.go`)
-- Criação de API Keys com geração de chave aleatória (prefixo `sk_test_` / `sk_live_`)
-- Armazena apenas o hash SHA-256 da chave (raw key nunca persiste)
-- Rotação de credencial: invalida a anterior e emite nova chave
-- Revogação (soft delete) por organization
-- Listagem e consulta por ID
-- Depende de `domain.CredentialRepository`
-- Isolamento multi-organization
+- Geração de API Keys via `KeyGenerator.GenerateAPIKey` (prefixo `I9TEST_`/`I9LIVE_`)
+- Armazena apenas `Hasher.SHA256WithPepper(pepper, rawKey)` — raw key nunca persiste
+- Rotação atômica via `TxManager`: revoga a anterior e emite nova chave
 
 **CredentialLogService** (`service/credential_log.go`)
 - Listagem paginada de logs com keyset pagination (cursor-based)
 - Filtros: `from`, `to`, `status_code`, `method`, `path`
-- Consulta por ID
-- Codificação/decodificação de cursor opaco (base64 + JSON)
-- Depende de `domain.CredentialLogRepository`
-- Isolamento multi-organization
+- Cursor opaco: `base64url(JSON{t: RFC3339Nano, i: UUID})`
+
+**WebhookService** (`service/webhook.go`)
+- CRUD de endpoints de webhook por organization
+- Listagem de logs com cursor-based pagination e filtros (`from`, `to`, `endpoint_id`, `event_type`, `success`)
+- Listagem de event types suportados
+
+**WebhookDispatcher** (`service/webhook_dispatcher.go`)
+- Busca endpoints ativos que correspondem ao evento e ambiente
+- Lê o `webhook_secret` da organization via `OrganizationSecretReader`
+- Enfileira um `WebhookJob` por endpoint via `Queue.Enqueue`
+- Falhas de enqueue são logadas e não interrompem o processamento dos demais endpoints
 
 ---
 
 ### Camada de Domínio (`domain/`)
 
-Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependências de HTTP.
+Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependências de HTTP ou infraestrutura.
 
 - `organization.go`: entidade Organization
 - `auth.go`: `AuthRepository`, `AuthUser`, `APIKey`, `AuthType`, `LoginRequest`
@@ -158,6 +147,7 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `product.go`: `ProductRepository`, modelo Product, ProductInput
 - `credential.go`: `CredentialRepository`, `CredentialRecord`, `CreateCredentialInput`
 - `credential_log.go`: `CredentialLogRepository`, `CredentialLogWriter`, `CredentialLogRecord`, `CreateCredentialLogInput`, `ListCredentialLogsInput`, `CursorToken`
+- `webhook.go`: `WebhookEndpointRepository`, `WebhookLogRepository`, `OrganizationSecretReader`, modelos `WebhookEndpoint` e `WebhookLog`, event types
 - `tx.go`: contratos transacionais (`TxManager`, `TxHandle`)
 - `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
 
@@ -170,17 +160,181 @@ owner (3) > admin (2) > member (1)
 - `user` — login por email + password (inclui role no token)
 - `system` — login por API Key (sem role no token)
 
+**Event types de webhook:**
+```
+customer.created    customer.updated    customer.deleted
+invoice.created     invoice.paid        invoice.payment_failed
+subscription.created  subscription.updated  subscription.canceled
+```
+
+---
+
+### Camada de Criptografia (`crypto/`)
+
+Centraliza todas as operações criptográficas do projeto. Nenhum serviço importa `crypto/*` ou `golang.org/x/crypto` diretamente.
+
+**PasswordHasher** (`crypto/crypto.go`)
+- `Hash(password)` → bcrypt hash com salt automático (cost configurável, padrão 12)
+- `Compare(hash, password)` → comparação segura contra hash armazenado
+- Usado em: `UserService.Create`, `AuthService.loginByUser`
+
+**KeyGenerator** (`crypto/crypto.go`)
+- `GenerateRandomBytes(n)` → n bytes aleatórios via `crypto/rand` como hex string
+- `GenerateAPIKey(environment)` → `I9TEST_{hex(32)}` ou `I9LIVE_{hex(32)}`
+- Usado em: `CredentialService.Create`, `CredentialService.Rotate`
+
+**Hasher** (`crypto/crypto.go`)
+- `SHA256(data)` → hex(SHA-256(data))
+- `SHA256WithPepper(pepper, data)` → hex(SHA-256(pepper + data))
+- Usado em: `AuthService.loginByAPIKey`, `CredentialService` (hash de API Keys)
+
+**HMACGenerator** (`crypto/crypto.go`)
+- `HMACSHA256(secret, data)` → hex(HMAC-SHA256(secret, data))
+- Usado em: `WebhookWorker.sign` para assinar payloads de webhook
+
+---
+
+### Sistema de Webhooks
+
+O sistema de webhooks é composto por quatro partes independentes:
+
+**1. Handler** (`api/handler/webhook.go`)
+- CRUD de endpoints: `POST /webhooks`, `GET /webhooks`, `GET /webhooks/:id`, `PUT /webhooks/:id`, `DELETE /webhooks/:id`
+- Logs: `GET /webhooks/logs`, `GET /webhooks/logs/:log_id`
+- Event types: `GET /webhooks/events`
+- Todos os endpoints requerem `admin` ou `owner`
+
+**2. Service + Dispatcher** (`service/webhook.go`, `service/webhook_dispatcher.go`)
+- `WebhookService`: CRUD e consulta de logs
+- `WebhookDispatcher`: enfileira jobs para entrega assíncrona
+
+**3. Queue** (`queue/`)
+- Interface `Queue` com `Enqueue` e `Dequeue`
+- `InMemoryQueue`: implementação com canal Go com buffer (dev/test)
+- Extensível: trocar por SQS, Redis, etc. sem alterar call sites
+
+**4. Worker** (`worker/webhook_worker.go`)
+- Consome jobs da fila com N goroutines paralelas (`workerCount`)
+- Entrega via HTTP POST com header `X-Webhook-Signature` (HMAC-SHA256)
+- Retry com backoff exponencial: 1min → 5min → 30min → 2h (máximo 5 tentativas)
+- Persiste `WebhookLog` após cada tentativa (sucesso ou falha)
+- Job é auto-suficiente: carrega `EndpointURL` e `Secret` para evitar acesso ao banco durante entrega
+
+**Fluxo de entrega:**
+```
+Evento de negócio
+    ↓
+WebhookDispatcher.Dispatch(orgID, eventType, env, payload)
+    ↓
+Queue.Enqueue(WebhookJob)
+    ↓
+WebhookWorker.consume() [goroutine]
+    ↓
+HTTP POST → endpoint URL
+    ↓
+WebhookLogRepo.Create() [persiste resultado]
+    ↓ (em caso de falha)
+Queue.Enqueue(job com AttemptNumber+1, ScheduledAt+backoff)
+```
+
+---
+
+### Query Filters (`api/dto/filter.go`)
+
+Helpers centralizados para parsing de query parameters, usados por todos os handlers que suportam paginação ou filtragem.
+
+**Cursor-based pagination** (keyset):
+```go
+f, ok := dto.ParsePagination(c)
+// f.Limit  int               — padrão 20, máximo 100
+// f.Cursor *domain.CursorToken — nil se ausente
+```
+
+**Offset-based pagination**:
+```go
+f, ok := dto.ParseOffsetPagination(c)
+// f.Limit  int32 — padrão 20, máximo 100
+// f.Offset int32 — padrão 0
+params := f.ToListParams()
+```
+
+**Date range**:
+```go
+f, ok := dto.ParseDateRange(c)
+// f.From *time.Time — RFC 3339, nil se ausente
+// f.To   *time.Time — RFC 3339, nil se ausente
+// Valida que From não é posterior a To
+```
+
+**Outros helpers**:
+```go
+dto.ParseInt32(c, "status_code")            // *int32, nil se ausente
+dto.ParseString(c, "method")               // *string, nil se ausente
+dto.ParseStatus(c, "active", "inactive")   // valida contra lista de valores permitidos
+```
+
+**Cursor encoding** (`service/credential_log.go`):
+- `EncodeCursor(t, id)` → `base64url(JSON{t: RFC3339Nano, i: UUID})`
+- `DecodeCursor(s)` → `*domain.CursorToken`
+- Cursor é opaco para o cliente; contém timestamp + UUID para keyset pagination eficiente
+
+---
+
+### Feature Flags (`config/`)
+
+Sistema de feature flags plugável, sem dependência de serviço externo por padrão.
+
+**Interface** (`config/flags.go`):
+```go
+type FlagProvider interface {
+    IsEnabled(flag Flag) bool
+    Reload() error
+}
+```
+
+**Implementação padrão** (`config/flags_env.go`):
+- `EnvFlagProvider` lê variáveis `FEATURE_{FLAG_NAME}` do ambiente
+- Thread-safe com `sync.RWMutex`
+- Valores aceitos: `true`, `1`, `yes` (case-insensitive)
+- `Reload()` re-lê o ambiente sem reiniciar o processo
+
+**Flags disponíveis:**
+
+| Flag | Env Var | Efeito |
+|------|---------|--------|
+| `FlagMaintenance` | `FEATURE_MAINTENANCE=true` | Bloqueia todos os endpoints exceto `/live` e `/ready` |
+
+**Extensibilidade**: para usar AWS AppConfig, banco de dados ou outro provider remoto, basta implementar `FlagProvider` e injetar no router — nenhum outro código muda.
+
+---
+
+### Monitoramento (`monitor/`)
+
+Integração opcional com Sentry para rastreamento de erros em produção.
+
+- `Init(cfg)`: inicializa o SDK do Sentry; no-op se `SENTRY_DSN` estiver vazio
+- `Flush()`: aguarda envio de eventos pendentes antes do processo encerrar
+- `Middleware()`: middleware Gin que captura panics e erros por requisição
+- `CaptureException(c, err)`: reporta erro usando o hub scoped à requisição
+- `LogHandler`: `slog.Handler` customizado que encaminha logs ao Sentry como breadcrumbs e erros como eventos
+
+Configuração:
+```bash
+SENTRY_DSN=https://...@sentry.io/...   # obrigatório para ativar
+GO_ENV=production                       # define o environment no Sentry
+```
+
 ---
 
 ### Camada de Banco de Dados (`database/`)
 
 **Conexão** (`database/connection.go`)
-- Gerencia conexão com PostgreSQL
-- Expõe interface para queries via SQLC
+- Gerencia conexão com PostgreSQL via `database/sql`
+- Expõe `*sql.DB` e instâncias de `Queries` por domínio
 
 **Código gerado pelo SQLC** (`database/dbgen/`)
 
-Cada domínio possui seu próprio subpacote gerado, mantendo isolamento e evitando conflitos de nomes:
+Cada domínio possui seu próprio subpacote gerado:
 
 | Subpacote | Domínio |
 |-----------|---------|
@@ -192,25 +346,24 @@ Cada domínio possui seu próprio subpacote gerado, mantendo isolamento e evitan
 | `dbgen/organization` | Organizations |
 | `dbgen/product` | Produtos |
 | `dbgen/user` | Usuários |
-
-Cada subpacote contém: `db.go`, `models.go`, `querier.go` e `<domain>.sql.go`.
+| `dbgen/webhook` | Endpoints de webhook |
+| `dbgen/webhooklog` | Logs de webhook |
 
 **Repositórios** (`database/repository/`)
 - Implementam os contratos da camada de domínio
-- Encapsulam acesso ao SQLC e mapeamento de erros
-- Incluem gerenciador transacional (`TxManager`) para casos atômicos
+- Encapsulam acesso ao SQLC e mapeamento de erros de domínio
+- `tx.go`: `TxManager` e `txHandle` para operações atômicas com `defer sqlTx.Rollback()`
 
 **SQL** (`database/queries/`)
-- Um arquivo `.sql` por domínio (ex: `credentials.sql`, `credential_logs.sql`)
+- Um arquivo `.sql` por domínio
 - Queries geram código Go via `make sqlc`
-- Versionadas junto com as migrations
 
 ---
 
 ### Health Monitor (`database/health.go`)
 
 - Goroutine em background faz ping no banco a cada 15 segundos
-- Cacheia o resultado em `dbStatus` com `sync.RWMutex` para leituras concorrentes seguras
+- Cacheia resultado em `dbStatus` com `sync.RWMutex`
 - Expõe `DatabaseOK() bool`, consumido pelo `HealthHandler`
 - Separa liveness (processo vivo) de readiness (banco acessível)
 
@@ -218,19 +371,17 @@ Cada subpacote contém: `db.go`, `models.go`, `querier.go` e `<domain>.sql.go`.
 
 ### Token Service (`auth/token/`)
 
-- Criação de tokens (access e refresh)
-- Validação e parsing de JWT
-- Suporta claims estendidos (`organization_id`, `role`, `auth_type`, `token_type`)
-- Dois tipos de autenticação: `user` (com role) e `system` (API Key, sem role)
-- Isolado da lógica HTTP
+- Criação e validação de tokens JWT (access e refresh)
+- Claims estendidos: `organization_id`, `user_id`, `role`, `auth_type`, `token_type`
+- Access token TTL: 15 minutos; Refresh token TTL: 7 dias
 
 ---
 
 ### Configuração (`config/`)
 
-- Carrega variáveis de ambiente
-- Valida valores obrigatórios
-- Suporte a múltiplos ambientes (development, staging, production)
+- Carrega variáveis de ambiente via `godotenv`
+- Valida valores obrigatórios na inicialização
+- Expõe `Config` struct com todos os parâmetros da aplicação
 
 ---
 
@@ -238,231 +389,144 @@ Cada subpacote contém: `db.go`, `models.go`, `querier.go` e `<domain>.sql.go`.
 
 ### Cadeia de Middleware
 
-A ordem de middleware é crítica para segurança e observabilidade:
+A ordem é crítica para segurança e observabilidade:
 
 ```
 1. Recovery()                    — captura panics
-2. RequestID()                   — gera/propaga X-Request-ID (UUID v4)
-3. StructuredLogger()            — registra requisição com slog
-4. Maintenance()                 — bloqueia tráfego em modo manutenção
-5. Errors()                      — serializa erros para JSON
-6. RateLimitByIP()               — limita por IP (grupo v1)
-7. Auth()                        — valida JWT (grupo protegido)
-8. CredentialLog()               — persiste log assíncrono para auth_type=system
-9. RateLimitByOrganization()     — limita por organization (grupo protegido)
-10. RequireRole()                — RBAC por endpoint (onde aplicável)
+2. monitor.Middleware()          — instrumentação Sentry por requisição
+3. RequestID()                   — gera/propaga X-Request-ID (UUID v4)
+4. StructuredLogger()            — registra requisição com slog
+5. Maintenance()                 — bloqueia tráfego em modo manutenção
+6. Errors()                      — serializa erros para JSON
+7. RateLimitByIP()               — limita por IP (grupo v1)
+8. Auth()                        — valida JWT (grupo protegido)
+9. CredentialLog()               — persiste log assíncrono para auth_type=system
+10. RateLimitByOrganization()    — limita por organization (grupo protegido)
+11. RequireRole()                — RBAC por endpoint (onde aplicável)
 ```
 
-### RBAC (Role-Based Access Control)
+### RBAC
 
-O middleware `RequireRole(minRole)` em `api/middleware/rbac.go` aplica controle de acesso baseado em roles:
-
-- Verifica se o token possui claims válidos
-- Tokens de sistema (`auth_type: "system"`) sem role recebem 403
-- Compara o nível do role do usuário com o mínimo exigido
+`RequireRole(minRole)` em `api/middleware/rbac.go`:
+- Tokens de sistema (`auth_type: system`) sem role recebem 403
 - Hierarquia: `owner (3) > admin (2) > member (1)`
-
-Usado nos endpoints de gerenciamento de usuários:
-- `POST /v1/users` → requer `owner`
-- `GET /v1/users` → requer `admin`
-- `PUT /v1/users/:user_id` → requer `owner`
-- `DELETE /v1/users/:user_id` → requer `owner`
 
 ### Rate Limiting
 
-Implementado com 3 tiers independentes:
+3 tiers independentes com `RateLimiterStore` separadas:
 
-1. Por IP — proteção geral contra abuso (100 req/min por IP)
-2. Por login — mitigação de força bruta (5 tentativas/5min por IP)
-3. Por organization — isolamento de recursos (200 req/min por organization)
-
-Cada tier usa uma `RateLimiterStore` separada com `sync.Mutex` e `map[string]*visitor`. Limpeza lazy (ao acessar chave expirada).
-
-### Logging Estruturado
-
-Usa `log/slog` nativo do Go (1.21+):
-- Produção: JSON handler (legível por máquina)
-- Desenvolvimento: Text handler (legível por humano)
-
-Cada log contém: `request_id`, `method`, `path`, `status`, `latency_ms`, `client_ip`, `user_id`.
-
-### Tradução de Erros de Validação
-
-Converte erros brutos do `go-playground/validator` em mensagens legíveis:
-- `required` → `{field} is required`
-- `email` → `{field} must be a valid email`
-- Resposta estruturada com `field`, `rejected_value`, `message`
+| Tier | Chave | Padrão |
+|------|-------|--------|
+| IP | IP do cliente | 100 req/min |
+| Login | IP do cliente | 5 tentativas/5min |
+| Organization | organization_id | 200 req/min |
 
 ### Padrão de Handler
 
-Todos os handlers ficam no pacote `internal/api/handler/`, com nomes qualificados para evitar conflitos. Cada handler implementa `RegisterRoutes()` para registrar suas rotas:
-
 ```go
-package handler
-
-type AuthHandler struct {
-    authSvc *service.AuthService
-    loginRL gin.HandlerFunc
+type FeatureHandler struct {
+    svc *service.FeatureService
 }
 
-func NewAuthHandler(authSvc *service.AuthService, loginRL gin.HandlerFunc) *AuthHandler {
-    return &AuthHandler{authSvc: authSvc, loginRL: loginRL}
+func NewFeatureHandler(svc *service.FeatureService) *FeatureHandler {
+    return &FeatureHandler{svc: svc}
 }
 
-// RegisterRoutes registra as rotas do handler no grupo fornecido.
-func (h *AuthHandler) RegisterRoutes(rg *gin.RouterGroup) {
-    auth := rg.Group("/auth")
-    auth.POST("/login", h.loginRL, h.Login)
-    auth.POST("/refresh", h.Refresh)
+func (h *FeatureHandler) RegisterRoutes(rg *gin.RouterGroup) {
+    g := rg.Group("/features")
+    g.POST("", h.Create)
+    g.GET("", h.List)
+    g.GET("/:id", h.GetByID)
 }
-```
-
-Sem framework de injeção de dependências. Dependências são passadas explicitamente no `router.go`:
-
-```go
-tokenSvc := token.NewService(secret, ttl1, ttl2)
-customerRepo := repository.NewCustomerRepo(db.CustomerQ)
-addressRepo := repository.NewAddressRepo(db.AddressQ)
-productRepo := repository.NewProductRepo(db.ProductQ)
-userRepo := repository.NewUserRepo(db.UserQ)
-authRepo := repository.NewAuthRepo(db.AuthQ)
-credentialRepo := repository.NewCredentialRepo(db.CredentialQ)
-credentialLogRepo := repository.NewCredentialLogRepo(db.CredentialLogQ)
-txManager := repository.NewTxManager(db)
-
-authSvc := service.NewAuthService(tokenSvc, authRepo)
-customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
-addressSvc := service.NewAddressService(customerRepo, addressRepo)
-productSvc := service.NewProductService(productRepo)
-userSvc := service.NewUserService(userRepo)
-credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
-credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
-
-// Cada handler registra suas próprias rotas
-authHandler.RegisterRoutes(v1)
-customerHandler.RegisterRoutes(protected)
-addressHandler.RegisterRoutes(protected)
-productHandler.RegisterRoutes(protected)
-userHandler.RegisterRoutes(protected)
-credentialHandler.RegisterRoutes(protected)
-credentialLogHandler.RegisterRoutes(protected)
 ```
 
 ### Tratamento de Erros
 
-1. Services retornam erros de domínio
-2. Handlers convertem quando necessário (ex.: `apierr.BadRequest`/`apierr.Unauthorized`)
-3. Middleware `Errors()` mapeia erros de domínio para status HTTP padronizados
+1. Services retornam erros de domínio (`domain.ErrNotFound`, `domain.ErrConflict`, etc.)
+2. Handlers convertem quando necessário (`apierr.BadRequest`, `apierr.Unauthorized`)
+3. Middleware `Errors()` mapeia para status HTTP e serializa JSON
 
 ```go
 // Handler
 if err != nil {
-    _ = c.Error(apierr.Unauthorized("invalid credentials"))
+    _ = c.Error(apierr.NotFound("customer not found"))
     return
 }
-
-// Middleware converte para JSON
-// {"error": "invalid credentials"}
+// Middleware → {"error": "customer not found"} com status 404
 ```
 
----
+### Transações
 
-## Adicionando Nova Feature
+`TxManager.WithTx` garante atomicidade com rollback automático via `defer`:
 
-### Estrutura de arquivos
-
-```
-internal/
-├── api/handler/{feature}.go    — camada HTTP
-├── service/{feature}.go        — lógica de negócio
-├── domain/{feature}.go         — modelos/contratos (se necessário)
-└── database/repository/{feature}_repo.go — persistência
-```
-
-### Usando queries geradas pelo SQLC
-
-1. Escreva a query no arquivo correspondente em `internal/database/queries/` (ex: `plans.sql`):
-```sql
--- name: GetPlan :one
-SELECT id, name FROM plans WHERE id = $1;
-```
-
-2. Gere o código:
-```bash
-make sqlc
-```
-
-3. Implemente o repositório em `internal/database/repository/` usando o subpacote gerado:
 ```go
-type PlanRepo struct {
-    q plandb.Querier
-}
-
-func (r *PlanRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Plan, error) {
-    row, err := r.q.GetPlan(ctx, id)
-    if err != nil {
-        return nil, err
+if err := s.txManager.WithTx(ctx, func(tx domain.TxHandle) error {
+    if _, err := tx.CustomerRepo().Create(ctx, orgID, input); err != nil {
+        return err // rollback automático
     }
-    return &domain.Plan{ID: row.ID, Name: row.Name}, nil
+    if _, err := tx.AddressRepo().Create(ctx, orgID, customerID, addr); err != nil {
+        return err // rollback automático
+    }
+    return nil // commit
+}); err != nil {
+    return nil, nil, err
 }
 ```
 
-4. Injete o repositório no service e registre as rotas em `internal/api/router/router.go`.
+Operações atômicas implementadas:
+- `CustomerService.Create` com endereço
+- `CustomerService.Update` com endereço
+- `CredentialService.Rotate` (revoga + cria)
 
 ---
 
 ## Segurança
 
-- Assinatura JWT com HMAC SHA-256
-- TTLs curtos para access token (15min) e longos para refresh (7 dias)
-- Header `Authorization` obrigatório em rotas protegidas
-- Middleware `Recovery` captura panics
-- RBAC com hierarquia de roles (owner > admin > member)
-- Senhas armazenadas com bcrypt (cost 12)
-- API Keys validadas via hash SHA-256 com pepper (`API_KEY_PEPPER`)
-- Raw key nunca persiste — apenas o hash é armazenado
-- Bloqueio de criação de segundo owner por organization
-- Audit trail assíncrono para todas as requisições autenticadas via API Key
+- JWT com HMAC SHA-256, TTL curto (15min access, 7d refresh)
+- Senhas com bcrypt cost 12 (salt automático)
+- API Keys: apenas hash SHA-256 com pepper armazenado; raw key nunca persiste
+- Webhook payloads assinados com HMAC-SHA256 (`X-Webhook-Signature`)
+- Criptografia centralizada em `internal/crypto/` — nenhum serviço usa `crypto/*` diretamente
+- RBAC com hierarquia de roles
+- Rate limiting em 3 tiers
+- Audit trail assíncrono para requisições via API Key
+- Bloqueio de segundo owner por organization
 
 ---
 
 ## Conformidade Legal (LGPD/GDPR)
 
-O `CustomerService` implementa `HardDelete()` para atender requisitos de remoção permanente de dados.
-
-**Casos de uso:**
+`CustomerService.HardDelete()` remove fisicamente o registro para atender:
 - LGPD Art. 18 (Direito ao Esquecimento)
 - GDPR Art. 17 (Right to Erasure)
-- Ordens judiciais
-- Políticas de retenção de dados
 
-**Diferença entre os métodos:**
-- `Delete()`: soft delete (marca `deleted_at`, dados preservados)
-- `HardDelete()`: remoção física permanente (conformidade legal)
-
-**Recomendações:**
-- Use `Delete()` para operações normais
-- Use `HardDelete()` apenas para requisições legais documentadas
-- Mantenha logs de auditoria das operações de hard delete
+Use `Delete()` (soft) para operações normais; `HardDelete()` apenas para requisições legais documentadas.
 
 ---
 
 ## Estratégia de Testes
 
-**Testes unitários:**
-- Services: mock de repositórios/interfaces de domínio
-- Handlers: mock de services
-- Domain: sem dependências, 100% testável
-
-**Testes de integração (planejados):**
-- Endpoints da API com banco de dados de teste
-- Transações com rollback
+- **Handlers**: mock de services, testa comportamento HTTP
+- **Services**: mock de repositórios, testa lógica de negócio
+- **Middleware**: testa rate limiting, RBAC, logging, erros
+- **Crypto**: testes de hash, geração de chaves, HMAC, comparação segura + benchmarks
+- **Domain**: sem dependências, 100% testável em isolamento
 
 ---
 
-## Performance
+## Adicionando Nova Feature
 
-- SQLC compila queries em build-time (zero custo em runtime)
-- Rate limiter com complexidade O(1) por requisição
-- Logging estruturado com overhead de ~1-2ms por requisição
-- Connection pooling via `database/sql` padrão
+```
+internal/
+├── api/handler/{feature}.go         — camada HTTP (RegisterRoutes)
+├── service/{feature}.go             — lógica de negócio
+├── domain/{feature}.go              — modelos e contratos
+└── database/repository/{feature}.go — persistência (implementa contratos)
+```
+
+1. Escreva queries em `internal/database/queries/{feature}.sql`
+2. Gere código: `make sqlc`
+3. Implemente repositório usando o subpacote `dbgen/{feature}`
+4. Implemente service dependendo de interfaces de domínio
+5. Implemente handler com `RegisterRoutes`
+6. Registre no `router.go` (composition root)
