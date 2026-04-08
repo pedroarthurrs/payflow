@@ -459,3 +459,16 @@ CREATE TABLE IF NOT EXISTS subscription_schedules (
         FOREIGN KEY (organization_id, subscription_id)
         REFERENCES subscriptions (organization_id, id) ON DELETE CASCADE
 );
+
+-- Histórico de mudanças de estado das transações.
+CREATE TABLE IF NOT EXISTS transaction_status_history (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id  UUID NOT NULL REFERENCES organizations(id),
+    transaction_id   UUID NOT NULL REFERENCES transactions(id),
+    old_status       transaction_status_type,
+    new_status       transaction_status_type NOT NULL,
+    event_source     VARCHAR(50),
+    event_source_id  UUID,
+    reason           TEXT,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

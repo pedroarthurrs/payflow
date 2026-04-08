@@ -257,6 +257,32 @@ func (m *mockTxHandle) CredentialRepo() domain.CredentialRepository {
 	return &mockCredentialRepo{}
 }
 
+func (m *mockTxHandle) TransactionFSMRepo() domain.TransactionFSMRepository {
+	return &mockTransactionFSMRepo{}
+}
+
+// ============================================================
+// Mock TransactionFSMRepository (stub for TxHandle compliance)
+// ============================================================
+
+type mockTransactionFSMRepo struct{}
+
+func (m *mockTransactionFSMRepo) GetForUpdate(ctx context.Context, organizationID, transactionID uuid.UUID) (*domain.TransactionForUpdate, error) {
+	return nil, domain.ErrTransactionNotFound
+}
+
+func (m *mockTransactionFSMRepo) UpdateStatus(ctx context.Context, organizationID, transactionID uuid.UUID, newStatus domain.TransactionStatus) error {
+	return nil
+}
+
+func (m *mockTransactionFSMRepo) InsertHistory(ctx context.Context, entry domain.TransitionHistory) error {
+	return nil
+}
+
+func (m *mockTransactionFSMRepo) ListHistory(ctx context.Context, organizationID, transactionID uuid.UUID) ([]domain.TransitionHistory, error) {
+	return nil, nil
+}
+
 // ============================================================
 // Mock CredentialRepository
 // ============================================================

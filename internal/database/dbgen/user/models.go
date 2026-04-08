@@ -458,6 +458,18 @@ type Transaction struct {
 	CreatedAt        sql.NullTime          `json:"created_at"`
 }
 
+type TransactionStatusHistory struct {
+	ID             uuid.UUID                 `json:"id"`
+	OrganizationID uuid.UUID                 `json:"organization_id"`
+	TransactionID  uuid.UUID                 `json:"transaction_id"`
+	OldStatus      NullTransactionStatusType `json:"old_status"`
+	NewStatus      TransactionStatusType     `json:"new_status"`
+	EventSource    sql.NullString            `json:"event_source"`
+	EventSourceID  uuid.NullUUID             `json:"event_source_id"`
+	Reason         sql.NullString            `json:"reason"`
+	CreatedAt      sql.NullTime              `json:"created_at"`
+}
+
 type User struct {
 	ID             uuid.UUID    `json:"id"`
 	OrganizationID uuid.UUID    `json:"organization_id"`

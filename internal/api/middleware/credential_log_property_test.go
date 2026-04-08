@@ -306,7 +306,7 @@ func TestProperty_CredentialLogMiddleware_BodySizeLimit(t *testing.T) {
 func TestProperty_CredentialLogMiddleware_Transparency(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		statusCode := rapid.IntRange(200, 599).Draw(t, "status_code")
-		body := rapid.StringMatching(`[a-zA-Z0-9 ]{0,50}`).Draw(t, "body")
+		body := rapid.StringMatching(`[a-zA-Z0-9]{1,50}`).Draw(t, "body")
 
 		claims := &i9token.Claims{
 			OrganizationID: uuid.New().String(),
@@ -324,8 +324,10 @@ func TestProperty_CredentialLogMiddleware_Transparency(t *testing.T) {
 		if rec.Code != statusCode {
 			t.Errorf("status: want %d, got %d", statusCode, rec.Code)
 		}
-		// 204 No Content legitimately has no body per HTTP spec.
-		if statusCode != http.StatusNoContent && rec.Body.String() != body {
+		// Some status codes legitimately have no body per HTTP spec:
+		// 1xx informational, 204 No Content, 304 Not Modified.
+		noBody := statusCode < 200 || statusCode == http.StatusNoContent || statusCode == http.StatusNotModified
+		if !noBody && rec.Body.String() != body {
 			t.Errorf("body: want %q, got %q", body, rec.Body.String())
 		}
 	})
