@@ -45,6 +45,15 @@ func (q *Queries) CreateWebhookLog(ctx context.Context, arg CreateWebhookLogPara
 	return err
 }
 
+const deleteWebhookLogsOlderThan = `-- name: DeleteWebhookLogsOlderThan :execresult
+DELETE FROM webhook_logs
+WHERE created_at < $1
+`
+
+func (q *Queries) DeleteWebhookLogsOlderThan(ctx context.Context, createdAt sql.NullTime) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteWebhookLogsOlderThan, createdAt)
+}
+
 const getWebhookLogByID = `-- name: GetWebhookLogByID :one
 SELECT id, organization_id, endpoint_id, event_type, payload, response_body, response_status, duration_ms, attempt_number, success, created_at
 FROM webhook_logs

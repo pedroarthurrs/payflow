@@ -67,6 +67,10 @@ func run() error {
 	wkr := worker.NewWebhookWorker(q, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, cfg.WebhookWorkerCount)
 	go wkr.Start(ctx)
 
+	cleanupRepo := repository.NewCleanupRepo(db.CredentialLogQ, db.WebhookLogQ, db.IdempotencyQ)
+	cleanupWorker := worker.NewCleanupWorker(cleanupRepo)
+	go cleanupWorker.Start(ctx)
+
 	r := router.NewRouter(cfg, logger, db, healthCheck, q)
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {

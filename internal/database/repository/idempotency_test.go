@@ -36,6 +36,10 @@ func (f *fakeIdempotencyQ) SaveIdempotencyKey(ctx context.Context, arg idempoten
 	return nil
 }
 
+func (f *fakeIdempotencyQ) DeleteExpiredIdempotencyKeys(_ context.Context) (sql.Result, error) {
+	return nil, nil
+}
+
 // ── Check ─────────────────────────────────────────────────────────────────────
 
 func TestIdempotencyRepo_Check_Found(t *testing.T) {

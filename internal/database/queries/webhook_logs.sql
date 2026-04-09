@@ -19,3 +19,7 @@ WHERE organization_id = @organization_id
   AND (sqlc.narg('success')::boolean IS NULL OR success = sqlc.narg('success')::boolean)
 ORDER BY created_at DESC, id DESC
 LIMIT @page_limit;
+
+-- name: DeleteWebhookLogsOlderThan :execresult
+DELETE FROM webhook_logs
+WHERE created_at < $1;

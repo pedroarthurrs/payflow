@@ -6,9 +6,11 @@ package idempotencydb
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
+	DeleteExpiredIdempotencyKeys(ctx context.Context) (sql.Result, error)
 	GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyParams) (GetIdempotencyKeyRow, error)
 	SaveIdempotencyKey(ctx context.Context, arg SaveIdempotencyKeyParams) error
 }

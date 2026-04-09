@@ -54,6 +54,15 @@ func (q *Queries) CreateCredentialLog(ctx context.Context, arg CreateCredentialL
 	return err
 }
 
+const deleteCredentialLogsOlderThan = `-- name: DeleteCredentialLogsOlderThan :execresult
+DELETE FROM credential_logs
+WHERE created_at < $1
+`
+
+func (q *Queries) DeleteCredentialLogsOlderThan(ctx context.Context, createdAt sql.NullTime) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteCredentialLogsOlderThan, createdAt)
+}
+
 const getCredentialLogByID = `-- name: GetCredentialLogByID :one
 SELECT id, organization_id, credential_id, method, path,
        request_body, response_body, status_code, latency_ms,

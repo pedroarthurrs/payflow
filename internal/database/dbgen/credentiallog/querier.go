@@ -6,10 +6,12 @@ package credentiallogdb
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
 	CreateCredentialLog(ctx context.Context, arg CreateCredentialLogParams) error
+	DeleteCredentialLogsOlderThan(ctx context.Context, createdAt sql.NullTime) (sql.Result, error)
 	GetCredentialLogByID(ctx context.Context, arg GetCredentialLogByIDParams) (GetCredentialLogByIDRow, error)
 	ListCredentialLogs(ctx context.Context, arg ListCredentialLogsParams) ([]ListCredentialLogsRow, error)
 }

@@ -14,6 +14,15 @@ import (
 	"github.com/sqlc-dev/pqtype"
 )
 
+const deleteExpiredIdempotencyKeys = `-- name: DeleteExpiredIdempotencyKeys :execresult
+DELETE FROM idempotency_keys
+WHERE expires_at <= NOW()
+`
+
+func (q *Queries) DeleteExpiredIdempotencyKeys(ctx context.Context) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteExpiredIdempotencyKeys)
+}
+
 const getIdempotencyKey = `-- name: GetIdempotencyKey :one
 SELECT response_code, response_body
 FROM idempotency_keys

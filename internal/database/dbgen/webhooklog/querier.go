@@ -6,10 +6,12 @@ package webhooklogdb
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
 	CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) error
+	DeleteWebhookLogsOlderThan(ctx context.Context, createdAt sql.NullTime) (sql.Result, error)
 	GetWebhookLogByID(ctx context.Context, arg GetWebhookLogByIDParams) (GetWebhookLogByIDRow, error)
 	ListWebhookLogs(ctx context.Context, arg ListWebhookLogsParams) ([]ListWebhookLogsRow, error)
 }

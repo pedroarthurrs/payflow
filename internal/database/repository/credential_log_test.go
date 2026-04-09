@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -36,6 +37,10 @@ func (m *mockCredentialLogQuerier) ListCredentialLogs(ctx context.Context, arg c
 	if m.listFn != nil {
 		return m.listFn(ctx, arg)
 	}
+	return nil, nil
+}
+
+func (m *mockCredentialLogQuerier) DeleteCredentialLogsOlderThan(_ context.Context, _ sql.NullTime) (sql.Result, error) {
 	return nil, nil
 }
 

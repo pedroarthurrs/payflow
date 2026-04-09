@@ -8,3 +8,7 @@ INSERT INTO idempotency_keys (organization_id, idempotency_key, request_path, re
 VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (organization_id, idempotency_key) DO UPDATE
 SET response_code = EXCLUDED.response_code, response_body = EXCLUDED.response_body;
+
+-- name: DeleteExpiredIdempotencyKeys :execresult
+DELETE FROM idempotency_keys
+WHERE expires_at <= NOW();

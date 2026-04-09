@@ -30,3 +30,7 @@ INSERT INTO credential_logs (
     @request_body, @response_body, @status_code, @latency_ms,
     @ip_address, @user_agent
 );
+
+-- name: DeleteCredentialLogsOlderThan :execresult
+DELETE FROM credential_logs
+WHERE created_at < $1;
