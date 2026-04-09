@@ -58,7 +58,8 @@ Resposta JSON
 
 **Handlers** (`api/handler/`)
 - Um arquivo por recurso, todos no mesmo pacote `handler`
-- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CustomerHandler`, `UserHandler`, `WebhookHandler`, etc.
+- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CredentialHandler`, `CustomerHandler`, `UserHandler`, `WebhookHandler`, etc.
+- `CredentialHandler` agrega tanto as rotas de credenciais quanto as de credential logs (handler unificado)
 - Cada handler implementa `RegisterRoutes(rg *gin.RouterGroup)`
 - Responsáveis por receber requisições HTTP, validar payload e chamar services
 
@@ -73,6 +74,7 @@ Resposta JSON
 - `auth.go`: valida JWT e extrai claims
 - `credential_log.go`: intercepta requisições autenticadas via API Key e persiste log assíncrono
 - `errors.go`: transforma erros de domínio em respostas HTTP
+- `idempotency.go`: previne operações duplicadas em POST/PATCH via `X-Idempotency-Key`
 - `maintenance.go`: bloqueia tráfego quando modo manutenção está ativo
 - `ratelimit.go`: rate limiting por IP e organization
 - `rbac.go`: controle de acesso baseado em roles
@@ -147,6 +149,10 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `product.go`: `ProductRepository`, modelo Product, ProductInput
 - `credential.go`: `CredentialRepository`, `CredentialRecord`, `CreateCredentialInput`
 - `credential_log.go`: `CredentialLogRepository`, `CredentialLogWriter`, `CredentialLogRecord`, `CreateCredentialLogInput`, `ListCredentialLogsInput`, `CursorToken`
+- `cleanup.go`: `CleanupRepository` — contratos para purga periódica de logs e chaves de idempotência
+- `idempotency.go`: `IdempotencyRecord`, `IdempotencyStorage` — chave de idempotência e interface de persistência
+- `payment.go`: modelos de pagamento (`Payment`, status, tipos)
+- `payment_fsm.go`: `PaymentFSMRepository`, `TransitionHistory`, `ErrInvalidTransition` — FSM de pagamentos
 - `webhook.go`: `WebhookEndpointRepository`, `WebhookLogRepository`, `OrganizationSecretReader`, modelos `WebhookEndpoint` e `WebhookLog`, event types
 - `tx.go`: contratos transacionais (`TxManager`, `TxHandle`)
 - `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
@@ -213,7 +219,7 @@ O sistema de webhooks é composto por quatro partes independentes:
 - `InMemoryQueue`: implementação com canal Go com buffer (dev/test)
 - Extensível: trocar por SQS, Redis, etc. sem alterar call sites
 
-**4. Worker** (`worker/webhook_worker.go`)
+**4. Worker** (`worker/webhook.go`)
 - Consome jobs da fila com N goroutines paralelas (`workerCount`)
 - Entrega via HTTP POST com header `X-Webhook-Signature` (HMAC-SHA256)
 - Retry com backoff exponencial: 1min → 5min → 30min → 2h (máximo 5 tentativas)
@@ -236,6 +242,41 @@ WebhookLogRepo.Create() [persiste resultado]
     ↓ (em caso de falha)
 Queue.Enqueue(job com AttemptNumber+1, ScheduledAt+backoff)
 ```
+
+---
+
+### Cleanup Worker (`worker/cleanup.go`)
+
+Worker de background que executa tarefas periódicas de purga de dados.
+
+- Usa `robfig/cron` para scheduling
+- Depende de `domain.CleanupRepository` (interface) — desacoplado da implementação
+- Iniciado em goroutine separada no `main.go`: `go cleanupWorker.Start(ctx)`
+
+**Jobs agendados:**
+
+| Job | Horário | Retenção |
+|-----|---------|----------|
+| `credential_logs` mais antigos que N dias | 02:00 diário | 90 dias |
+| `webhook_logs` mais antigos que N dias | 02:00 diário | 90 dias |
+| `idempotency_keys` expiradas (`expires_at <= NOW()`) | 03:00 diário | — |
+
+---
+
+### Idempotency (`api/middleware/idempotency.go`)
+
+Middleware que previne reprocessamento de operações de escrita duplicadas.
+
+**Fluxo:**
+1. Intercepta apenas `POST` e `PATCH`
+2. Lê o header `X-Idempotency-Key` — ignora se ausente
+3. Extrai `organization_id` dos claims JWT (requer middleware `Auth` antes)
+4. **Cache HIT**: replays a resposta armazenada imediatamente (`c.Abort()`)
+5. **Cache MISS**: envolve o `ResponseWriter` para capturar body, executa o handler e persiste o resultado com TTL de 24h
+
+**Armazenamento**: `domain.IdempotencyStorage` — interface trocável (Postgres por padrão, extensível para Redis)
+
+**TTL padrão**: `DefaultIdempotencyTTL = 24h`
 
 ---
 
@@ -343,7 +384,9 @@ Cada domínio possui seu próprio subpacote gerado:
 | `dbgen/credential` | Credenciais (API Keys) |
 | `dbgen/credentiallog` | Logs de credenciais |
 | `dbgen/customer` | Clientes |
+| `dbgen/idempotency` | Chaves de idempotência |
 | `dbgen/organization` | Organizations |
+| `dbgen/payment` | Pagamentos e FSM de transações |
 | `dbgen/product` | Produtos |
 | `dbgen/user` | Usuários |
 | `dbgen/webhook` | Endpoints de webhook |
@@ -400,9 +443,10 @@ A ordem é crítica para segurança e observabilidade:
 6. Errors()                      — serializa erros para JSON
 7. RateLimitByIP()               — limita por IP (grupo v1)
 8. Auth()                        — valida JWT (grupo protegido)
-9. CredentialLog()               — persiste log assíncrono para auth_type=system
-10. RateLimitByOrganization()    — limita por organization (grupo protegido)
-11. RequireRole()                — RBAC por endpoint (onde aplicável)
+9. Idempotency()                 — previne duplicatas via X-Idempotency-Key (POST/PATCH)
+10. CredentialLog()              — persiste log assíncrono para auth_type=system
+11. RateLimitByOrganization()    — limita por organization (grupo protegido)
+12. RequireRole()                — RBAC por endpoint (onde aplicável)
 ```
 
 ### RBAC
@@ -477,6 +521,7 @@ Operações atômicas implementadas:
 - `CustomerService.Create` com endereço
 - `CustomerService.Update` com endereço
 - `CredentialService.Rotate` (revoga + cria)
+- `PaymentFSMService` (criação de pagamento + registro de histórico FSM)
 
 ---
 

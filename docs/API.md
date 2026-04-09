@@ -16,6 +16,16 @@ Authorization: Bearer <access_token>
 
 O `access_token` é obtido via `POST /v1/auth/login` ou `POST /v1/auth/refresh`.
 
+## Idempotência
+
+Para operações de escrita (`POST` e `PATCH`), envie o header `X-Idempotency-Key` com um UUID único gerado pelo cliente. Se a requisição for reenviada com a mesma chave dentro de 24 horas, a resposta original armazenada em cache será retornada sem reprocessar a operação.
+
+```
+X-Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+```
+
+O header é ignorado em métodos de leitura (`GET`, `DELETE`).
+
 ## Formato de Resposta
 
 Todas as respostas são JSON. Erros seguem o formato:
