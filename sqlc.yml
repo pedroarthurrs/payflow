@@ -120,3 +120,14 @@ sql:
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/idempotency.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "idempotencydb"
+        out: "internal/database/dbgen/idempotency"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
