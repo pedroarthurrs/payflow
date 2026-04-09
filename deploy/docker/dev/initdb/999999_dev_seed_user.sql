@@ -2,7 +2,7 @@
 -- Seed de desenvolvimento: massa de dados para testes locais.
 -- Executa apenas no compose de dev e é idempotente (ON CONFLICT).
 --
--- Senha padrão para todos os usuários: "password123"
+-- Senha padrão para todos os usuários: "Dev@123456"
 -- Hash bcrypt (cost 10): $2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e
 -- =============================================================================
 
