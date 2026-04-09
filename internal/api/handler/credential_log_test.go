@@ -43,11 +43,14 @@ func setupCredentialLogRouter(svc *mockCredentialLogService, orgID string) *gin.
 	repo := &credentialLogRepoAdapter{svc: svc}
 	realSvc := service.NewCredentialLogService(repo)
 
-	h := NewCredentialLogHandler(realSvc)
+	h := NewCredentialHandler(nil, realSvc)
 	r := gin.New()
 	r.Use(middleware.Errors())
 	r.Use(withClaimsAndRole(orgID, "admin"))
-	h.RegisterRoutes(&r.RouterGroup)
+
+	logs := r.Group("/credentials/logs")
+	logs.GET("", h.ListLogs)
+	logs.GET("/:log_id", h.GetLogByID)
 	return r
 }
 

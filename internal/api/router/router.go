@@ -87,8 +87,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	addressHandler := handler.NewAddressHandler(addressSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	userHandler := handler.NewUserHandler(userSvc)
-	credentialHandler := handler.NewCredentialHandler(credentialSvc)
-	credentialLogHandler := handler.NewCredentialLogHandler(credentialLogSvc)
+	credentialHandler := handler.NewCredentialHandler(credentialSvc, credentialLogSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
 
 	// Rota raiz (fora do grupo de versão)
@@ -114,7 +113,6 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	productHandler.RegisterRoutes(protected)
 	userHandler.RegisterRoutes(protected)
 	credentialHandler.RegisterRoutes(protected)
-	credentialLogHandler.RegisterRoutes(protected)
 	webhookHandler.RegisterRoutes(protected)
 
 	return r
