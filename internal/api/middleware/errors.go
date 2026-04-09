@@ -27,7 +27,7 @@ var domainStatusMap = map[error]int{
 	domain.ErrInternal:                http.StatusInternalServerError,
 	domain.ErrWebhookEndpointNotFound: http.StatusNotFound,
 	domain.ErrWebhookLogNotFound:      http.StatusNotFound,
-	domain.ErrTransactionNotFound:     http.StatusNotFound,            // 404
+	domain.ErrPaymentNotFound:         http.StatusNotFound,            // 404
 	domain.ErrTerminalState:           http.StatusConflict,            // 409
 	domain.ErrSameStateTransition:     http.StatusUnprocessableEntity, // 422
 	domain.ErrInvalidTransition:       http.StatusUnprocessableEntity, // 422

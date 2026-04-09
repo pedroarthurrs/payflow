@@ -67,9 +67,24 @@ type GetCredentialLogByIDParams struct {
 	ID             uuid.UUID `json:"id"`
 }
 
-func (q *Queries) GetCredentialLogByID(ctx context.Context, arg GetCredentialLogByIDParams) (CredentialLog, error) {
+type GetCredentialLogByIDRow struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	CredentialID   uuid.NullUUID         `json:"credential_id"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	RequestBody    pqtype.NullRawMessage `json:"request_body"`
+	ResponseBody   pqtype.NullRawMessage `json:"response_body"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+func (q *Queries) GetCredentialLogByID(ctx context.Context, arg GetCredentialLogByIDParams) (GetCredentialLogByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getCredentialLogByID, arg.OrganizationID, arg.ID)
-	var i CredentialLog
+	var i GetCredentialLogByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
@@ -115,7 +130,22 @@ type ListCredentialLogsParams struct {
 	PageLimit      int32          `json:"page_limit"`
 }
 
-func (q *Queries) ListCredentialLogs(ctx context.Context, arg ListCredentialLogsParams) ([]CredentialLog, error) {
+type ListCredentialLogsRow struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	CredentialID   uuid.NullUUID         `json:"credential_id"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	RequestBody    pqtype.NullRawMessage `json:"request_body"`
+	ResponseBody   pqtype.NullRawMessage `json:"response_body"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+func (q *Queries) ListCredentialLogs(ctx context.Context, arg ListCredentialLogsParams) ([]ListCredentialLogsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCredentialLogs,
 		arg.OrganizationID,
 		arg.CursorTs,
@@ -131,9 +161,9 @@ func (q *Queries) ListCredentialLogs(ctx context.Context, arg ListCredentialLogs
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CredentialLog
+	var items []ListCredentialLogsRow
 	for rows.Next() {
-		var i CredentialLog
+		var i ListCredentialLogsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,

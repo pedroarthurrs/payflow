@@ -208,9 +208,9 @@ INSERT INTO invoice_items (id, organization_id, invoice_id, description, quantit
     ('88aaa010-0000-0000-0000-000000000010', '22222222-2222-2222-2222-222222222222', '77aaa010-0000-0000-0000-000000000010', 'Business Monthly',           1.0, 4990,  4990)
 ON CONFLICT (id) DO NOTHING;
 
--- ===================== TRANSACTIONS =====================
+-- ===================== PAYMENTS =====================
 
-INSERT INTO transactions (id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, idempotency_key) VALUES
+INSERT INTO payments (id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, idempotency_key) VALUES
     -- I9Pay transactions
     ('99aaa001-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '77aaa001-0000-0000-0000-000000000001', 'stripe',  'pi_dev_001', 'credit_card', 7990,  'succeeded',          'idem_dev_001'),
     ('99aaa002-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '77aaa002-0000-0000-0000-000000000002', 'stripe',  'pi_dev_002', 'credit_card', 9980,  'succeeded',          'idem_dev_002'),

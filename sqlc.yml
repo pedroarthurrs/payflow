@@ -111,12 +111,12 @@ sql:
         emit_interface: true
 
   - schema: "deploy/migrations"
-    queries: "internal/database/queries/transaction_fsm.sql"
+    queries: "internal/database/queries/payment_fsm.sql"
     engine: "postgresql"
     gen:
       go:
-        package: "transactiondb"
-        out: "internal/database/dbgen/transaction"
+        package: "paymentdb"
+        out: "internal/database/dbgen/payment"
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true

@@ -62,7 +62,7 @@ func (r *WebhookLogRepo) GetByID(ctx context.Context, orgID, logID uuid.UUID) (*
 		slog.Error("failed to get webhook log", "organization_id", orgID, "log_id", logID, "error", err)
 		return nil, domain.ErrInternal
 	}
-	rec := toDomainWebhookLog(row)
+	rec := toDomainWebhookLogFromGetRow(row)
 	return &rec, nil
 }
 
@@ -101,12 +101,41 @@ func (r *WebhookLogRepo) List(ctx context.Context, orgID uuid.UUID, input domain
 
 	records := make([]domain.WebhookLog, len(rows))
 	for i := range rows {
-		records[i] = toDomainWebhookLog(rows[i])
+		records[i] = toDomainWebhookLogFromListRow(rows[i])
 	}
 	return records, nil
 }
 
-func toDomainWebhookLog(row webhooklogdb.WebhookLog) domain.WebhookLog {
+func toDomainWebhookLogFromGetRow(row webhooklogdb.GetWebhookLogByIDRow) domain.WebhookLog {
+	rec := domain.WebhookLog{
+		ID:             row.ID,
+		OrganizationID: row.OrganizationID,
+		EndpointID:     row.EndpointID,
+		EventType:      row.EventType,
+		Payload:        row.Payload,
+	}
+	if row.ResponseBody.Valid {
+		rec.ResponseBody = &row.ResponseBody.String
+	}
+	if row.ResponseStatus.Valid {
+		rec.ResponseStatus = &row.ResponseStatus.Int32
+	}
+	if row.DurationMs.Valid {
+		rec.DurationMs = &row.DurationMs.Int32
+	}
+	if row.AttemptNumber.Valid {
+		rec.AttemptNumber = row.AttemptNumber.Int32
+	}
+	if row.Success.Valid {
+		rec.Success = row.Success.Bool
+	}
+	if row.CreatedAt.Valid {
+		rec.CreatedAt = row.CreatedAt.Time
+	}
+	return rec
+}
+
+func toDomainWebhookLogFromListRow(row webhooklogdb.ListWebhookLogsRow) domain.WebhookLog {
 	rec := domain.WebhookLog{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

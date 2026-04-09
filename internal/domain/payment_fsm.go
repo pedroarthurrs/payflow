@@ -1,10 +1,10 @@
 package domain
 
-// StateMachine é a FSM pura de transações — sem dependências de infraestrutura.
+// StateMachine é a FSM pura de pagamentos — sem dependências de infraestrutura.
 type StateMachine struct{}
 
 // transitionRules é o grafo imutável de transições válidas, inicializado uma única vez.
-var transitionRules = map[TransactionStatus][]TransactionStatus{
+var transitionRules = map[PaymentStatus][]PaymentStatus{
 	StatusPending:           {StatusAuthorized, StatusSucceeded, StatusFailed, StatusCanceled},
 	StatusAuthorized:        {StatusSucceeded, StatusFailed, StatusCanceled},
 	StatusSucceeded:         {StatusDisputed, StatusRefunded, StatusPartiallyRefunded},
@@ -16,7 +16,7 @@ var transitionRules = map[TransactionStatus][]TransactionStatus{
 }
 
 // terminalStates é o conjunto de estados dos quais nenhuma transição é permitida.
-var terminalStates = map[TransactionStatus]bool{
+var terminalStates = map[PaymentStatus]bool{
 	StatusCanceled: true,
 	StatusRefunded: true,
 }
@@ -26,7 +26,7 @@ func NewStateMachine() *StateMachine { return &StateMachine{} }
 
 // Validate verifica se a transição de from para to é permitida.
 // Retorna nil se válida, ou um dos erros sentinela caso contrário.
-func (sm *StateMachine) Validate(from, to TransactionStatus) error {
+func (sm *StateMachine) Validate(from, to PaymentStatus) error {
 	if from == to {
 		return ErrSameStateTransition
 	}
@@ -43,11 +43,11 @@ func (sm *StateMachine) Validate(from, to TransactionStatus) error {
 
 // AllowedTransitions retorna os estados de destino permitidos a partir de from.
 // Retorna slice vazia para estados terminais.
-func (sm *StateMachine) AllowedTransitions(from TransactionStatus) []TransactionStatus {
+func (sm *StateMachine) AllowedTransitions(from PaymentStatus) []PaymentStatus {
 	return transitionRules[from]
 }
 
 // IsTerminal retorna true se status é um estado terminal (canceled ou refunded).
-func (sm *StateMachine) IsTerminal(status TransactionStatus) bool {
+func (sm *StateMachine) IsTerminal(status PaymentStatus) bool {
 	return terminalStates[status]
 }

@@ -14,5 +14,5 @@ type TxHandle interface {
 	CustomerRepo() CustomerRepository
 	AddressRepo() AddressRepository
 	CredentialRepo() CredentialRepository
-	TransactionFSMRepo() TransactionFSMRepository
+	PaymentFSMRepo() PaymentFSMRepository
 }

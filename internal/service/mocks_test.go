@@ -257,29 +257,29 @@ func (m *mockTxHandle) CredentialRepo() domain.CredentialRepository {
 	return &mockCredentialRepo{}
 }
 
-func (m *mockTxHandle) TransactionFSMRepo() domain.TransactionFSMRepository {
-	return &mockTransactionFSMRepo{}
+func (m *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository {
+	return &mockPaymentFSMRepo{}
 }
 
 // ============================================================
-// Mock TransactionFSMRepository (stub for TxHandle compliance)
+// Mock PaymentFSMRepository (stub for TxHandle compliance)
 // ============================================================
 
-type mockTransactionFSMRepo struct{}
+type mockPaymentFSMRepo struct{}
 
-func (m *mockTransactionFSMRepo) GetForUpdate(ctx context.Context, organizationID, transactionID uuid.UUID) (*domain.TransactionForUpdate, error) {
-	return nil, domain.ErrTransactionNotFound
+func (m *mockPaymentFSMRepo) GetForUpdate(ctx context.Context, organizationID, paymentID uuid.UUID) (*domain.PaymentForUpdate, error) {
+	return nil, domain.ErrPaymentNotFound
 }
 
-func (m *mockTransactionFSMRepo) UpdateStatus(ctx context.Context, organizationID, transactionID uuid.UUID, newStatus domain.TransactionStatus) error {
+func (m *mockPaymentFSMRepo) UpdateStatus(ctx context.Context, organizationID, paymentID uuid.UUID, newStatus domain.PaymentStatus) error {
 	return nil
 }
 
-func (m *mockTransactionFSMRepo) InsertHistory(ctx context.Context, entry domain.TransitionHistory) error {
+func (m *mockPaymentFSMRepo) InsertHistory(ctx context.Context, entry domain.TransitionHistory) error {
 	return nil
 }
 
-func (m *mockTransactionFSMRepo) ListHistory(ctx context.Context, organizationID, transactionID uuid.UUID) ([]domain.TransitionHistory, error) {
+func (m *mockPaymentFSMRepo) ListHistory(ctx context.Context, organizationID, paymentID uuid.UUID) ([]domain.TransitionHistory, error) {
 	return nil, nil
 }
 

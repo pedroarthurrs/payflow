@@ -58,7 +58,7 @@ func (r *CredentialLogRepo) List(ctx context.Context, orgID uuid.UUID, input dom
 
 	records := make([]domain.CredentialLogRecord, len(rows))
 	for i := range rows {
-		records[i] = toDomainCredentialLog(rows[i])
+		records[i] = toDomainCredentialLogFromListRow(rows[i])
 	}
 	return records, nil
 }
@@ -76,11 +76,50 @@ func (r *CredentialLogRepo) GetByID(ctx context.Context, orgID, logID uuid.UUID)
 		slog.Error("failed to get credential log", "organization_id", orgID, "log_id", logID, "error", err)
 		return nil, domain.ErrInternal
 	}
-	rec := toDomainCredentialLog(row)
+	rec := toDomainCredentialLogFromGetRow(row)
 	return &rec, nil
 }
 
-func toDomainCredentialLog(row credentiallogdb.CredentialLog) domain.CredentialLogRecord {
+func toDomainCredentialLogFromGetRow(row credentiallogdb.GetCredentialLogByIDRow) domain.CredentialLogRecord {
+	rec := domain.CredentialLogRecord{
+		ID:             row.ID,
+		OrganizationID: row.OrganizationID,
+	}
+	if row.CredentialID.Valid {
+		id := row.CredentialID.UUID
+		rec.CredentialID = &id
+	}
+	if row.Method.Valid {
+		rec.Method = &row.Method.String
+	}
+	if row.Path.Valid {
+		rec.Path = &row.Path.String
+	}
+	if row.RequestBody.Valid {
+		rec.RequestBody = row.RequestBody.RawMessage
+	}
+	if row.ResponseBody.Valid {
+		rec.ResponseBody = row.ResponseBody.RawMessage
+	}
+	if row.StatusCode.Valid {
+		rec.StatusCode = &row.StatusCode.Int32
+	}
+	if row.LatencyMs.Valid {
+		rec.LatencyMs = &row.LatencyMs.Int32
+	}
+	if row.IpAddress.Valid {
+		rec.IPAddress = &row.IpAddress.String
+	}
+	if row.UserAgent.Valid {
+		rec.UserAgent = &row.UserAgent.String
+	}
+	if row.CreatedAt.Valid {
+		rec.CreatedAt = row.CreatedAt.Time
+	}
+	return rec
+}
+
+func toDomainCredentialLogFromListRow(row credentiallogdb.ListCredentialLogsRow) domain.CredentialLogRecord {
 	rec := domain.CredentialLogRecord{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

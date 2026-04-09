@@ -14,8 +14,8 @@ import (
 // mockCredentialLogQuerier is a test double for credentiallogdb.Querier.
 type mockCredentialLogQuerier struct {
 	createFn  func(ctx context.Context, arg credentiallogdb.CreateCredentialLogParams) error
-	getByIDFn func(ctx context.Context, arg credentiallogdb.GetCredentialLogByIDParams) (credentiallogdb.CredentialLog, error)
-	listFn    func(ctx context.Context, arg credentiallogdb.ListCredentialLogsParams) ([]credentiallogdb.CredentialLog, error)
+	getByIDFn func(ctx context.Context, arg credentiallogdb.GetCredentialLogByIDParams) (credentiallogdb.GetCredentialLogByIDRow, error)
+	listFn    func(ctx context.Context, arg credentiallogdb.ListCredentialLogsParams) ([]credentiallogdb.ListCredentialLogsRow, error)
 }
 
 func (m *mockCredentialLogQuerier) CreateCredentialLog(ctx context.Context, arg credentiallogdb.CreateCredentialLogParams) error {
@@ -25,14 +25,14 @@ func (m *mockCredentialLogQuerier) CreateCredentialLog(ctx context.Context, arg 
 	return nil
 }
 
-func (m *mockCredentialLogQuerier) GetCredentialLogByID(ctx context.Context, arg credentiallogdb.GetCredentialLogByIDParams) (credentiallogdb.CredentialLog, error) {
+func (m *mockCredentialLogQuerier) GetCredentialLogByID(ctx context.Context, arg credentiallogdb.GetCredentialLogByIDParams) (credentiallogdb.GetCredentialLogByIDRow, error) {
 	if m.getByIDFn != nil {
 		return m.getByIDFn(ctx, arg)
 	}
-	return credentiallogdb.CredentialLog{}, nil
+	return credentiallogdb.GetCredentialLogByIDRow{}, nil
 }
 
-func (m *mockCredentialLogQuerier) ListCredentialLogs(ctx context.Context, arg credentiallogdb.ListCredentialLogsParams) ([]credentiallogdb.CredentialLog, error) {
+func (m *mockCredentialLogQuerier) ListCredentialLogs(ctx context.Context, arg credentiallogdb.ListCredentialLogsParams) ([]credentiallogdb.ListCredentialLogsRow, error) {
 	if m.listFn != nil {
 		return m.listFn(ctx, arg)
 	}

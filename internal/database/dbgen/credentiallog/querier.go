@@ -10,8 +10,8 @@ import (
 
 type Querier interface {
 	CreateCredentialLog(ctx context.Context, arg CreateCredentialLogParams) error
-	GetCredentialLogByID(ctx context.Context, arg GetCredentialLogByIDParams) (CredentialLog, error)
-	ListCredentialLogs(ctx context.Context, arg ListCredentialLogsParams) ([]CredentialLog, error)
+	GetCredentialLogByID(ctx context.Context, arg GetCredentialLogByIDParams) (GetCredentialLogByIDRow, error)
+	ListCredentialLogs(ctx context.Context, arg ListCredentialLogsParams) ([]ListCredentialLogsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

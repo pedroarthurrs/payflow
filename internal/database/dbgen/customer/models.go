@@ -100,6 +100,54 @@ func (ns NullEnvironmentType) Value() (driver.Value, error) {
 	return string(ns.EnvironmentType), nil
 }
 
+type PaymentStatusType string
+
+const (
+	PaymentStatusTypePending           PaymentStatusType = "pending"
+	PaymentStatusTypeAuthorized        PaymentStatusType = "authorized"
+	PaymentStatusTypeSucceeded         PaymentStatusType = "succeeded"
+	PaymentStatusTypeFailed            PaymentStatusType = "failed"
+	PaymentStatusTypeCanceled          PaymentStatusType = "canceled"
+	PaymentStatusTypeDisputed          PaymentStatusType = "disputed"
+	PaymentStatusTypeRefunded          PaymentStatusType = "refunded"
+	PaymentStatusTypePartiallyRefunded PaymentStatusType = "partially_refunded"
+)
+
+func (e *PaymentStatusType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PaymentStatusType(s)
+	case string:
+		*e = PaymentStatusType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PaymentStatusType: %T", src)
+	}
+	return nil
+}
+
+type NullPaymentStatusType struct {
+	PaymentStatusType PaymentStatusType `json:"payment_status_type"`
+	Valid             bool              `json:"valid"` // Valid is true if PaymentStatusType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPaymentStatusType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PaymentStatusType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PaymentStatusType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPaymentStatusType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PaymentStatusType), nil
+}
+
 type SubscriptionStatusType string
 
 const (
@@ -147,54 +195,6 @@ func (ns NullSubscriptionStatusType) Value() (driver.Value, error) {
 	return string(ns.SubscriptionStatusType), nil
 }
 
-type TransactionStatusType string
-
-const (
-	TransactionStatusTypePending           TransactionStatusType = "pending"
-	TransactionStatusTypeAuthorized        TransactionStatusType = "authorized"
-	TransactionStatusTypeSucceeded         TransactionStatusType = "succeeded"
-	TransactionStatusTypeFailed            TransactionStatusType = "failed"
-	TransactionStatusTypeCanceled          TransactionStatusType = "canceled"
-	TransactionStatusTypeDisputed          TransactionStatusType = "disputed"
-	TransactionStatusTypeRefunded          TransactionStatusType = "refunded"
-	TransactionStatusTypePartiallyRefunded TransactionStatusType = "partially_refunded"
-)
-
-func (e *TransactionStatusType) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = TransactionStatusType(s)
-	case string:
-		*e = TransactionStatusType(s)
-	default:
-		return fmt.Errorf("unsupported scan type for TransactionStatusType: %T", src)
-	}
-	return nil
-}
-
-type NullTransactionStatusType struct {
-	TransactionStatusType TransactionStatusType `json:"transaction_status_type"`
-	Valid                 bool                  `json:"valid"` // Valid is true if TransactionStatusType is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullTransactionStatusType) Scan(value interface{}) error {
-	if value == nil {
-		ns.TransactionStatusType, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.TransactionStatusType.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullTransactionStatusType) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.TransactionStatusType), nil
-}
-
 type Address struct {
 	ID             uuid.UUID       `json:"id"`
 	OrganizationID uuid.UUID       `json:"organization_id"`
@@ -212,6 +212,19 @@ type Address struct {
 	CreatedAt      sql.NullTime    `json:"created_at"`
 	UpdatedAt      sql.NullTime    `json:"updated_at"`
 	DeletedAt      sql.NullTime    `json:"deleted_at"`
+}
+
+type CommissionSetting struct {
+	ID               uuid.UUID             `json:"id"`
+	OrganizationID   uuid.UUID             `json:"organization_id"`
+	TargetCustomerID uuid.UUID             `json:"target_customer_id"`
+	Type             string                `json:"type"`
+	Value            string                `json:"value"`
+	Conditions       pqtype.NullRawMessage `json:"conditions"`
+	IsActive         sql.NullBool          `json:"is_active"`
+	CreatedAt        sql.NullTime          `json:"created_at"`
+	UpdatedAt        sql.NullTime          `json:"updated_at"`
+	DeletedAt        sql.NullTime          `json:"deleted_at"`
 }
 
 type Credential struct {
@@ -240,6 +253,7 @@ type CredentialLog struct {
 	IpAddress      sql.NullString        `json:"ip_address"`
 	UserAgent      sql.NullString        `json:"user_agent"`
 	CreatedAt      sql.NullTime          `json:"created_at"`
+	UpdatedAt      sql.NullTime          `json:"updated_at"`
 }
 
 type Customer struct {
@@ -258,20 +272,6 @@ type Customer struct {
 	DeletedAt         sql.NullTime          `json:"deleted_at"`
 }
 
-type CustomerBalanceTransaction struct {
-	ID             uuid.UUID             `json:"id"`
-	OrganizationID uuid.UUID             `json:"organization_id"`
-	CustomerID     uuid.UUID             `json:"customer_id"`
-	Type           string                `json:"type"`
-	AmountCents    int32                 `json:"amount_cents"`
-	Description    sql.NullString        `json:"description"`
-	SubscriptionID uuid.NullUUID         `json:"subscription_id"`
-	InvoiceID      uuid.NullUUID         `json:"invoice_id"`
-	Metadata       pqtype.NullRawMessage `json:"metadata"`
-	CreatedAt      sql.NullTime          `json:"created_at"`
-	DeletedAt      sql.NullTime          `json:"deleted_at"`
-}
-
 type IdempotencyKey struct {
 	ID             uuid.UUID             `json:"id"`
 	OrganizationID uuid.UUID             `json:"organization_id"`
@@ -281,6 +281,7 @@ type IdempotencyKey struct {
 	ResponseBody   pqtype.NullRawMessage `json:"response_body"`
 	ExpiresAt      time.Time             `json:"expires_at"`
 	CreatedAt      sql.NullTime          `json:"created_at"`
+	UpdatedAt      sql.NullTime          `json:"updated_at"`
 }
 
 type Invoice struct {
@@ -311,6 +312,7 @@ type InvoiceItem struct {
 	TotalPriceCents int32                 `json:"total_price_cents"`
 	Metadata        pqtype.NullRawMessage `json:"metadata"`
 	CreatedAt       sql.NullTime          `json:"created_at"`
+	UpdatedAt       sql.NullTime          `json:"updated_at"`
 }
 
 type InvoiceLog struct {
@@ -330,6 +332,7 @@ type InvoiceLog struct {
 	Success         bool                  `json:"success"`
 	Message         string                `json:"message"`
 	CreatedAt       sql.NullTime          `json:"created_at"`
+	UpdatedAt       sql.NullTime          `json:"updated_at"`
 }
 
 type InvoiceSetting struct {
@@ -351,6 +354,22 @@ type InvoiceSetting struct {
 	UpdatedAt           sql.NullTime   `json:"updated_at"`
 }
 
+type LedgerEntry struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	WalletID       uuid.UUID             `json:"wallet_id"`
+	Type           string                `json:"type"`
+	AmountCents    int32                 `json:"amount_cents"`
+	Category       string                `json:"category"`
+	BalanceAfter   int32                 `json:"balance_after"`
+	SubscriptionID uuid.NullUUID         `json:"subscription_id"`
+	InvoiceID      uuid.NullUUID         `json:"invoice_id"`
+	PaymentID      uuid.NullUUID         `json:"payment_id"`
+	Metadata       pqtype.NullRawMessage `json:"metadata"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+	UpdatedAt      sql.NullTime          `json:"updated_at"`
+}
+
 type Organization struct {
 	ID            uuid.UUID      `json:"id"`
 	Name          string         `json:"name"`
@@ -369,6 +388,46 @@ type OrganizationConfig struct {
 	PrimaryColor   sql.NullString `json:"primary_color"`
 	CreatedAt      sql.NullTime   `json:"created_at"`
 	UpdatedAt      sql.NullTime   `json:"updated_at"`
+}
+
+type Payment struct {
+	ID               uuid.UUID             `json:"id"`
+	OrganizationID   uuid.UUID             `json:"organization_id"`
+	InvoiceID        uuid.NullUUID         `json:"invoice_id"`
+	GatewayName      sql.NullString        `json:"gateway_name"`
+	GatewayReference sql.NullString        `json:"gateway_reference"`
+	PaymentMethod    sql.NullString        `json:"payment_method"`
+	AmountCents      int32                 `json:"amount_cents"`
+	Status           PaymentStatusType     `json:"status"`
+	Currency         sql.NullString        `json:"currency"`
+	IdempotencyKey   sql.NullString        `json:"idempotency_key"`
+	ErrorLog         pqtype.NullRawMessage `json:"error_log"`
+	CreatedAt        sql.NullTime          `json:"created_at"`
+	UpdatedAt        sql.NullTime          `json:"updated_at"`
+}
+
+type PaymentStatusHistory struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	PaymentID      uuid.UUID             `json:"payment_id"`
+	OldStatus      NullPaymentStatusType `json:"old_status"`
+	NewStatus      PaymentStatusType     `json:"new_status"`
+	EventSource    sql.NullString        `json:"event_source"`
+	EventSourceID  uuid.NullUUID         `json:"event_source_id"`
+	Reason         sql.NullString        `json:"reason"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+type Payout struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	WalletID       uuid.UUID             `json:"wallet_id"`
+	AmountCents    int32                 `json:"amount_cents"`
+	FeeCents       sql.NullInt32         `json:"fee_cents"`
+	Status         sql.NullString        `json:"status"`
+	BankInfo       pqtype.NullRawMessage `json:"bank_info"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+	UpdatedAt      sql.NullTime          `json:"updated_at"`
 }
 
 type Plan struct {
@@ -430,6 +489,7 @@ type SubscriptionSchedule struct {
 	TargetPlanID   uuid.NullUUID              `json:"target_plan_id"`
 	AppliedAt      sql.NullTime               `json:"applied_at"`
 	CreatedAt      sql.NullTime               `json:"created_at"`
+	UpdatedAt      sql.NullTime               `json:"updated_at"`
 }
 
 type SubscriptionStatusHistory struct {
@@ -444,32 +504,6 @@ type SubscriptionStatusHistory struct {
 	CreatedAt      sql.NullTime               `json:"created_at"`
 }
 
-type Transaction struct {
-	ID               uuid.UUID             `json:"id"`
-	OrganizationID   uuid.UUID             `json:"organization_id"`
-	InvoiceID        uuid.NullUUID         `json:"invoice_id"`
-	GatewayName      sql.NullString        `json:"gateway_name"`
-	GatewayReference sql.NullString        `json:"gateway_reference"`
-	PaymentMethod    sql.NullString        `json:"payment_method"`
-	AmountCents      int32                 `json:"amount_cents"`
-	Status           TransactionStatusType `json:"status"`
-	IdempotencyKey   sql.NullString        `json:"idempotency_key"`
-	ErrorLog         pqtype.NullRawMessage `json:"error_log"`
-	CreatedAt        sql.NullTime          `json:"created_at"`
-}
-
-type TransactionStatusHistory struct {
-	ID             uuid.UUID                 `json:"id"`
-	OrganizationID uuid.UUID                 `json:"organization_id"`
-	TransactionID  uuid.UUID                 `json:"transaction_id"`
-	OldStatus      NullTransactionStatusType `json:"old_status"`
-	NewStatus      TransactionStatusType     `json:"new_status"`
-	EventSource    sql.NullString            `json:"event_source"`
-	EventSourceID  uuid.NullUUID             `json:"event_source_id"`
-	Reason         sql.NullString            `json:"reason"`
-	CreatedAt      sql.NullTime              `json:"created_at"`
-}
-
 type User struct {
 	ID             uuid.UUID    `json:"id"`
 	OrganizationID uuid.UUID    `json:"organization_id"`
@@ -480,6 +514,18 @@ type User struct {
 	CreatedAt      sql.NullTime `json:"created_at"`
 	UpdatedAt      sql.NullTime `json:"updated_at"`
 	DeletedAt      sql.NullTime `json:"deleted_at"`
+}
+
+type Wallet struct {
+	ID                  uuid.UUID      `json:"id"`
+	OrganizationID      uuid.UUID      `json:"organization_id"`
+	OrganizationOwnerID uuid.NullUUID  `json:"organization_owner_id"`
+	CustomerOwnerID     uuid.NullUUID  `json:"customer_owner_id"`
+	Balance             int32          `json:"balance"`
+	Currency            sql.NullString `json:"currency"`
+	Status              sql.NullString `json:"status"`
+	CreatedAt           sql.NullTime   `json:"created_at"`
+	UpdatedAt           sql.NullTime   `json:"updated_at"`
 }
 
 type WebhookEndpoint struct {
@@ -507,4 +553,5 @@ type WebhookLog struct {
 	AttemptNumber  sql.NullInt32   `json:"attempt_number"`
 	Success        sql.NullBool    `json:"success"`
 	CreatedAt      sql.NullTime    `json:"created_at"`
+	UpdatedAt      sql.NullTime    `json:"updated_at"`
 }

@@ -56,9 +56,23 @@ type GetWebhookLogByIDParams struct {
 	ID             uuid.UUID `json:"id"`
 }
 
-func (q *Queries) GetWebhookLogByID(ctx context.Context, arg GetWebhookLogByIDParams) (WebhookLog, error) {
+type GetWebhookLogByIDRow struct {
+	ID             uuid.UUID       `json:"id"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
+	EndpointID     uuid.UUID       `json:"endpoint_id"`
+	EventType      string          `json:"event_type"`
+	Payload        json.RawMessage `json:"payload"`
+	ResponseBody   sql.NullString  `json:"response_body"`
+	ResponseStatus sql.NullInt32   `json:"response_status"`
+	DurationMs     sql.NullInt32   `json:"duration_ms"`
+	AttemptNumber  sql.NullInt32   `json:"attempt_number"`
+	Success        sql.NullBool    `json:"success"`
+	CreatedAt      sql.NullTime    `json:"created_at"`
+}
+
+func (q *Queries) GetWebhookLogByID(ctx context.Context, arg GetWebhookLogByIDParams) (GetWebhookLogByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getWebhookLogByID, arg.OrganizationID, arg.ID)
-	var i WebhookLog
+	var i GetWebhookLogByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
@@ -101,7 +115,21 @@ type ListWebhookLogsParams struct {
 	PageLimit      int32          `json:"page_limit"`
 }
 
-func (q *Queries) ListWebhookLogs(ctx context.Context, arg ListWebhookLogsParams) ([]WebhookLog, error) {
+type ListWebhookLogsRow struct {
+	ID             uuid.UUID       `json:"id"`
+	OrganizationID uuid.UUID       `json:"organization_id"`
+	EndpointID     uuid.UUID       `json:"endpoint_id"`
+	EventType      string          `json:"event_type"`
+	Payload        json.RawMessage `json:"payload"`
+	ResponseBody   sql.NullString  `json:"response_body"`
+	ResponseStatus sql.NullInt32   `json:"response_status"`
+	DurationMs     sql.NullInt32   `json:"duration_ms"`
+	AttemptNumber  sql.NullInt32   `json:"attempt_number"`
+	Success        sql.NullBool    `json:"success"`
+	CreatedAt      sql.NullTime    `json:"created_at"`
+}
+
+func (q *Queries) ListWebhookLogs(ctx context.Context, arg ListWebhookLogsParams) ([]ListWebhookLogsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listWebhookLogs,
 		arg.OrganizationID,
 		arg.CursorTs,
@@ -117,9 +145,9 @@ func (q *Queries) ListWebhookLogs(ctx context.Context, arg ListWebhookLogsParams
 		return nil, err
 	}
 	defer rows.Close()
-	var items []WebhookLog
+	var items []ListWebhookLogsRow
 	for rows.Next() {
-		var i WebhookLog
+		var i ListWebhookLogsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,

@@ -11,7 +11,7 @@ CREATE TYPE subscription_status_type AS ENUM (
     'incomplete'    -- Incompleto: Pagamento em processamento
 );
 
-CREATE TYPE transaction_status_type AS ENUM (
+CREATE TYPE payment_status_type AS ENUM (
     'pending',      -- Aguardando ação (ex: Boleto gerado, PIX aguardando scan)
     'authorized',   -- Cartão: Valor reservado, mas não capturado (comum em fluxos de 2 etapas)
     'succeeded',    -- Sucesso total: Dinheiro confirmado
@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS credential_logs (
     ip_address VARCHAR(45),
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_credential_logs_credential_organization
         FOREIGN KEY (organization_id, credential_id)
@@ -126,6 +127,7 @@ CREATE TABLE IF NOT EXISTS webhook_logs (
     attempt_number INTEGER DEFAULT 1,
     success BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_webhook_logs_endpoint_organization
         FOREIGN KEY (organization_id, endpoint_id)
@@ -298,6 +300,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     total_price_cents INTEGER NOT NULL CHECK (total_price_cents >= 0),
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_invoice_items_invoice_organization
         FOREIGN KEY (organization_id, invoice_id)
@@ -327,6 +330,7 @@ CREATE TABLE IF NOT EXISTS invoice_logs (
     success BOOLEAN NOT NULL DEFAULT false,
     message TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_invoice_logs_invoice_organization
         FOREIGN KEY (organization_id, invoice_id)
@@ -367,7 +371,7 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
 );
 
 -- Registros financeiros brutos vinculados a faturas.
-CREATE TABLE IF NOT EXISTS transactions (
+CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
     invoice_id UUID,
@@ -376,13 +380,15 @@ CREATE TABLE IF NOT EXISTS transactions (
     gateway_reference VARCHAR(255), -- Identificador externo atribuído pelo gateway.
     payment_method VARCHAR(50),     -- Meio de pagamento utilizado.
     amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
-    status transaction_status_type NOT NULL, -- Estado financeiro do pagamento.
+    status payment_status_type NOT NULL, -- Estado financeiro do pagamento.
+    currency VARCHAR(3) DEFAULT 'BRL',
 
     idempotency_key VARCHAR(255) UNIQUE, -- Token para blindagem contra retentativas duplicadas.
     error_log JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    CONSTRAINT fk_transactions_invoice_organization
+    CONSTRAINT fk_payments_invoice_organization
         FOREIGN KEY (organization_id, invoice_id)
         REFERENCES invoices (organization_id, id) ON DELETE SET NULL
 );
@@ -398,31 +404,10 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
     response_body JSONB,            -- Resposta serializada para replay em chamadas repetidas.
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT unique_idempotency_key_per_organization
         UNIQUE (organization_id, idempotency_key)
-);
-
--- Movimentações de saldo do cliente.
-CREATE TABLE IF NOT EXISTS customer_balance_transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL REFERENCES organizations(id),
-    customer_id UUID NOT NULL,
-
-    type VARCHAR(10) NOT NULL CHECK (type IN ('credit', 'debit')), -- Direção monetária da movimentação.
-    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
-    description TEXT,
-
-    subscription_id UUID REFERENCES subscriptions(id), -- Assinatura que originou a movimentação.
-    invoice_id UUID REFERENCES invoices(id),           -- Fatura que originou a movimentação.
-
-    metadata JSONB,                                    -- Dados auxiliares, incluindo cálculos de pro-rata.
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE,
-
-    CONSTRAINT fk_balance_customer_organization
-        FOREIGN KEY (organization_id, customer_id)
-        REFERENCES customers (organization_id, id)
 );
 
 -- Histórico de mudanças de estado das assinaturas.
@@ -435,7 +420,7 @@ CREATE TABLE IF NOT EXISTS subscription_status_history (
     new_status subscription_status_type NOT NULL, -- Novo estado da assinatura.
     reason VARCHAR(100),                          -- Motivo operacional que originou a mudança.
     metadata JSONB,
-    event_source_id UUID,                         -- Entidade associada que disparou a mudança (transaction ou invoice).
+    event_source_id UUID,                         -- Entidade associada que disparou a mudança (payment ou invoice).
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_sub_history_subscription_organization
@@ -454,6 +439,7 @@ CREATE TABLE IF NOT EXISTS subscription_schedules (
     target_plan_id UUID,                    -- Plano a ser aplicado na data agendada.
     applied_at TIMESTAMP WITH TIME ZONE,    -- Preenchido pelo job após execução bem-sucedida.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_sub_schedules_subscription_organization
         FOREIGN KEY (organization_id, subscription_id)
@@ -461,14 +447,88 @@ CREATE TABLE IF NOT EXISTS subscription_schedules (
 );
 
 -- Histórico de mudanças de estado das transações.
-CREATE TABLE IF NOT EXISTS transaction_status_history (
+CREATE TABLE IF NOT EXISTS payment_status_history (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id  UUID NOT NULL REFERENCES organizations(id),
-    transaction_id   UUID NOT NULL REFERENCES transactions(id),
-    old_status       transaction_status_type,
-    new_status       transaction_status_type NOT NULL,
+    payment_id   UUID NOT NULL REFERENCES payments(id),
+    old_status       payment_status_type,
+    new_status       payment_status_type NOT NULL,
     event_source     VARCHAR(50),
     event_source_id  UUID,
     reason           TEXT,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+
+CREATE TABLE IF NOT EXISTS wallets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+
+    organization_owner_id UUID REFERENCES organizations(id),
+    customer_owner_id UUID REFERENCES customers(id),
+
+    balance INTEGER NOT NULL DEFAULT 0,
+    currency VARCHAR(3) DEFAULT 'BRL',
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    -- Restrição para garantir que a carteira tenha exatamente UM dono
+    CONSTRAINT check_only_one_owner CHECK (
+        (organization_owner_id IS NOT NULL AND customer_owner_id IS NULL) OR
+        (organization_owner_id IS NULL AND customer_owner_id IS NOT NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS ledger_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    wallet_id UUID NOT NULL REFERENCES wallets(id),
+
+    type VARCHAR(10) NOT NULL CHECK (type IN ('credit', 'debit')), -- Direção monetária da movimentação.
+    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+    category VARCHAR(30) NOT NULL, -- payment_split, payout, refund, manual_adjustment
+    balance_after INTEGER NOT NULL,
+
+    subscription_id UUID REFERENCES subscriptions(id),
+    invoice_id UUID REFERENCES invoices(id),
+    payment_id UUID REFERENCES payments(id),
+
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    CONSTRAINT fk_ledger_wallet_organization
+        FOREIGN KEY (wallet_id) REFERENCES wallets (id)
+);
+
+CREATE TABLE IF NOT EXISTS payouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+
+    wallet_id UUID NOT NULL REFERENCES wallets(id),
+    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+    fee_cents INTEGER DEFAULT 0 CHECK (fee_cents >= 0),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'paid', 'failed')),
+    bank_info JSONB,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS commission_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+
+    target_customer_id UUID NOT NULL REFERENCES customers(id),
+    
+    type VARCHAR(20) NOT NULL CHECK (type IN ('percentage', 'fixed')),
+    value NUMERIC(15,2) NOT NULL, -- Valor ou Porcentagem
+    conditions JSONB,
+
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
 );

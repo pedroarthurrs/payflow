@@ -10,8 +10,8 @@ import (
 
 type Querier interface {
 	CreateWebhookLog(ctx context.Context, arg CreateWebhookLogParams) error
-	GetWebhookLogByID(ctx context.Context, arg GetWebhookLogByIDParams) (WebhookLog, error)
-	ListWebhookLogs(ctx context.Context, arg ListWebhookLogsParams) ([]WebhookLog, error)
+	GetWebhookLogByID(ctx context.Context, arg GetWebhookLogByIDParams) (GetWebhookLogByIDRow, error)
+	ListWebhookLogs(ctx context.Context, arg ListWebhookLogsParams) ([]ListWebhookLogsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -8,7 +8,7 @@ import (
 	addressdb "i9pay/internal/database/dbgen/address"
 	credentialdb "i9pay/internal/database/dbgen/credential"
 	customerdb "i9pay/internal/database/dbgen/customer"
-	transactiondb "i9pay/internal/database/dbgen/transaction"
+	paymentdb "i9pay/internal/database/dbgen/payment"
 	"i9pay/internal/domain"
 )
 
@@ -32,10 +32,10 @@ func (m *TxManager) WithTx(ctx context.Context, fn func(tx domain.TxHandle) erro
 	defer func() { _ = sqlTx.Rollback() }()
 
 	handle := &txHandle{
-		customerQ:    customerdb.New(sqlTx),
-		addressQ:     addressdb.New(sqlTx),
-		credentialQ:  credentialdb.New(sqlTx),
-		transactionQ: transactiondb.New(sqlTx),
+		customerQ:   customerdb.New(sqlTx),
+		addressQ:    addressdb.New(sqlTx),
+		credentialQ: credentialdb.New(sqlTx),
+		paymentQ:    paymentdb.New(sqlTx),
 	}
 
 	if err := fn(handle); err != nil {
@@ -51,10 +51,10 @@ func (m *TxManager) WithTx(ctx context.Context, fn func(tx domain.TxHandle) erro
 
 // txHandle provides scoped repositories within a transaction.
 type txHandle struct {
-	customerQ    *customerdb.Queries
-	addressQ     *addressdb.Queries
-	credentialQ  *credentialdb.Queries
-	transactionQ *transactiondb.Queries
+	customerQ   *customerdb.Queries
+	addressQ    *addressdb.Queries
+	credentialQ *credentialdb.Queries
+	paymentQ    *paymentdb.Queries
 }
 
 func (h *txHandle) CustomerRepo() domain.CustomerRepository {
@@ -69,8 +69,8 @@ func (h *txHandle) CredentialRepo() domain.CredentialRepository {
 	return NewCredentialRepo(h.credentialQ)
 }
 
-func (h *txHandle) TransactionFSMRepo() domain.TransactionFSMRepository {
-	return NewTransactionFSMRepo(h.transactionQ)
+func (h *txHandle) PaymentFSMRepo() domain.PaymentFSMRepository {
+	return NewPaymentFSMRepo(h.paymentQ)
 }
 
 var _ domain.TxManager = (*TxManager)(nil)
