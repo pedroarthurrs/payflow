@@ -10,6 +10,7 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
 
 const countPayments = `-- name: CountPayments :one
@@ -309,6 +310,46 @@ func (q *Queries) ListPayments(ctx context.Context, arg ListPaymentsParams) ([]P
 		return nil, err
 	}
 	return items, nil
+}
+
+const updatePaymentErrorLog = `-- name: UpdatePaymentErrorLog :exec
+UPDATE payments
+SET error_log = $3
+WHERE organization_id = $1 AND id = $2
+`
+
+type UpdatePaymentErrorLogParams struct {
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	ID             uuid.UUID             `json:"id"`
+	ErrorLog       pqtype.NullRawMessage `json:"error_log"`
+}
+
+func (q *Queries) UpdatePaymentErrorLog(ctx context.Context, arg UpdatePaymentErrorLogParams) error {
+	_, err := q.db.ExecContext(ctx, updatePaymentErrorLog, arg.OrganizationID, arg.ID, arg.ErrorLog)
+	return err
+}
+
+const updatePaymentGatewayReference = `-- name: UpdatePaymentGatewayReference :exec
+UPDATE payments
+SET gateway_name = $3, gateway_reference = $4
+WHERE organization_id = $1 AND id = $2
+`
+
+type UpdatePaymentGatewayReferenceParams struct {
+	OrganizationID   uuid.UUID      `json:"organization_id"`
+	ID               uuid.UUID      `json:"id"`
+	GatewayName      sql.NullString `json:"gateway_name"`
+	GatewayReference sql.NullString `json:"gateway_reference"`
+}
+
+func (q *Queries) UpdatePaymentGatewayReference(ctx context.Context, arg UpdatePaymentGatewayReferenceParams) error {
+	_, err := q.db.ExecContext(ctx, updatePaymentGatewayReference,
+		arg.OrganizationID,
+		arg.ID,
+		arg.GatewayName,
+		arg.GatewayReference,
+	)
+	return err
 }
 
 const updatePaymentStatus = `-- name: UpdatePaymentStatus :exec

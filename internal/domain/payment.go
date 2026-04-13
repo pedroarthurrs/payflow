@@ -52,6 +52,8 @@ type PaymentRepository interface {
 	GetByID(ctx context.Context, organizationID, paymentID uuid.UUID) (*Payment, error)
 	List(ctx context.Context, organizationID uuid.UUID, params PaymentListParams) ([]Payment, error)
 	Count(ctx context.Context, organizationID uuid.UUID, params PaymentListParams) (int64, error)
+	UpdateGatewayReference(ctx context.Context, organizationID, paymentID uuid.UUID, gatewayName, gatewayReference string) error
+	UpdateErrorLog(ctx context.Context, organizationID, paymentID uuid.UUID, errorLog json.RawMessage) error
 }
 
 // PaymentStatus representa os estados possíveis de um pagamento.

@@ -13,6 +13,7 @@ import (
 	"i9pay/internal/config"
 	"i9pay/internal/database"
 	"i9pay/internal/database/repository"
+	"i9pay/internal/gateway"
 	"i9pay/internal/monitor"
 	"i9pay/internal/queue"
 	"i9pay/internal/worker"
@@ -63,6 +64,8 @@ func run() error {
 
 	q := queue.NewInMemoryQueue(cfg.WebhookQueueBufferSize)
 
+	gatewayAdapter := gateway.New(cfg.GatewayProviderName, cfg.GatewayProviderAPIKey)
+
 	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
 	wkr := worker.NewWebhookWorker(q, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, cfg.WebhookWorkerCount)
 	go wkr.Start(ctx)
@@ -71,7 +74,7 @@ func run() error {
 	cleanupWorker := worker.NewCleanupWorker(cleanupRepo)
 	go cleanupWorker.Start(ctx)
 
-	r := router.NewRouter(cfg, logger, db, healthCheck, q)
+	r := router.NewRouter(cfg, logger, db, healthCheck, q, gatewayAdapter)
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		logger.Error("server stopped", "error", err)

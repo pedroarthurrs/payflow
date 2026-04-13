@@ -65,3 +65,13 @@ WHERE organization_id = $1
   AND (sqlc.narg('payment_method')::varchar IS NULL OR payment_method = sqlc.narg('payment_method'))
   AND (sqlc.narg('created_from')::timestamptz IS NULL OR created_at >= sqlc.narg('created_from'))
   AND (sqlc.narg('created_to')::timestamptz IS NULL OR created_at <= sqlc.narg('created_to'));
+
+-- name: UpdatePaymentGatewayReference :exec
+UPDATE payments
+SET gateway_name = $3, gateway_reference = $4
+WHERE organization_id = $1 AND id = $2;
+
+-- name: UpdatePaymentErrorLog :exec
+UPDATE payments
+SET error_log = $3
+WHERE organization_id = $1 AND id = $2;

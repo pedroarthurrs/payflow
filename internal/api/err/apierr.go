@@ -64,3 +64,8 @@ func ServiceUnavailable(msg string) *AppError {
 func UnprocessableEntity(msg string) *AppError {
 	return &AppError{Status: http.StatusUnprocessableEntity, Message: msg}
 }
+
+// PaymentRequired creates a 402 Payment Required error.
+func PaymentRequired(msg string) *AppError {
+	return &AppError{Status: http.StatusPaymentRequired, Message: msg}
+}

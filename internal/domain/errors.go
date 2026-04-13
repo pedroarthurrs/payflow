@@ -20,4 +20,10 @@ var (
 	ErrDuplicateDocument       = errors.New("customer with this document already exists")
 	ErrWebhookEndpointNotFound = errors.New("webhook endpoint not found")
 	ErrWebhookLogNotFound      = errors.New("webhook log not found")
+
+	// Gateway errors
+	ErrGatewayChargeFailed = errors.New("gateway charge failed")
+	ErrGatewayRefundFailed = errors.New("gateway refund failed")
+	ErrGatewayCancelFailed = errors.New("gateway cancel failed")
+	ErrGatewayUnavailable  = errors.New("gateway unavailable")
 )

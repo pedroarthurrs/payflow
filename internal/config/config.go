@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"strconv"
 )
@@ -41,6 +42,10 @@ type Config struct {
 	WebhookQueueBufferSize int
 	WebhookWorkerCount     int
 	WebhookQueueDriver     string
+
+	// Gateway provider
+	GatewayProviderAPIKey string // GATEWAY_PROVIDER_API_KEY
+	GatewayProviderName   string // GATEWAY_PROVIDER_NAME (e.g. "stripe")
 }
 
 // envInt reads an environment variable and converts it to int.
@@ -59,7 +64,7 @@ func envInt(key string, fallback int) int {
 
 // Load reads environment variables and returns a populated Config.
 func Load() *Config {
-	return &Config{
+	cfg := &Config{
 		GoEnv:      os.Getenv("GO_ENV"),
 		ServerPort: os.Getenv("SERVER_PORT"),
 		JwtSecret:  os.Getenv("JWT_SECRET"),
@@ -85,5 +90,14 @@ func Load() *Config {
 		WebhookQueueBufferSize: envInt("WEBHOOK_QUEUE_BUFFER_SIZE", 1000),
 		WebhookWorkerCount:     envInt("WEBHOOK_WORKER_COUNT", 5),
 		WebhookQueueDriver:     os.Getenv("WEBHOOK_QUEUE_DRIVER"),
+
+		GatewayProviderAPIKey: os.Getenv("GATEWAY_PROVIDER_API_KEY"),
+		GatewayProviderName:   os.Getenv("GATEWAY_PROVIDER_NAME"),
 	}
+
+	if cfg.GatewayProviderAPIKey == "" {
+		slog.Warn("GATEWAY_PROVIDER_API_KEY is empty; gateway operations will fail at runtime")
+	}
+
+	return cfg
 }

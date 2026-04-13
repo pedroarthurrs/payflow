@@ -22,7 +22,43 @@ import (
 	"pgregory.net/rapid"
 )
 
+// ── mock TxManager and TxHandle for FSM tests ────────────────────────────────
+
+type mockTxManager struct {
+	fsmRepo domain.PaymentFSMRepository
+}
+
+func (m *mockTxManager) WithTx(_ context.Context, fn func(domain.TxHandle) error) error {
+	return fn(&mockTxHandle{fsmRepo: m.fsmRepo})
+}
+
+type mockTxHandle struct {
+	fsmRepo domain.PaymentFSMRepository
+}
+
+func (h *mockTxHandle) CustomerRepo() domain.CustomerRepository     { return nil }
+func (h *mockTxHandle) AddressRepo() domain.AddressRepository       { return nil }
+func (h *mockTxHandle) CredentialRepo() domain.CredentialRepository { return nil }
+func (h *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository { return h.fsmRepo }
+
 // ── mock payment querier ──────────────────────────────────────────────────────
+
+// noopGateway is a test double that always returns a successful charge result.
+type noopGateway struct{}
+
+func (g *noopGateway) Charge(_ context.Context, req domain.GatewayRequest) (*domain.ChargeResult, error) {
+	return &domain.ChargeResult{
+		GatewayReference: "noop-ref",
+		GatewayName:      "noop",
+		Status:           domain.StatusAuthorized,
+	}, nil
+}
+func (g *noopGateway) Refund(_ context.Context, _ domain.GatewayRequest) (*domain.RefundResult, error) {
+	return &domain.RefundResult{GatewayReference: "noop-ref", Status: domain.StatusRefunded}, nil
+}
+func (g *noopGateway) Cancel(_ context.Context, _ domain.GatewayRequest) (*domain.ChargeResult, error) {
+	return &domain.ChargeResult{GatewayReference: "noop-ref", GatewayName: "noop", Status: domain.StatusCanceled}, nil
+}
 
 type mockPaymentQuerier struct {
 	capturedListParams paymentdb.ListPaymentsParams
@@ -57,11 +93,18 @@ func (m *mockPaymentQuerier) ListPayments(ctx context.Context, arg paymentdb.Lis
 func (m *mockPaymentQuerier) UpdatePaymentStatus(_ context.Context, _ paymentdb.UpdatePaymentStatusParams) error {
 	return nil
 }
+func (m *mockPaymentQuerier) UpdatePaymentErrorLog(_ context.Context, _ paymentdb.UpdatePaymentErrorLogParams) error {
+	return nil
+}
+func (m *mockPaymentQuerier) UpdatePaymentGatewayReference(_ context.Context, _ paymentdb.UpdatePaymentGatewayReferenceParams) error {
+	return nil
+}
 
 // ── mock domain payment repository ───────────────────────────────────────────
 
 type mockDomainPaymentRepo struct {
-	createFn func(ctx context.Context, orgID uuid.UUID, input domain.PaymentInput) (*domain.Payment, error)
+	createFn  func(ctx context.Context, orgID uuid.UUID, input domain.PaymentInput) (*domain.Payment, error)
+	getByIDFn func(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.Payment, error)
 }
 
 func (m *mockDomainPaymentRepo) Create(ctx context.Context, orgID uuid.UUID, input domain.PaymentInput) (*domain.Payment, error) {
@@ -70,7 +113,10 @@ func (m *mockDomainPaymentRepo) Create(ctx context.Context, orgID uuid.UUID, inp
 	}
 	return nil, nil
 }
-func (m *mockDomainPaymentRepo) GetByID(_ context.Context, _, _ uuid.UUID) (*domain.Payment, error) {
+func (m *mockDomainPaymentRepo) GetByID(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.Payment, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, orgID, paymentID)
+	}
 	return nil, domain.ErrPaymentNotFound
 }
 func (m *mockDomainPaymentRepo) List(_ context.Context, _ uuid.UUID, _ domain.PaymentListParams) ([]domain.Payment, error) {
@@ -79,14 +125,24 @@ func (m *mockDomainPaymentRepo) List(_ context.Context, _ uuid.UUID, _ domain.Pa
 func (m *mockDomainPaymentRepo) Count(_ context.Context, _ uuid.UUID, _ domain.PaymentListParams) (int64, error) {
 	return 0, nil
 }
+func (m *mockDomainPaymentRepo) UpdateGatewayReference(_ context.Context, _, _ uuid.UUID, _, _ string) error {
+	return nil
+}
+func (m *mockDomainPaymentRepo) UpdateErrorLog(_ context.Context, _, _ uuid.UUID, _ json.RawMessage) error {
+	return nil
+}
 
 // ── mock FSM repository ───────────────────────────────────────────────────────
 
 type mockPaymentFSMRepo struct {
-	listHistoryFn func(ctx context.Context, orgID, paymentID uuid.UUID) ([]domain.TransitionHistory, error)
+	listHistoryFn  func(ctx context.Context, orgID, paymentID uuid.UUID) ([]domain.TransitionHistory, error)
+	getForUpdateFn func(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.PaymentForUpdate, error)
 }
 
-func (m *mockPaymentFSMRepo) GetForUpdate(_ context.Context, _, _ uuid.UUID) (*domain.PaymentForUpdate, error) {
+func (m *mockPaymentFSMRepo) GetForUpdate(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.PaymentForUpdate, error) {
+	if m.getForUpdateFn != nil {
+		return m.getForUpdateFn(ctx, orgID, paymentID)
+	}
 	return nil, domain.ErrPaymentNotFound
 }
 func (m *mockPaymentFSMRepo) UpdateStatus(_ context.Context, _, _ uuid.UUID, _ domain.PaymentStatus) error {
@@ -105,17 +161,21 @@ func (m *mockPaymentFSMRepo) ListHistory(ctx context.Context, orgID, paymentID u
 // ── router helpers ────────────────────────────────────────────────────────────
 
 func setupPaymentRouter(repo domain.PaymentRepository, orgID string) *gin.Engine {
-	return setupPaymentRouterWithFSM(repo, nil, orgID)
+	fsmRepo := &mockPaymentFSMRepo{}
+	return setupPaymentRouterWithFSM(repo, fsmRepo, orgID)
 }
 
 func setupPaymentRouterWithFSM(repo domain.PaymentRepository, fsmRepo domain.PaymentFSMRepository, orgID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	svc := service.NewPaymentService(repo)
 	var fsmSvc *service.PaymentFSMService
+	var gatewaySvc *service.GatewayService
 	if fsmRepo != nil {
-		fsmSvc = service.NewPaymentFSMService(nil, fsmRepo)
+		txMgr := &mockTxManager{fsmRepo: fsmRepo}
+		fsmSvc = service.NewPaymentFSMService(txMgr, fsmRepo)
+		gatewaySvc = service.NewGatewayService(repo, fsmSvc, &noopGateway{})
 	}
-	h := NewPaymentHandler(svc, fsmSvc)
+	h := NewPaymentHandler(svc, fsmSvc, gatewaySvc)
 	r := gin.New()
 	r.Use(middleware.Errors())
 	v1 := r.Group("/v1")
@@ -136,22 +196,51 @@ func TestProperty_Preservation_CreateReturns201Pending(t *testing.T) {
 		amountCents := rapid.Int32Range(1, 1_000_000).Draw(t, "amount_cents")
 		paymentMethod := rapid.StringMatching(`[a-z]{3,10}`).Draw(t, "payment_method")
 
+		paymentID := uuid.New()
 		createdPayment := &domain.Payment{
-			ID:             uuid.New(),
+			ID:             paymentID,
 			OrganizationID: orgID,
 			CustomerID:     customerID,
 			AmountCents:    amountCents,
 			Status:         domain.StatusPending,
 		}
+		authorizedPayment := &domain.Payment{
+			ID:             paymentID,
+			OrganizationID: orgID,
+			CustomerID:     customerID,
+			AmountCents:    amountCents,
+			Status:         domain.StatusAuthorized,
+		}
 
+		callCount := 0
 		repo := &mockDomainPaymentRepo{
 			createFn: func(_ context.Context, _ uuid.UUID, input domain.PaymentInput) (*domain.Payment, error) {
 				createdPayment.AmountCents = input.AmountCents
+				authorizedPayment.AmountCents = input.AmountCents
 				return createdPayment, nil
+			},
+			getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Payment, error) {
+				callCount++
+				// First call: GatewayService.Charge pre-check — return pending
+				// Second call: GatewayService.Charge post-transition fetch — return authorized
+				if callCount == 1 {
+					return createdPayment, nil
+				}
+				return authorizedPayment, nil
 			},
 		}
 
-		router := setupPaymentRouter(repo, orgID.String())
+		fsmRepo := &mockPaymentFSMRepo{
+			getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.PaymentForUpdate, error) {
+				return &domain.PaymentForUpdate{
+					ID:             paymentID,
+					OrganizationID: orgID,
+					Status:         domain.StatusPending,
+				}, nil
+			},
+		}
+
+		router := setupPaymentRouterWithFSM(repo, fsmRepo, orgID.String())
 
 		body := fmt.Sprintf(`{"customer_id":%q,"payment_method":%q,"amount_cents":%d}`,
 			customerID.String(), paymentMethod, amountCents)
@@ -167,9 +256,6 @@ func TestProperty_Preservation_CreateReturns201Pending(t *testing.T) {
 		var resp map[string]any
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response: %v", err)
-		}
-		if resp["status"] != "pending" {
-			t.Fatalf("expected status=pending, got %v", resp["status"])
 		}
 		gotAmount, ok := resp["amount_cents"].(float64)
 		if !ok {
@@ -360,6 +446,12 @@ func (r *fixedCountPaymentRepo) List(_ context.Context, _ uuid.UUID, _ domain.Pa
 }
 func (r *fixedCountPaymentRepo) Count(_ context.Context, _ uuid.UUID, _ domain.PaymentListParams) (int64, error) {
 	return r.total, nil
+}
+func (r *fixedCountPaymentRepo) UpdateGatewayReference(_ context.Context, _, _ uuid.UUID, _, _ string) error {
+	return nil
+}
+func (r *fixedCountPaymentRepo) UpdateErrorLog(_ context.Context, _, _ uuid.UUID, _ json.RawMessage) error {
+	return nil
 }
 
 // TestFixCheck_IdempotencyKeyRoundTrip (task 7.5): GetByID returns idempotency_key

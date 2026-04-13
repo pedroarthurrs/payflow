@@ -7,6 +7,7 @@ import (
 
 	"i9pay/internal/api/dto"
 	apierr "i9pay/internal/api/err"
+	"i9pay/internal/api/middleware"
 	"i9pay/internal/domain"
 	"i9pay/internal/service"
 
@@ -18,11 +19,12 @@ import (
 type PaymentHandler struct {
 	paymentSvc *service.PaymentService
 	fsmSvc     *service.PaymentFSMService
+	gatewaySvc *service.GatewayService
 }
 
 // NewPaymentHandler creates a PaymentHandler.
-func NewPaymentHandler(paymentSvc *service.PaymentService, fsmSvc *service.PaymentFSMService) *PaymentHandler {
-	return &PaymentHandler{paymentSvc: paymentSvc, fsmSvc: fsmSvc}
+func NewPaymentHandler(paymentSvc *service.PaymentService, fsmSvc *service.PaymentFSMService, gatewaySvc *service.GatewayService) *PaymentHandler {
+	return &PaymentHandler{paymentSvc: paymentSvc, fsmSvc: fsmSvc, gatewaySvc: gatewaySvc}
 }
 
 // RegisterRoutes registers the payment handler routes.
@@ -32,6 +34,8 @@ func (h *PaymentHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	payments.GET("", h.List)
 	payments.GET("/:payment_id", h.GetByID)
 	payments.GET("/:payment_id/history", h.ListHistory)
+	payments.POST("/:payment_id/refund", middleware.RequireRole("member"), h.Refund)
+	payments.POST("/:payment_id/cancel", middleware.RequireRole("member"), h.Cancel)
 }
 
 // createPaymentRequest is the DTO for creating a payment.
@@ -104,7 +108,7 @@ func toTransitionHistoryResponse(h domain.TransitionHistory) transitionHistoryRe
 	return r
 }
 
-// Create handles POST /v1/payments.
+// Create handles POST /v1/payments — creates the payment then auto-charges via the gateway.
 func (h *PaymentHandler) Create(c *gin.Context) {
 	orgID, ok := dto.OrganizationID(c)
 	if !ok {
@@ -130,7 +134,21 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, toPaymentResponse(payment))
+	charged, err := h.gatewaySvc.Charge(c.Request.Context(), orgID, payment.ID, "")
+	if err != nil {
+		if errors.Is(err, domain.ErrGatewayChargeFailed) {
+			_ = c.Error(apierr.PaymentRequired("payment charge failed: " + err.Error()))
+			return
+		}
+		if errors.Is(err, domain.ErrGatewayUnavailable) {
+			_ = c.Error(apierr.ServiceUnavailable("payment gateway unavailable, try again later"))
+			return
+		}
+		_ = c.Error(err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, toPaymentResponse(charged))
 }
 
 // List handles GET /v1/payments.
@@ -255,4 +273,75 @@ func (h *PaymentHandler) ListHistory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// gatewayActionRequest is the optional request body for refund and cancel actions.
+type gatewayActionRequest struct {
+	Reason string `json:"reason"`
+}
+
+// mapGatewayError maps gateway service errors to apierr types.
+func mapGatewayError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, domain.ErrGatewayChargeFailed),
+		errors.Is(err, domain.ErrGatewayRefundFailed),
+		errors.Is(err, domain.ErrGatewayCancelFailed):
+		_ = c.Error(apierr.PaymentRequired(err.Error()))
+	case errors.Is(err, domain.ErrInvalidTransition), errors.Is(err, domain.ErrTerminalState):
+		_ = c.Error(apierr.UnprocessableEntity(err.Error()))
+	case errors.Is(err, domain.ErrGatewayUnavailable):
+		_ = c.Error(apierr.ServiceUnavailable("payment gateway unavailable, try again later"))
+	case errors.Is(err, domain.ErrPaymentNotFound):
+		_ = c.Error(apierr.NotFound("payment not found"))
+	default:
+		_ = c.Error(err)
+	}
+}
+
+// Refund handles POST /v1/payments/:payment_id/refund.
+func (h *PaymentHandler) Refund(c *gin.Context) {
+	orgID, ok := dto.OrganizationID(c)
+	if !ok {
+		return
+	}
+
+	pid, ok := dto.PaymentID(c)
+	if !ok {
+		return
+	}
+
+	var req gatewayActionRequest
+	_ = c.ShouldBindJSON(&req) // reason is optional
+
+	payment, err := h.gatewaySvc.Refund(c.Request.Context(), orgID, pid, req.Reason)
+	if err != nil {
+		mapGatewayError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toPaymentResponse(payment))
+}
+
+// Cancel handles POST /v1/payments/:payment_id/cancel.
+func (h *PaymentHandler) Cancel(c *gin.Context) {
+	orgID, ok := dto.OrganizationID(c)
+	if !ok {
+		return
+	}
+
+	pid, ok := dto.PaymentID(c)
+	if !ok {
+		return
+	}
+
+	var req gatewayActionRequest
+	_ = c.ShouldBindJSON(&req) // reason is optional
+
+	payment, err := h.gatewaySvc.Cancel(c.Request.Context(), orgID, pid, req.Reason)
+	if err != nil {
+		mapGatewayError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, toPaymentResponse(payment))
 }

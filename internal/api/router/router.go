@@ -10,6 +10,7 @@ import (
 	"i9pay/internal/config"
 	"i9pay/internal/database"
 	"i9pay/internal/database/repository"
+	"i9pay/internal/domain"
 	"i9pay/internal/monitor"
 	"i9pay/internal/queue"
 	"i9pay/internal/service"
@@ -21,7 +22,7 @@ const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
-func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker, q queue.Queue) *gin.Engine {
+func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker, q queue.Queue, gatewayAdapter domain.Gateway) *gin.Engine {
 	// Feature flags — backed by env vars by default; swap for AWS AppConfig or
 	// any other store by passing a different config.FlagProvider implementation.
 	flags := config.NewEnvFlagProvider(
@@ -79,6 +80,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	_ = dispatcher // TODO: inject into handler that triggers webhook events
 	paymentSvc := service.NewPaymentService(paymentRepo)
 	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
+	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, gatewayAdapter)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -94,7 +96,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userHandler := handler.NewUserHandler(userSvc)
 	credentialHandler := handler.NewCredentialHandler(credentialSvc, credentialLogSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
-	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentFSMSvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentFSMSvc, gatewaySvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)

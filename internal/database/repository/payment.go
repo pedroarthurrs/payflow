@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
 
@@ -10,6 +11,7 @@ import (
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
 
 // PaymentRepo implements domain.PaymentRepository backed by PostgreSQL via sqlc.
@@ -180,6 +182,35 @@ func (r *PaymentRepo) Count(ctx context.Context, organizationID uuid.UUID, param
 		return 0, domain.ErrInternal
 	}
 	return count, nil
+}
+
+// UpdateGatewayReference updates only the gateway_name and gateway_reference columns.
+func (r *PaymentRepo) UpdateGatewayReference(ctx context.Context, organizationID, paymentID uuid.UUID, gatewayName, gatewayReference string) error {
+	err := r.q.UpdatePaymentGatewayReference(ctx, paymentdb.UpdatePaymentGatewayReferenceParams{
+		OrganizationID:   organizationID,
+		ID:               paymentID,
+		GatewayName:      sql.NullString{String: gatewayName, Valid: gatewayName != ""},
+		GatewayReference: sql.NullString{String: gatewayReference, Valid: gatewayReference != ""},
+	})
+	if err != nil {
+		slog.Error("failed to update gateway reference", "organization_id", organizationID, "payment_id", paymentID, "error", err)
+		return domain.ErrInternal
+	}
+	return nil
+}
+
+// UpdateErrorLog updates only the error_log column.
+func (r *PaymentRepo) UpdateErrorLog(ctx context.Context, organizationID, paymentID uuid.UUID, errorLog json.RawMessage) error {
+	err := r.q.UpdatePaymentErrorLog(ctx, paymentdb.UpdatePaymentErrorLogParams{
+		OrganizationID: organizationID,
+		ID:             paymentID,
+		ErrorLog:       pqtype.NullRawMessage{RawMessage: errorLog, Valid: len(errorLog) > 0},
+	})
+	if err != nil {
+		slog.Error("failed to update error log", "organization_id", organizationID, "payment_id", paymentID, "error", err)
+		return domain.ErrInternal
+	}
+	return nil
 }
 
 var _ domain.PaymentRepository = (*PaymentRepo)(nil)
