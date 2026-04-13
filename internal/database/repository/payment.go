@@ -31,8 +31,10 @@ func (r *PaymentRepo) Create(ctx context.Context, organizationID uuid.UUID, inpu
 
 	row, err := r.q.CreatePayment(ctx, paymentdb.CreatePaymentParams{
 		OrganizationID: organizationID,
+		CustomerID:     input.CustomerID,
 		PaymentMethod:  sql.NullString{String: input.PaymentMethod, Valid: input.PaymentMethod != ""},
 		AmountCents:    input.AmountCents,
+		Status:         paymentdb.PaymentStatusTypePending,
 		Currency:       sql.NullString{String: currency, Valid: true},
 	})
 	if err != nil {
@@ -60,13 +62,33 @@ func (r *PaymentRepo) GetByID(ctx context.Context, organizationID, paymentID uui
 	return toDomainPayment(row), nil
 }
 
-// List returns payments for the given organization with offset-based pagination.
-func (r *PaymentRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Payment, error) {
-	rows, err := r.q.ListPayments(ctx, paymentdb.ListPaymentsParams{
+// List returns payments for the given organization with offset-based pagination and filters.
+func (r *PaymentRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.PaymentListParams) ([]domain.Payment, error) {
+	arg := paymentdb.ListPaymentsParams{
 		OrganizationID: organizationID,
 		Limit:          params.Limit,
 		Offset:         params.Offset,
-	})
+	}
+	if params.Status != nil {
+		arg.Status = paymentdb.NullPaymentStatusType{
+			PaymentStatusType: paymentdb.PaymentStatusType(*params.Status),
+			Valid:             true,
+		}
+	}
+	if params.CustomerID != nil {
+		arg.CustomerID = uuid.NullUUID{UUID: *params.CustomerID, Valid: true}
+	}
+	if params.PaymentMethod != nil {
+		arg.PaymentMethod = sql.NullString{String: *params.PaymentMethod, Valid: true}
+	}
+	if params.CreatedFrom != nil {
+		arg.CreatedFrom = sql.NullTime{Time: *params.CreatedFrom, Valid: true}
+	}
+	if params.CreatedTo != nil {
+		arg.CreatedTo = sql.NullTime{Time: *params.CreatedTo, Valid: true}
+	}
+
+	rows, err := r.q.ListPayments(ctx, arg)
 	if err != nil {
 		slog.Error("failed to list payments", "organization_id", organizationID, "error", err)
 		return nil, domain.ErrInternal
@@ -83,6 +105,7 @@ func toDomainPayment(row paymentdb.Payment) *domain.Payment {
 	p := &domain.Payment{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
+		CustomerID:     row.CustomerID,
 		AmountCents:    row.AmountCents,
 		Status:         domain.PaymentStatus(row.Status),
 	}
@@ -125,6 +148,38 @@ func toDomainPayment(row paymentdb.Payment) *domain.Payment {
 	}
 
 	return p
+}
+
+// Count returns the total number of payments matching the given filters for the organization.
+func (r *PaymentRepo) Count(ctx context.Context, organizationID uuid.UUID, params domain.PaymentListParams) (int64, error) {
+	arg := paymentdb.CountPaymentsParams{
+		OrganizationID: organizationID,
+	}
+	if params.Status != nil {
+		arg.Status = paymentdb.NullPaymentStatusType{
+			PaymentStatusType: paymentdb.PaymentStatusType(*params.Status),
+			Valid:             true,
+		}
+	}
+	if params.CustomerID != nil {
+		arg.CustomerID = uuid.NullUUID{UUID: *params.CustomerID, Valid: true}
+	}
+	if params.PaymentMethod != nil {
+		arg.PaymentMethod = sql.NullString{String: *params.PaymentMethod, Valid: true}
+	}
+	if params.CreatedFrom != nil {
+		arg.CreatedFrom = sql.NullTime{Time: *params.CreatedFrom, Valid: true}
+	}
+	if params.CreatedTo != nil {
+		arg.CreatedTo = sql.NullTime{Time: *params.CreatedTo, Valid: true}
+	}
+
+	count, err := r.q.CountPayments(ctx, arg)
+	if err != nil {
+		slog.Error("failed to count payments", "organization_id", organizationID, "error", err)
+		return 0, domain.ErrInternal
+	}
+	return count, nil
 }
 
 var _ domain.PaymentRepository = (*PaymentRepo)(nil)

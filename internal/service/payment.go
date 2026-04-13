@@ -28,7 +28,16 @@ func (s *PaymentService) GetByID(ctx context.Context, organizationID, paymentID 
 	return s.payments.GetByID(ctx, organizationID, paymentID)
 }
 
-// List returns payments for the given organization with offset-based pagination.
-func (s *PaymentService) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.Payment, error) {
-	return s.payments.List(ctx, organizationID, params)
+// List returns payments for the given organization with offset-based pagination and filters.
+// Also returns the total count of matching payments for pagination metadata.
+func (s *PaymentService) List(ctx context.Context, organizationID uuid.UUID, params domain.PaymentListParams) ([]domain.Payment, int64, error) {
+	payments, err := s.payments.List(ctx, organizationID, params)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.payments.Count(ctx, organizationID, params)
+	if err != nil {
+		return nil, 0, err
+	}
+	return payments, total, nil
 }

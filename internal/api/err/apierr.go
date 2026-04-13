@@ -59,3 +59,8 @@ func Internal(msg string) *AppError {
 func ServiceUnavailable(msg string) *AppError {
 	return &AppError{Status: http.StatusServiceUnavailable, Message: msg}
 }
+
+// UnprocessableEntity creates a 422 Unprocessable Entity error.
+func UnprocessableEntity(msg string) *AppError {
+	return &AppError{Status: http.StatusUnprocessableEntity, Message: msg}
+}

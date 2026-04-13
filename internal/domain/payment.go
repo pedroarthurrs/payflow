@@ -13,6 +13,7 @@ import (
 type Payment struct {
 	ID               uuid.UUID
 	OrganizationID   uuid.UUID
+	CustomerID       uuid.UUID
 	InvoiceID        *uuid.UUID
 	GatewayName      *string
 	GatewayReference *string
@@ -28,17 +29,29 @@ type Payment struct {
 
 // PaymentInput represents the input for creating a payment.
 type PaymentInput struct {
+	CustomerID    uuid.UUID
 	PaymentMethod string
 	AmountCents   int32
 	// Currency defaults to "BRL" when empty.
 	Currency string
 }
 
+// PaymentListParams carries optional filters for listing payments.
+type PaymentListParams struct {
+	ListParams
+	CustomerID    *uuid.UUID
+	Status        *PaymentStatus
+	PaymentMethod *string
+	CreatedFrom   *time.Time
+	CreatedTo     *time.Time
+}
+
 // PaymentRepository defines persistence operations for the payment domain.
 type PaymentRepository interface {
 	Create(ctx context.Context, organizationID uuid.UUID, input PaymentInput) (*Payment, error)
 	GetByID(ctx context.Context, organizationID, paymentID uuid.UUID) (*Payment, error)
-	List(ctx context.Context, organizationID uuid.UUID, params ListParams) ([]Payment, error)
+	List(ctx context.Context, organizationID uuid.UUID, params PaymentListParams) ([]Payment, error)
+	Count(ctx context.Context, organizationID uuid.UUID, params PaymentListParams) (int64, error)
 }
 
 // PaymentStatus representa os estados possíveis de um pagamento.

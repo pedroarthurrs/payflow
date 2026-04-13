@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
+    customer_id UUID NOT NULL REFERENCES customers(id), -- Associação direta ao cliente.
     invoice_id UUID,
 
     gateway_name VARCHAR(50),       -- Gateway que processou o pagamento.

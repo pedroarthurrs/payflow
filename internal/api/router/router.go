@@ -94,8 +94,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userHandler := handler.NewUserHandler(userSvc)
 	credentialHandler := handler.NewCredentialHandler(credentialSvc, credentialLogSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
-	paymentHandler := handler.NewPaymentHandler(paymentSvc)
-	_ = paymentFSMSvc // TODO: inject into payment handler for status transitions
+	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentFSMSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)

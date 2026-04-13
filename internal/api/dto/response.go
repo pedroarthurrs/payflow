@@ -13,6 +13,7 @@ type PagedResponse[T any] struct {
 	Data   []T   `json:"data"`
 	Limit  int32 `json:"limit"`
 	Offset int32 `json:"offset"`
+	Total  int64 `json:"total"`
 }
 
 // AddressResponse is the response DTO for an address.

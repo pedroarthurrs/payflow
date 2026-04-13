@@ -393,6 +393,7 @@ type OrganizationConfig struct {
 type Payment struct {
 	ID               uuid.UUID             `json:"id"`
 	OrganizationID   uuid.UUID             `json:"organization_id"`
+	CustomerID       uuid.UUID             `json:"customer_id"`
 	InvoiceID        uuid.NullUUID         `json:"invoice_id"`
 	GatewayName      sql.NullString        `json:"gateway_name"`
 	GatewayReference sql.NullString        `json:"gateway_reference"`

@@ -82,6 +82,9 @@ CREATE INDEX IF NOT EXISTS idx_payments_organization_created_at
 CREATE INDEX IF NOT EXISTS idx_payments_status
     ON payments (status);
 
+CREATE INDEX IF NOT EXISTS idx_payments_customer_id
+    ON payments (organization_id, customer_id);
+
 -- Payment Status History
 CREATE INDEX IF NOT EXISTS idx_payment_status_history_payment_id
     ON payment_status_history (payment_id, created_at DESC);

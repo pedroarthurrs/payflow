@@ -12,35 +12,76 @@ import (
 	"github.com/google/uuid"
 )
 
+const countPayments = `-- name: CountPayments :one
+SELECT count(*) FROM payments
+WHERE organization_id = $1
+  AND ($2::payment_status_type IS NULL OR status = $2)
+  AND ($3::uuid IS NULL OR customer_id = $3)
+  AND ($4::varchar IS NULL OR payment_method = $4)
+  AND ($5::timestamptz IS NULL OR created_at >= $5)
+  AND ($6::timestamptz IS NULL OR created_at <= $6)
+`
+
+type CountPaymentsParams struct {
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	Status         NullPaymentStatusType `json:"status"`
+	CustomerID     uuid.NullUUID         `json:"customer_id"`
+	PaymentMethod  sql.NullString        `json:"payment_method"`
+	CreatedFrom    sql.NullTime          `json:"created_from"`
+	CreatedTo      sql.NullTime          `json:"created_to"`
+}
+
+func (q *Queries) CountPayments(ctx context.Context, arg CountPaymentsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPayments,
+		arg.OrganizationID,
+		arg.Status,
+		arg.CustomerID,
+		arg.PaymentMethod,
+		arg.CreatedFrom,
+		arg.CreatedTo,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createPayment = `-- name: CreatePayment :one
 INSERT INTO payments (
-    organization_id,
-    payment_method,
-    amount_cents,
-    currency,
-    status
-) VALUES ($1, $2, $3, $4, 'pending')
-RETURNING id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, currency, idempotency_key, error_log, created_at, updated_at
+    organization_id, customer_id, payment_method, amount_cents,
+    status, currency, gateway_name, idempotency_key
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, organization_id, customer_id, invoice_id, gateway_name,
+          gateway_reference, payment_method, amount_cents, status,
+          currency, idempotency_key, error_log, created_at, updated_at
 `
 
 type CreatePaymentParams struct {
-	OrganizationID uuid.UUID      `json:"organization_id"`
-	PaymentMethod  sql.NullString `json:"payment_method"`
-	AmountCents    int32          `json:"amount_cents"`
-	Currency       sql.NullString `json:"currency"`
+	OrganizationID uuid.UUID         `json:"organization_id"`
+	CustomerID     uuid.UUID         `json:"customer_id"`
+	PaymentMethod  sql.NullString    `json:"payment_method"`
+	AmountCents    int32             `json:"amount_cents"`
+	Status         PaymentStatusType `json:"status"`
+	Currency       sql.NullString    `json:"currency"`
+	GatewayName    sql.NullString    `json:"gateway_name"`
+	IdempotencyKey sql.NullString    `json:"idempotency_key"`
 }
 
 func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
 	row := q.db.QueryRowContext(ctx, createPayment,
 		arg.OrganizationID,
+		arg.CustomerID,
 		arg.PaymentMethod,
 		arg.AmountCents,
+		arg.Status,
 		arg.Currency,
+		arg.GatewayName,
+		arg.IdempotencyKey,
 	)
 	var i Payment
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.CustomerID,
 		&i.InvoiceID,
 		&i.GatewayName,
 		&i.GatewayReference,
@@ -57,7 +98,9 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 }
 
 const getPaymentByID = `-- name: GetPaymentByID :one
-SELECT id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, currency, idempotency_key, error_log, created_at, updated_at
+SELECT id, organization_id, customer_id, invoice_id, gateway_name,
+       gateway_reference, payment_method, amount_cents, status,
+       currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
 WHERE organization_id = $1 AND id = $2
 `
@@ -73,6 +116,7 @@ func (q *Queries) GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.CustomerID,
 		&i.InvoiceID,
 		&i.GatewayName,
 		&i.GatewayReference,
@@ -195,21 +239,42 @@ func (q *Queries) ListPaymentHistory(ctx context.Context, arg ListPaymentHistory
 }
 
 const listPayments = `-- name: ListPayments :many
-SELECT id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, currency, idempotency_key, error_log, created_at, updated_at
+SELECT id, organization_id, customer_id, invoice_id, gateway_name,
+       gateway_reference, payment_method, amount_cents, status,
+       currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
 WHERE organization_id = $1
+  AND ($4::payment_status_type IS NULL OR status = $4)
+  AND ($5::uuid IS NULL OR customer_id = $5)
+  AND ($6::varchar IS NULL OR payment_method = $6)
+  AND ($7::timestamptz IS NULL OR created_at >= $7)
+  AND ($8::timestamptz IS NULL OR created_at <= $8)
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
 `
 
 type ListPaymentsParams struct {
-	OrganizationID uuid.UUID `json:"organization_id"`
-	Limit          int32     `json:"limit"`
-	Offset         int32     `json:"offset"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	Limit          int32                 `json:"limit"`
+	Offset         int32                 `json:"offset"`
+	Status         NullPaymentStatusType `json:"status"`
+	CustomerID     uuid.NullUUID         `json:"customer_id"`
+	PaymentMethod  sql.NullString        `json:"payment_method"`
+	CreatedFrom    sql.NullTime          `json:"created_from"`
+	CreatedTo      sql.NullTime          `json:"created_to"`
 }
 
 func (q *Queries) ListPayments(ctx context.Context, arg ListPaymentsParams) ([]Payment, error) {
-	rows, err := q.db.QueryContext(ctx, listPayments, arg.OrganizationID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listPayments,
+		arg.OrganizationID,
+		arg.Limit,
+		arg.Offset,
+		arg.Status,
+		arg.CustomerID,
+		arg.PaymentMethod,
+		arg.CreatedFrom,
+		arg.CreatedTo,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +285,7 @@ func (q *Queries) ListPayments(ctx context.Context, arg ListPaymentsParams) ([]P
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,
+			&i.CustomerID,
 			&i.InvoiceID,
 			&i.GatewayName,
 			&i.GatewayReference,

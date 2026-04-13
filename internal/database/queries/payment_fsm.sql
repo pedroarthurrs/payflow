@@ -39,14 +39,14 @@ RETURNING id, organization_id, customer_id, invoice_id, gateway_name,
 -- name: GetPaymentByID :one
 SELECT id, organization_id, customer_id, invoice_id, gateway_name,
        gateway_reference, payment_method, amount_cents, status,
-       currency, error_log, created_at, updated_at
+       currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
 WHERE organization_id = $1 AND id = $2;
 
 -- name: ListPayments :many
 SELECT id, organization_id, customer_id, invoice_id, gateway_name,
        gateway_reference, payment_method, amount_cents, status,
-       currency, created_at, updated_at
+       currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
 WHERE organization_id = $1
   AND (sqlc.narg('status')::payment_status_type IS NULL OR status = sqlc.narg('status'))

@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	CountPayments(ctx context.Context, arg CountPaymentsParams) (int64, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
 	GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) (Payment, error)
 	GetPaymentForUpdate(ctx context.Context, arg GetPaymentForUpdateParams) (GetPaymentForUpdateRow, error)
