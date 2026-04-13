@@ -9,9 +9,12 @@ import (
 )
 
 type Querier interface {
+	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
+	GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) (Payment, error)
 	GetPaymentForUpdate(ctx context.Context, arg GetPaymentForUpdateParams) (GetPaymentForUpdateRow, error)
 	InsertPaymentHistory(ctx context.Context, arg InsertPaymentHistoryParams) error
 	ListPaymentHistory(ctx context.Context, arg ListPaymentHistoryParams) ([]PaymentStatusHistory, error)
+	ListPayments(ctx context.Context, arg ListPaymentsParams) ([]Payment, error)
 	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error
 }
 

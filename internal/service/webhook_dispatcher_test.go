@@ -99,6 +99,7 @@ func TestNewWebhookDispatcher_Construction(t *testing.T) {
 
 	if d == nil {
 		t.Fatal("expected non-nil dispatcher")
+		return
 	}
 	if d.endpointRepo == nil {
 		t.Fatal("expected endpointRepo to be set")

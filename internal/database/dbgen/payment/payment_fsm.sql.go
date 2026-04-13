@@ -12,6 +12,82 @@ import (
 	"github.com/google/uuid"
 )
 
+const createPayment = `-- name: CreatePayment :one
+INSERT INTO payments (
+    organization_id,
+    payment_method,
+    amount_cents,
+    currency,
+    status
+) VALUES ($1, $2, $3, $4, 'pending')
+RETURNING id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, currency, idempotency_key, error_log, created_at, updated_at
+`
+
+type CreatePaymentParams struct {
+	OrganizationID uuid.UUID      `json:"organization_id"`
+	PaymentMethod  sql.NullString `json:"payment_method"`
+	AmountCents    int32          `json:"amount_cents"`
+	Currency       sql.NullString `json:"currency"`
+}
+
+func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
+	row := q.db.QueryRowContext(ctx, createPayment,
+		arg.OrganizationID,
+		arg.PaymentMethod,
+		arg.AmountCents,
+		arg.Currency,
+	)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.InvoiceID,
+		&i.GatewayName,
+		&i.GatewayReference,
+		&i.PaymentMethod,
+		&i.AmountCents,
+		&i.Status,
+		&i.Currency,
+		&i.IdempotencyKey,
+		&i.ErrorLog,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPaymentByID = `-- name: GetPaymentByID :one
+SELECT id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, currency, idempotency_key, error_log, created_at, updated_at
+FROM payments
+WHERE organization_id = $1 AND id = $2
+`
+
+type GetPaymentByIDParams struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	ID             uuid.UUID `json:"id"`
+}
+
+func (q *Queries) GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) (Payment, error) {
+	row := q.db.QueryRowContext(ctx, getPaymentByID, arg.OrganizationID, arg.ID)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.InvoiceID,
+		&i.GatewayName,
+		&i.GatewayReference,
+		&i.PaymentMethod,
+		&i.AmountCents,
+		&i.Status,
+		&i.Currency,
+		&i.IdempotencyKey,
+		&i.ErrorLog,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPaymentForUpdate = `-- name: GetPaymentForUpdate :one
 SELECT id, organization_id, status
 FROM payments
@@ -104,6 +180,57 @@ func (q *Queries) ListPaymentHistory(ctx context.Context, arg ListPaymentHistory
 			&i.EventSourceID,
 			&i.Reason,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPayments = `-- name: ListPayments :many
+SELECT id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, currency, idempotency_key, error_log, created_at, updated_at
+FROM payments
+WHERE organization_id = $1
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListPaymentsParams struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Limit          int32     `json:"limit"`
+	Offset         int32     `json:"offset"`
+}
+
+func (q *Queries) ListPayments(ctx context.Context, arg ListPaymentsParams) ([]Payment, error) {
+	rows, err := q.db.QueryContext(ctx, listPayments, arg.OrganizationID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Payment
+	for rows.Next() {
+		var i Payment
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.InvoiceID,
+			&i.GatewayName,
+			&i.GatewayReference,
+			&i.PaymentMethod,
+			&i.AmountCents,
+			&i.Status,
+			&i.Currency,
+			&i.IdempotencyKey,
+			&i.ErrorLog,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -64,6 +64,7 @@ func TestIdempotencyRepo_Check_Found(t *testing.T) {
 	}
 	if record == nil {
 		t.Fatal("expected record, got nil")
+		return
 	}
 	if record.ResponseCode != 201 {
 		t.Fatalf("expected code 201, got %d", record.ResponseCode)

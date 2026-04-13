@@ -2,11 +2,44 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// Payment represents a payment entity in the domain layer.
+type Payment struct {
+	ID               uuid.UUID
+	OrganizationID   uuid.UUID
+	InvoiceID        *uuid.UUID
+	GatewayName      *string
+	GatewayReference *string
+	PaymentMethod    *string
+	AmountCents      int32
+	Status           PaymentStatus
+	Currency         *string
+	IdempotencyKey   *string
+	ErrorLog         json.RawMessage
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+// PaymentInput represents the input for creating a payment.
+type PaymentInput struct {
+	PaymentMethod string
+	AmountCents   int32
+	// Currency defaults to "BRL" when empty.
+	Currency string
+}
+
+// PaymentRepository defines persistence operations for the payment domain.
+type PaymentRepository interface {
+	Create(ctx context.Context, organizationID uuid.UUID, input PaymentInput) (*Payment, error)
+	GetByID(ctx context.Context, organizationID, paymentID uuid.UUID) (*Payment, error)
+	List(ctx context.Context, organizationID uuid.UUID, params ListParams) ([]Payment, error)
+}
 
 // PaymentStatus representa os estados possíveis de um pagamento.
 type PaymentStatus string

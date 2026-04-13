@@ -32,6 +32,7 @@ func TestCredentialCreate_Success(t *testing.T) {
 	}
 	if rec == nil {
 		t.Fatal("expected record, got nil")
+		return
 	}
 	if rawKey == "" {
 		t.Fatal("expected raw key, got empty string")
@@ -210,6 +211,7 @@ func TestCredentialRotate_Success(t *testing.T) {
 	}
 	if newRec == nil {
 		t.Fatal("expected new record, got nil")
+		return
 	}
 	if newRec.ID == credID {
 		t.Fatal("expected new ID, got same as old")

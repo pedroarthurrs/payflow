@@ -61,6 +61,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
 	orgSecretReader := repository.NewOrganizationSecretReader(db.OrganizationQ)
 	idempotencyRepo := repository.NewIdempotencyRepo(db.IdempotencyQ)
+	paymentRepo := repository.NewPaymentRepo(db.PaymentQ)
+	paymentFSMRepo := repository.NewPaymentFSMRepo(db.PaymentQ)
 	txManager := repository.NewTxManager(db)
 
 	// Services
@@ -75,6 +77,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
 	dispatcher := service.NewWebhookDispatcher(webhookRepo, orgSecretReader, q)
 	_ = dispatcher // TODO: inject into handler that triggers webhook events
+	paymentSvc := service.NewPaymentService(paymentRepo)
+	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -90,6 +94,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userHandler := handler.NewUserHandler(userSvc)
 	credentialHandler := handler.NewCredentialHandler(credentialSvc, credentialLogSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc)
+	_ = paymentFSMSvc // TODO: inject into payment handler for status transitions
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -116,6 +122,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	userHandler.RegisterRoutes(protected)
 	credentialHandler.RegisterRoutes(protected)
 	webhookHandler.RegisterRoutes(protected)
+	paymentHandler.RegisterRoutes(protected)
 
 	return r
 }
