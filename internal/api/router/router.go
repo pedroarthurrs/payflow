@@ -124,5 +124,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	webhookHandler.RegisterRoutes(protected)
 	paymentHandler.RegisterRoutes(protected)
 
+	// SPA: serve o frontend embutido para todas as rotas não mapeadas pela API.
+	r.NoRoute(SPAHandler())
+
 	return r
 }
