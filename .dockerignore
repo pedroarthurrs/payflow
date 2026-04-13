@@ -32,6 +32,7 @@ web/*.tsbuildinfo
 *.log
 .DS_Store
 .env*
+*.yml
 
 # Infra e Deploy 
 deploy/
