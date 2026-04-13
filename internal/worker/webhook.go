@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 
 	"i9pay/internal/crypto"
 	"i9pay/internal/domain"
-	"i9pay/internal/queue"
 )
 
 var backoffSchedule = []time.Duration{
@@ -21,18 +21,17 @@ var backoffSchedule = []time.Duration{
 	2 * time.Hour,
 }
 
-// WebhookWorker consome jobs da Queue e executa a entrega HTTP com retry via backoff exponential.
+// WebhookWorker consumes jobs from the Queue and performs HTTP delivery with exponential backoff retry.
 type WebhookWorker struct {
-	queue       queue.Queue
+	queue       domain.Queue
 	logRepo     domain.WebhookLogRepository
 	httpClient  *http.Client
 	workerCount int
 	hmacGen     *crypto.HMACGenerator
 }
 
-// NewWebhookWorker cria um WebhookWorker.
-// workerCount define o número de goroutines de consumo paralelas.
-func NewWebhookWorker(q queue.Queue, logRepo domain.WebhookLogRepository, httpClient *http.Client, workerCount int) *WebhookWorker {
+// NewWebhookWorker creates a WebhookWorker. workerCount sets the number of concurrent consumer goroutines.
+func NewWebhookWorker(q domain.Queue, logRepo domain.WebhookLogRepository, httpClient *http.Client, workerCount int) *WebhookWorker {
 	return &WebhookWorker{
 		queue:       q,
 		logRepo:     logRepo,
@@ -42,7 +41,7 @@ func NewWebhookWorker(q queue.Queue, logRepo domain.WebhookLogRepository, httpCl
 	}
 }
 
-// Start inicia workerCount goroutines de consumo e bloqueia até que o contexto seja cancelado.
+// Start launches workerCount consumer goroutines and blocks until the context is canceled.
 func (w *WebhookWorker) Start(ctx context.Context) {
 	slog.Info("webhook worker started", "worker_count", w.workerCount)
 	var wg sync.WaitGroup
@@ -54,7 +53,7 @@ func (w *WebhookWorker) Start(ctx context.Context) {
 	slog.Info("webhook worker stopped")
 }
 
-// consume é o loop de consumo executado por cada goroutine worker.
+// consume is the processing loop run by each worker goroutine.
 func (w *WebhookWorker) consume(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
@@ -70,9 +69,20 @@ func (w *WebhookWorker) consume(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// process executa a entrega de um único job: respeita ScheduledAt, faz HTTP POST,
-// persiste WebhookLog e reenfileira em caso de falha.
-func (w *WebhookWorker) process(ctx context.Context, job *queue.WebhookJob) {
+// process handles a single job: validates the type, deserializes the payload,
+// respects ScheduledAt, performs the HTTP POST, persists the WebhookLog, and re-enqueues on failure.
+func (w *WebhookWorker) process(ctx context.Context, job *domain.Job) {
+	if job.Type != domain.JobTypeWebhook {
+		slog.Warn("unknown job type, discarding", "type", job.Type, "job_id", job.ID)
+		return
+	}
+
+	var webhookJob domain.WebhookJob
+	if err := json.Unmarshal(job.Payload, &webhookJob); err != nil {
+		slog.Error("failed to unmarshal webhook job payload", "job_id", job.ID, "error", err)
+		return
+	}
+
 	if delay := time.Until(job.ScheduledAt); delay > 0 {
 		select {
 		case <-time.After(delay):
@@ -81,45 +91,49 @@ func (w *WebhookWorker) process(ctx context.Context, job *queue.WebhookJob) {
 		}
 	}
 
-	logInput := w.deliver(ctx, job)
+	logInput := w.deliver(ctx, &webhookJob, job.AttemptNumber)
 
 	if err := w.logRepo.Create(ctx, *logInput); err != nil {
-		slog.Error("failed to persist webhook log", "endpoint_id", job.EndpointID, "error", err)
+		slog.Error("failed to persist webhook log", "endpoint_id", webhookJob.EndpointID, "error", err)
 	}
 
 	if logInput.Success {
-		slog.Info("webhook delivered", "endpoint_id", job.EndpointID, "event_type", job.EventType,
+		slog.Info("webhook delivered", "endpoint_id", webhookJob.EndpointID, "event_type", webhookJob.EventType,
 			"attempt", job.AttemptNumber, "status_code", *logInput.ResponseStatus, "duration_ms", *logInput.DurationMs)
 		return
 	}
 
 	if job.AttemptNumber >= 5 {
-		slog.Warn("webhook dead letter", "endpoint_id", job.EndpointID,
-			"event_type", job.EventType, "total_attempts", job.AttemptNumber)
+		slog.Warn("webhook dead letter", "endpoint_id", webhookJob.EndpointID,
+			"event_type", webhookJob.EventType, "total_attempts", job.AttemptNumber)
 		return
 	}
 
-	nextJob := *job
-	nextJob.AttemptNumber = job.AttemptNumber + 1
-	nextJob.ScheduledAt = time.Now().Add(backoffSchedule[job.AttemptNumber-1])
+	nextJob := domain.Job{
+		ID:            job.ID,
+		Type:          job.Type,
+		Payload:       job.Payload,
+		AttemptNumber: job.AttemptNumber + 1,
+		ScheduledAt:   time.Now().Add(backoffSchedule[job.AttemptNumber-1]),
+	}
 
-	slog.Warn("webhook failed, re-enqueuing", "endpoint_id", job.EndpointID,
-		"event_type", job.EventType, "attempt", job.AttemptNumber,
+	slog.Warn("webhook failed, re-enqueuing", "endpoint_id", webhookJob.EndpointID,
+		"event_type", webhookJob.EventType, "attempt", job.AttemptNumber,
 		"next_retry_at", nextJob.ScheduledAt)
 
-	if err := w.queue.Enqueue(ctx, queue.WebhookJob(nextJob)); err != nil {
-		slog.Error("failed to re-enqueue webhook job", "endpoint_id", job.EndpointID, "error", err)
+	if err := w.queue.Enqueue(ctx, nextJob); err != nil {
+		slog.Error("failed to re-enqueue webhook job", "endpoint_id", webhookJob.EndpointID, "error", err)
 	}
 }
 
-// deliver executa o HTTP POST e retorna o CreateWebhookLogInput preenchido.
-func (w *WebhookWorker) deliver(ctx context.Context, job *queue.WebhookJob) *domain.CreateWebhookLogInput {
+// deliver performs the HTTP POST and returns a populated CreateWebhookLogInput.
+func (w *WebhookWorker) deliver(ctx context.Context, job *domain.WebhookJob, attemptNumber int32) *domain.CreateWebhookLogInput {
 	logInput := &domain.CreateWebhookLogInput{
 		OrganizationID: job.OrganizationID,
 		EndpointID:     job.EndpointID,
 		EventType:      job.EventType,
 		Payload:        job.Payload,
-		AttemptNumber:  job.AttemptNumber,
+		AttemptNumber:  attemptNumber,
 		Success:        false,
 	}
 
@@ -141,7 +155,7 @@ func (w *WebhookWorker) deliver(ctx context.Context, job *queue.WebhookJob) *dom
 	logInput.DurationMs = &durationMs
 
 	if err != nil {
-		slog.Error("webhook delivery failed", "endpoint_id", job.EndpointID, "attempt", job.AttemptNumber, "error", err)
+		slog.Error("webhook delivery failed", "endpoint_id", job.EndpointID, "attempt", attemptNumber, "error", err)
 		return logInput
 	}
 	defer func() {
@@ -161,7 +175,7 @@ func (w *WebhookWorker) deliver(ctx context.Context, job *queue.WebhookJob) *dom
 	return logInput
 }
 
-// sign computa HMAC-SHA256 do payload com o secret do job.
+// sign computes the HMAC-SHA256 signature of the payload using the job's secret.
 func (w *WebhookWorker) sign(secret string, payload []byte) string {
 	return w.hmacGen.HMACSHA256(secret, payload)
 }

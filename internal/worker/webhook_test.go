@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"i9pay/internal/domain"
-	"i9pay/internal/queue"
 
 	"github.com/google/uuid"
 )
@@ -23,15 +23,15 @@ import (
 // --- Mock types ---
 
 type mockQueue struct {
-	enqueueFn func(ctx context.Context, job queue.WebhookJob) error
-	dequeueFn func(ctx context.Context) (*queue.WebhookJob, error)
+	enqueueFn func(ctx context.Context, job domain.Job) error
+	dequeueFn func(ctx context.Context) (*domain.Job, error)
 }
 
-func (m *mockQueue) Enqueue(ctx context.Context, job queue.WebhookJob) error {
+func (m *mockQueue) Enqueue(ctx context.Context, job domain.Job) error {
 	return m.enqueueFn(ctx, job)
 }
 
-func (m *mockQueue) Dequeue(ctx context.Context) (*queue.WebhookJob, error) {
+func (m *mockQueue) Dequeue(ctx context.Context) (*domain.Job, error) {
 	return m.dequeueFn(ctx)
 }
 
@@ -49,6 +49,22 @@ func (m *mockWebhookLogRepo) GetByID(ctx context.Context, orgID, logID uuid.UUID
 
 func (m *mockWebhookLogRepo) List(ctx context.Context, orgID uuid.UUID, input domain.ListWebhookLogsInput) ([]domain.WebhookLog, error) {
 	return nil, nil
+}
+
+// makeWebhookJob builds a domain.Job wrapping a WebhookJob payload.
+func makeWebhookJob(t *testing.T, wj domain.WebhookJob, attemptNumber int32) domain.Job {
+	t.Helper()
+	payload, err := json.Marshal(wj)
+	if err != nil {
+		t.Fatalf("failed to marshal WebhookJob: %v", err)
+	}
+	return domain.Job{
+		ID:            uuid.New(),
+		Type:          domain.JobTypeWebhook,
+		Payload:       payload,
+		ScheduledAt:   time.Now(),
+		AttemptNumber: attemptNumber,
+	}
 }
 
 // --- Test 10.1: deliver with HTTP 200 success ---
@@ -80,7 +96,7 @@ func TestDeliver_Success200(t *testing.T) {
 
 	w := NewWebhookWorker(nil, nil, srv.Client(), 1)
 
-	job := queue.WebhookJob{
+	wj := domain.WebhookJob{
 		OrganizationID: uuid.New(),
 		EndpointID:     uuid.New(),
 		EndpointURL:    srv.URL,
@@ -88,12 +104,10 @@ func TestDeliver_Success200(t *testing.T) {
 		EventType:      eventType,
 		Environment:    "test",
 		Payload:        payload,
-		AttemptNumber:  1,
-		ScheduledAt:    time.Now(),
 	}
 
 	ctx := context.Background()
-	result := w.deliver(ctx, &job)
+	result := w.deliver(ctx, &wj, 1)
 
 	// Assert success
 	if !result.Success {
@@ -142,7 +156,7 @@ func TestDeliver_Failure500(t *testing.T) {
 
 	w := NewWebhookWorker(nil, nil, srv.Client(), 1)
 
-	job := queue.WebhookJob{
+	wj := domain.WebhookJob{
 		OrganizationID: uuid.New(),
 		EndpointID:     uuid.New(),
 		EndpointURL:    srv.URL,
@@ -150,12 +164,10 @@ func TestDeliver_Failure500(t *testing.T) {
 		EventType:      "invoice.paid",
 		Environment:    "production",
 		Payload:        []byte(`{"invoice_id":"456"}`),
-		AttemptNumber:  1,
-		ScheduledAt:    time.Now(),
 	}
 
 	ctx := context.Background()
-	result := w.deliver(ctx, &job)
+	result := w.deliver(ctx, &wj, 1)
 
 	if result.Success {
 		t.Errorf("expected Success=false, got true")
@@ -177,11 +189,11 @@ func TestProcess_Attempt1_FailedDelivery_Reenqueues(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	var enqueuedJobs []queue.WebhookJob
+	var enqueuedJobs []domain.Job
 	var mu sync.Mutex
 
 	mq := &mockQueue{
-		enqueueFn: func(ctx context.Context, job queue.WebhookJob) error {
+		enqueueFn: func(ctx context.Context, job domain.Job) error {
 			mu.Lock()
 			defer mu.Unlock()
 			enqueuedJobs = append(enqueuedJobs, job)
@@ -197,7 +209,7 @@ func TestProcess_Attempt1_FailedDelivery_Reenqueues(t *testing.T) {
 
 	w := NewWebhookWorker(mq, logRepo, srv.Client(), 1)
 
-	job := queue.WebhookJob{
+	wj := domain.WebhookJob{
 		OrganizationID: uuid.New(),
 		EndpointID:     uuid.New(),
 		EndpointURL:    srv.URL,
@@ -205,9 +217,8 @@ func TestProcess_Attempt1_FailedDelivery_Reenqueues(t *testing.T) {
 		EventType:      "customer.created",
 		Environment:    "test",
 		Payload:        []byte(`{"data":"test"}`),
-		AttemptNumber:  1,
-		ScheduledAt:    time.Now(),
 	}
+	job := makeWebhookJob(t, wj, 1)
 
 	ctx := context.Background()
 	now := time.Now()
@@ -223,6 +234,12 @@ func TestProcess_Attempt1_FailedDelivery_Reenqueues(t *testing.T) {
 	requeued := enqueuedJobs[0]
 	if requeued.AttemptNumber != 2 {
 		t.Errorf("expected AttemptNumber=2, got %d", requeued.AttemptNumber)
+	}
+	if requeued.ID != job.ID {
+		t.Errorf("expected same ID %v, got %v", job.ID, requeued.ID)
+	}
+	if !bytes.Equal(requeued.Payload, job.Payload) {
+		t.Errorf("expected same Payload, got different")
 	}
 
 	expectedScheduledAt := now.Add(1 * time.Minute)
@@ -246,7 +263,7 @@ func TestProcess_Attempt5_FailedDelivery_DeadLetter(t *testing.T) {
 	var mu sync.Mutex
 
 	mq := &mockQueue{
-		enqueueFn: func(ctx context.Context, job queue.WebhookJob) error {
+		enqueueFn: func(ctx context.Context, job domain.Job) error {
 			mu.Lock()
 			defer mu.Unlock()
 			enqueueCount++
@@ -262,7 +279,7 @@ func TestProcess_Attempt5_FailedDelivery_DeadLetter(t *testing.T) {
 
 	w := NewWebhookWorker(mq, logRepo, srv.Client(), 1)
 
-	job := queue.WebhookJob{
+	wj := domain.WebhookJob{
 		OrganizationID: uuid.New(),
 		EndpointID:     uuid.New(),
 		EndpointURL:    srv.URL,
@@ -270,9 +287,8 @@ func TestProcess_Attempt5_FailedDelivery_DeadLetter(t *testing.T) {
 		EventType:      "customer.deleted",
 		Environment:    "production",
 		Payload:        []byte(`{"data":"test"}`),
-		AttemptNumber:  5,
-		ScheduledAt:    time.Now(),
 	}
+	job := makeWebhookJob(t, wj, 5)
 
 	ctx := context.Background()
 	w.process(ctx, &job)
@@ -285,11 +301,107 @@ func TestProcess_Attempt5_FailedDelivery_DeadLetter(t *testing.T) {
 	}
 }
 
+// --- Test: process with unknown job type (discarded) ---
+
+func TestProcess_UnknownJobType_Discarded(t *testing.T) {
+	var httpCalls int
+	var mu sync.Mutex
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		httpCalls++
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	var enqueueCount int
+	mq := &mockQueue{
+		enqueueFn: func(ctx context.Context, job domain.Job) error {
+			mu.Lock()
+			enqueueCount++
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	w := NewWebhookWorker(mq, nil, srv.Client(), 1)
+
+	job := domain.Job{
+		ID:            uuid.New(),
+		Type:          domain.JobType("email"),
+		Payload:       []byte(`{"to":"test@example.com"}`),
+		ScheduledAt:   time.Now(),
+		AttemptNumber: 1,
+	}
+
+	ctx := context.Background()
+	w.process(ctx, &job)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if httpCalls != 0 {
+		t.Errorf("expected zero HTTP calls for unknown job type, got %d", httpCalls)
+	}
+	if enqueueCount != 0 {
+		t.Errorf("expected zero enqueued jobs for unknown job type, got %d", enqueueCount)
+	}
+}
+
+// --- Test: process with invalid payload (discarded) ---
+
+func TestProcess_InvalidPayload_Discarded(t *testing.T) {
+	var httpCalls int
+	var mu sync.Mutex
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		httpCalls++
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	var enqueueCount int
+	mq := &mockQueue{
+		enqueueFn: func(ctx context.Context, job domain.Job) error {
+			mu.Lock()
+			enqueueCount++
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	w := NewWebhookWorker(mq, nil, srv.Client(), 1)
+
+	job := domain.Job{
+		ID:            uuid.New(),
+		Type:          domain.JobTypeWebhook,
+		Payload:       []byte("not-json"),
+		ScheduledAt:   time.Now(),
+		AttemptNumber: 1,
+	}
+
+	ctx := context.Background()
+	w.process(ctx, &job)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if httpCalls != 0 {
+		t.Errorf("expected zero HTTP calls for invalid payload, got %d", httpCalls)
+	}
+	if enqueueCount != 0 {
+		t.Errorf("expected zero enqueued jobs for invalid payload, got %d", enqueueCount)
+	}
+}
+
 // --- Test 10.5: Start with context cancellation (no goroutine leak) ---
 
 func TestStart_ContextCancellation(t *testing.T) {
 	mq := &mockQueue{
-		dequeueFn: func(ctx context.Context) (*queue.WebhookJob, error) {
+		dequeueFn: func(ctx context.Context) (*domain.Job, error) {
 			<-ctx.Done()
 			return nil, ctx.Err()
 		},

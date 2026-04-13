@@ -13,6 +13,7 @@ import (
 	"i9pay/internal/config"
 	"i9pay/internal/database"
 	"i9pay/internal/database/repository"
+	"i9pay/internal/domain"
 	"i9pay/internal/gateway"
 	"i9pay/internal/monitor"
 	"i9pay/internal/queue"
@@ -21,21 +22,65 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupLogger creates an slog.Logger based on the environment, wrapped with
-// Sentry integration so error-level records are captured as Sentry events.
-func SetupLogger(env string) *slog.Logger {
-	var handler slog.Handler
-	if env == "production" {
-		handler = slog.NewJSONHandler(os.Stdout, nil)
+func setupLogger(cfg *config.Config) *slog.Logger {
+	var logHandler slog.Handler
+	if cfg.GoEnv == "production" {
+		logHandler = slog.NewJSONHandler(os.Stdout, nil)
 	} else {
-		handler = slog.NewTextHandler(os.Stdout, nil)
+		logHandler = slog.NewTextHandler(os.Stdout, nil)
 	}
-	return slog.New(monitor.NewLogHandler(handler))
+	return slog.New(monitor.NewLogHandler(logHandler))
+}
+
+func setupDatabase(cfg *config.Config, logger *slog.Logger) (*database.DB, *database.HealthChecker, error) {
+	db, err := database.New(cfg)
+	if err != nil {
+		logger.Error("failed to connect to database", "error", err)
+		monitor.Flush()
+		return nil, nil, err
+	}
+
+	healthCheck := database.NewHealthChecker(db)
+	healthCheck.Start()
+
+	return db, healthCheck, nil
+}
+
+func setupInfrastructure(cfg *config.Config, logger *slog.Logger) (domain.Queue, domain.Gateway, config.FlagProvider) {
+	jobQueue := queue.New("memory", cfg.WebhookQueueBufferSize)
+	if jobQueue == nil {
+		logger.Error("failed to initialize job queue")
+		os.Exit(1)
+	}
+
+	paymentGateway := gateway.New(cfg.GatewayProviderName, cfg.GatewayProviderAPIKey)
+	if paymentGateway == nil {
+		logger.Warn("no payment gateway configured; gateway operations will be unavailable",
+			"provider", cfg.GatewayProviderName)
+	}
+
+	featureFlags := config.NewEnvFlagProvider(
+		config.FlagMaintenance,
+	)
+
+	return jobQueue, paymentGateway, featureFlags
+}
+
+func startWorkers(ctx context.Context, db *database.DB, jobQueue domain.Queue, cfg *config.Config) {
+	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
+	webhookWorker := worker.NewWebhookWorker(jobQueue, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, cfg.WebhookWorkerCount)
+	go webhookWorker.Start(ctx)
+
+	cleanupRepo := repository.NewCleanupRepo(db.CredentialLogQ, db.WebhookLogQ, db.IdempotencyQ)
+	cleanupWorker := worker.NewCleanupWorker(cleanupRepo)
+	go cleanupWorker.Start(ctx)
 }
 
 func run() error {
 	cfg := config.Load()
-	logger := SetupLogger(cfg.GoEnv)
+
+	logger := setupLogger(cfg)
+
 	monitor.Init(cfg)
 	defer monitor.Flush()
 
@@ -45,9 +90,8 @@ func run() error {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	db, err := database.New(cfg)
+	db, healthCheck, err := setupDatabase(cfg, logger)
 	if err != nil {
-		logger.Error("failed to connect to database", "error", err)
 		return err
 	}
 	defer func() {
@@ -56,30 +100,26 @@ func run() error {
 		}
 	}()
 
-	healthCheck := database.NewHealthChecker(db)
-	healthCheck.Start()
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	q := queue.NewInMemoryQueue(cfg.WebhookQueueBufferSize)
+	jobQueue, paymentGateway, featureFlags := setupInfrastructure(cfg, logger)
 
-	gatewayAdapter := gateway.New(cfg.GatewayProviderName, cfg.GatewayProviderAPIKey)
+	startWorkers(ctx, db, jobQueue, cfg)
 
-	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
-	wkr := worker.NewWebhookWorker(q, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, cfg.WebhookWorkerCount)
-	go wkr.Start(ctx)
-
-	cleanupRepo := repository.NewCleanupRepo(db.CredentialLogQ, db.WebhookLogQ, db.IdempotencyQ)
-	cleanupWorker := worker.NewCleanupWorker(cleanupRepo)
-	go cleanupWorker.Start(ctx)
-
-	r := router.NewRouter(cfg, logger, db, healthCheck, q, gatewayAdapter)
+	r := router.NewRouter(cfg, logger, router.Adapters{
+		DB:          db,
+		HealthCheck: healthCheck,
+		Queue:       jobQueue,
+		Gateway:     paymentGateway,
+		Flags:       featureFlags,
+	})
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		logger.Error("server stopped", "error", err)
 		return err
 	}
+
 	return nil
 }
 

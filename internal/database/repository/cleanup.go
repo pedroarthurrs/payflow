@@ -48,6 +48,8 @@ func (r *CleanupRepo) DeleteWebhookLogsOlderThan(ctx context.Context, cutoff tim
 	return res.RowsAffected()
 }
 
+var _ domain.CleanupRepository = (*CleanupRepo)(nil)
+
 // DeleteExpiredIdempotencyKeys removes idempotency keys that have expired.
 func (r *CleanupRepo) DeleteExpiredIdempotencyKeys(ctx context.Context) (int64, error) {
 	res, err := r.idempotencyQ.DeleteExpiredIdempotencyKeys(ctx)

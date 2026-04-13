@@ -74,3 +74,5 @@ func (r *IdempotencyRepo) Save(ctx context.Context, key string, orgID uuid.UUID,
 	}
 	return nil
 }
+
+var _ domain.IdempotencyStorage = (*IdempotencyRepo)(nil)

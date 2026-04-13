@@ -108,6 +108,18 @@ type ListWebhookLogsInput struct {
 	Success    *bool
 }
 
+// WebhookJob holds all data required for a single webhook delivery attempt.
+// It is serialized as JSON by the WebhookDispatcher and stored in Job.Payload.
+type WebhookJob struct {
+	OrganizationID uuid.UUID `json:"organization_id"`
+	EndpointID     uuid.UUID `json:"endpoint_id"`
+	EndpointURL    string    `json:"endpoint_url"`
+	Secret         string    `json:"secret"`
+	EventType      string    `json:"event_type"`
+	Environment    string    `json:"environment"`
+	Payload        []byte    `json:"payload"`
+}
+
 // WebhookEndpointRepository defines persistence operations for webhook endpoints.
 type WebhookEndpointRepository interface {
 	Create(ctx context.Context, orgID uuid.UUID, input CreateWebhookEndpointInput) (*WebhookEndpoint, error)

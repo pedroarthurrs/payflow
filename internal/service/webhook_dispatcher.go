@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 
 	"i9pay/internal/domain"
-	"i9pay/internal/queue"
 
 	"github.com/google/uuid"
 )
@@ -15,14 +15,14 @@ import (
 type WebhookDispatcher struct {
 	endpointRepo domain.WebhookEndpointRepository
 	secretReader domain.OrganizationSecretReader
-	queue        queue.Queue
+	queue        domain.Queue
 }
 
 // NewWebhookDispatcher creates a WebhookDispatcher.
 func NewWebhookDispatcher(
 	endpointRepo domain.WebhookEndpointRepository,
 	secretReader domain.OrganizationSecretReader,
-	q queue.Queue,
+	q domain.Queue,
 ) *WebhookDispatcher {
 	return &WebhookDispatcher{
 		endpointRepo: endpointRepo,
@@ -47,7 +47,7 @@ func (d *WebhookDispatcher) Dispatch(ctx context.Context, orgID uuid.UUID, event
 	}
 
 	for i := range endpoints {
-		job := queue.WebhookJob{
+		webhookJob := domain.WebhookJob{
 			OrganizationID: endpoints[i].OrganizationID,
 			EndpointID:     endpoints[i].ID,
 			EndpointURL:    endpoints[i].URL,
@@ -55,8 +55,18 @@ func (d *WebhookDispatcher) Dispatch(ctx context.Context, orgID uuid.UUID, event
 			EventType:      eventType,
 			Environment:    environment,
 			Payload:        payload,
-			AttemptNumber:  1,
-			ScheduledAt:    time.Now(),
+		}
+		bytes, err := json.Marshal(webhookJob)
+		if err != nil {
+			slog.Error("failed to serialize webhook job", "endpoint_id", endpoints[i].ID, "error", err)
+			continue
+		}
+		job := domain.Job{
+			ID:            uuid.New(),
+			Type:          domain.JobTypeWebhook,
+			Payload:       bytes,
+			ScheduledAt:   time.Now(),
+			AttemptNumber: 1,
 		}
 		if err := d.queue.Enqueue(ctx, job); err != nil {
 			slog.Error("failed to enqueue webhook job", "endpoint_id", endpoints[i].ID, "error", err)

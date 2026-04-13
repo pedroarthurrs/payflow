@@ -2,20 +2,17 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
 
 	"i9pay/internal/domain"
-	"i9pay/internal/queue"
 
 	"github.com/google/uuid"
 )
 
 // ── mock repos for dispatcher tests ───────────────────────────────────────────
-
-// Task 11.1: Mocks updated for the new WebhookDispatcher signature
-// (no logRepo, no httpClient; uses queue.Queue).
 
 type mockEndpointRepo struct {
 	listActiveByEventFn func(ctx context.Context, orgID uuid.UUID, eventType string, env string) ([]domain.WebhookEndpoint, error)
@@ -58,15 +55,15 @@ func (m *mockDispatcherSecretReader) GetWebhookSecret(ctx context.Context, orgID
 
 type mockQueue struct {
 	mu        sync.Mutex
-	enqueueFn func(ctx context.Context, job queue.WebhookJob) error
-	dequeueFn func(ctx context.Context) (*queue.WebhookJob, error)
-	jobs      []queue.WebhookJob
+	enqueueFn func(ctx context.Context, job domain.Job) error
+	dequeueFn func(ctx context.Context) (*domain.Job, error)
+	jobs      []domain.Job
 	calls     int
 }
 
-var _ queue.Queue = (*mockQueue)(nil)
+var _ domain.Queue = (*mockQueue)(nil)
 
-func (m *mockQueue) Enqueue(ctx context.Context, job queue.WebhookJob) error {
+func (m *mockQueue) Enqueue(ctx context.Context, job domain.Job) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
@@ -81,7 +78,7 @@ func (m *mockQueue) Enqueue(ctx context.Context, job queue.WebhookJob) error {
 	return nil
 }
 
-func (m *mockQueue) Dequeue(ctx context.Context) (*queue.WebhookJob, error) {
+func (m *mockQueue) Dequeue(ctx context.Context) (*domain.Job, error) {
 	if m.dequeueFn != nil {
 		return m.dequeueFn(ctx)
 	}
@@ -183,14 +180,31 @@ func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 	}
 
 	for i, job := range q.jobs {
-		if job.Secret != "test-secret" {
-			t.Errorf("job[%d]: expected Secret='test-secret', got %q", i, job.Secret)
+		// Verify domain.Job fields
+		if job.Type != domain.JobTypeWebhook {
+			t.Errorf("job[%d]: expected Type=%q, got %q", i, domain.JobTypeWebhook, job.Type)
 		}
-		if job.EndpointURL != endpoints[i].URL {
-			t.Errorf("job[%d]: expected EndpointURL=%q, got %q", i, endpoints[i].URL, job.EndpointURL)
+		if job.AttemptNumber != 1 {
+			t.Errorf("job[%d]: expected AttemptNumber=1, got %d", i, job.AttemptNumber)
 		}
-		if job.EndpointID != endpoints[i].ID {
-			t.Errorf("job[%d]: expected EndpointID=%s, got %s", i, endpoints[i].ID, job.EndpointID)
+		if job.ID == uuid.Nil {
+			t.Errorf("job[%d]: expected non-zero ID", i)
+		}
+
+		// Verify payload is valid JSON that unmarshals back to WebhookJob
+		var wj domain.WebhookJob
+		if err := json.Unmarshal(job.Payload, &wj); err != nil {
+			t.Errorf("job[%d]: payload is not valid WebhookJob JSON: %v", i, err)
+			continue
+		}
+		if wj.Secret != "test-secret" {
+			t.Errorf("job[%d]: expected Secret='test-secret', got %q", i, wj.Secret)
+		}
+		if wj.EndpointURL != endpoints[i].URL {
+			t.Errorf("job[%d]: expected EndpointURL=%q, got %q", i, endpoints[i].URL, wj.EndpointURL)
+		}
+		if wj.EndpointID != endpoints[i].ID {
+			t.Errorf("job[%d]: expected EndpointID=%s, got %s", i, endpoints[i].ID, wj.EndpointID)
 		}
 	}
 }
@@ -207,7 +221,7 @@ func TestDispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
 
 	callCount := 0
 	q := &mockQueue{
-		enqueueFn: func(_ context.Context, _ queue.WebhookJob) error {
+		enqueueFn: func(_ context.Context, _ domain.Job) error {
 			callCount++
 			if callCount == 2 {
 				return errors.New("queue temporarily unavailable")

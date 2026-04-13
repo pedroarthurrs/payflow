@@ -34,8 +34,8 @@ type DB struct {
 	OrganizationQ  organizationdb.Querier
 	CredentialQ    credentialdb.Querier
 	CredentialLogQ credentiallogdb.Querier
-	WebhookQ       *webhookdb.Queries
-	WebhookLogQ    *webhooklogdb.Queries
+	WebhookQ       webhookdb.Querier
+	WebhookLogQ    webhooklogdb.Querier
 	IdempotencyQ   idempotencydb.Querier
 	PaymentQ       paymentdb.Querier
 }

@@ -12,7 +12,6 @@ import (
 	"i9pay/internal/database/repository"
 	"i9pay/internal/domain"
 	"i9pay/internal/monitor"
-	"i9pay/internal/queue"
 	"i9pay/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -21,19 +20,27 @@ import (
 const accessTokenTTL = 15 * time.Minute
 const refreshTokenTTL = 7 * 24 * time.Hour
 
+// Adapters holds the infrastructure adapters that are wired externally (in main)
+// and injected into the router. Keeping them in a struct avoids a long parameter
+// list and makes it easy to add new adapters without changing the function signature.
+type Adapters struct {
+	DB          *database.DB
+	HealthCheck *database.HealthChecker
+	Queue       domain.Queue
+	Gateway     domain.Gateway
+	Flags       config.FlagProvider
+}
+
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
-func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthCheck *database.HealthChecker, q queue.Queue, gatewayAdapter domain.Gateway) *gin.Engine {
-	// Feature flags — backed by env vars by default; swap for AWS AppConfig or
-	// any other store by passing a different config.FlagProvider implementation.
-	flags := config.NewEnvFlagProvider(
-		config.FlagMaintenance,
-	)
+func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.Engine {
+	// Feature flags — MaintenanceProvider wraps the FlagProvider so the middleware
+	// always reads the current value; Reload() on the provider propagates automatically.
+	maintenanceProvider := middleware.NewMaintenanceProvider(adapters.Flags.IsEnabled(config.FlagMaintenance))
 
 	// Stores
 	ipStore := middleware.NewRateLimiterStore()
 	loginStore := middleware.NewRateLimiterStore()
 	organizationStore := middleware.NewRateLimiterStore()
-	maintenanceProvider := middleware.NewMaintenanceProvider(flags.IsEnabled(config.FlagMaintenance))
 
 	r := gin.New()
 	r.RedirectTrailingSlash = false
@@ -51,20 +58,20 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	organizationWindow := time.Duration(cfg.RateLimitOrganizationWindowSeconds) * time.Second
 
 	// Repositories
-	customerRepo := repository.NewCustomerRepo(db.CustomerQ)
-	addressRepo := repository.NewAddressRepo(db.AddressQ)
-	productRepo := repository.NewProductRepo(db.ProductQ)
-	userRepo := repository.NewUserRepo(db.UserQ)
-	authRepo := repository.NewAuthRepo(db.AuthQ)
-	credentialRepo := repository.NewCredentialRepo(db.CredentialQ)
-	credentialLogRepo := repository.NewCredentialLogRepo(db.CredentialLogQ)
-	webhookRepo := repository.NewWebhookRepo(db.WebhookQ)
-	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
-	orgSecretReader := repository.NewOrganizationSecretReader(db.OrganizationQ)
-	idempotencyRepo := repository.NewIdempotencyRepo(db.IdempotencyQ)
-	paymentRepo := repository.NewPaymentRepo(db.PaymentQ)
-	paymentFSMRepo := repository.NewPaymentFSMRepo(db.PaymentQ)
-	txManager := repository.NewTxManager(db)
+	customerRepo := repository.NewCustomerRepo(adapters.DB.CustomerQ)
+	addressRepo := repository.NewAddressRepo(adapters.DB.AddressQ)
+	productRepo := repository.NewProductRepo(adapters.DB.ProductQ)
+	userRepo := repository.NewUserRepo(adapters.DB.UserQ)
+	authRepo := repository.NewAuthRepo(adapters.DB.AuthQ)
+	credentialRepo := repository.NewCredentialRepo(adapters.DB.CredentialQ)
+	credentialLogRepo := repository.NewCredentialLogRepo(adapters.DB.CredentialLogQ)
+	webhookRepo := repository.NewWebhookRepo(adapters.DB.WebhookQ)
+	webhookLogRepo := repository.NewWebhookLogRepo(adapters.DB.WebhookLogQ)
+	orgSecretReader := repository.NewOrganizationSecretReader(adapters.DB.OrganizationQ)
+	idempotencyRepo := repository.NewIdempotencyRepo(adapters.DB.IdempotencyQ)
+	paymentRepo := repository.NewPaymentRepo(adapters.DB.PaymentQ)
+	paymentFSMRepo := repository.NewPaymentFSMRepo(adapters.DB.PaymentQ)
+	txManager := repository.NewTxManager(adapters.DB)
 
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
@@ -76,11 +83,11 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
 	credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
 	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
-	dispatcher := service.NewWebhookDispatcher(webhookRepo, orgSecretReader, q)
+	dispatcher := service.NewWebhookDispatcher(webhookRepo, orgSecretReader, adapters.Queue)
 	_ = dispatcher // TODO: inject into handler that triggers webhook events
 	paymentSvc := service.NewPaymentService(paymentRepo)
 	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
-	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, gatewayAdapter)
+	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, adapters.Gateway)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -88,7 +95,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, db *database.DB, healthC
 	// Handlers
 	rootHandler := handler.NewRootHandler()
 	authHandler := handler.NewAuthHandler(authSvc, loginRL)
-	healthHandler := handler.NewHealthHandler(healthCheck, maintenanceProvider)
+	healthHandler := handler.NewHealthHandler(adapters.HealthCheck, maintenanceProvider)
 	meHandler := handler.NewMeHandler()
 	customerHandler := handler.NewCustomerHandler(customerSvc)
 	addressHandler := handler.NewAddressHandler(addressSvc)
