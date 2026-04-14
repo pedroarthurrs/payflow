@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"time"
 
 	subscriptiondb "i9pay/internal/database/dbgen/subscription"
 	"i9pay/internal/domain"
@@ -34,6 +35,7 @@ func (r *SubscriptionRepo) Create(ctx context.Context, organizationID uuid.UUID,
 		Status:             subscriptiondb.SubscriptionStatusType(input.Status),
 		CurrentPeriodStart: input.CurrentPeriodStart,
 		CurrentPeriodEnd:   input.CurrentPeriodEnd,
+		PaymentMethod:      input.PaymentMethod,
 		Metadata:           toNullRawMessage(input.Metadata),
 	})
 	if err != nil {
@@ -133,6 +135,25 @@ func (r *SubscriptionRepo) SetCancelAtPeriodEnd(ctx context.Context, organizatio
 			return nil, domain.ErrSubscriptionNotFound
 		}
 		slog.Error("failed to set cancel_at_period_end", "organization_id", organizationID, "subscription_id", subscriptionID, "error", err)
+		return nil, domain.ErrInternal
+	}
+	s := toDomainSubscription(row)
+	return &s, nil
+}
+
+// AdvancePeriod updates current_period_start/end and clears billing_locked_until.
+func (r *SubscriptionRepo) AdvancePeriod(ctx context.Context, orgID, subID uuid.UUID, newStart, newEnd time.Time) (*domain.Subscription, error) {
+	row, err := r.q.AdvanceSubscriptionPeriod(ctx, subscriptiondb.AdvanceSubscriptionPeriodParams{
+		OrganizationID:     orgID,
+		ID:                 subID,
+		CurrentPeriodStart: newStart,
+		CurrentPeriodEnd:   newEnd,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrSubscriptionNotFound
+		}
+		slog.Error("failed to advance subscription period", "organization_id", orgID, "subscription_id", subID, "error", err)
 		return nil, domain.ErrInternal
 	}
 	s := toDomainSubscription(row)
@@ -313,9 +334,14 @@ func toDomainSubscription(row subscriptiondb.Subscription) domain.Subscription {
 		Status:             domain.SubscriptionStatus(row.Status),
 		CurrentPeriodStart: row.CurrentPeriodStart,
 		CurrentPeriodEnd:   row.CurrentPeriodEnd,
+		PaymentMethod:      row.PaymentMethod,
 	}
 	if row.CancelAtPeriodEnd.Valid {
 		s.CancelAtPeriodEnd = row.CancelAtPeriodEnd.Bool
+	}
+	if row.BillingLockedUntil.Valid {
+		t := row.BillingLockedUntil.Time
+		s.BillingLockedUntil = &t
 	}
 	if row.Metadata.Valid {
 		s.Metadata = row.Metadata.RawMessage

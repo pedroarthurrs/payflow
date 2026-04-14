@@ -42,6 +42,9 @@ func (h *mockTxHandle) CredentialRepo() domain.CredentialRepository             
 func (h *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository             { return h.fsmRepo }
 func (h *mockTxHandle) SubscriptionRepo() domain.SubscriptionRepository         { return nil }
 func (h *mockTxHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository { return nil }
+func (h *mockTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
+	return nil
+}
 
 // ── mock payment querier ──────────────────────────────────────────────────────
 

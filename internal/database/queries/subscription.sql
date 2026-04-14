@@ -10,12 +10,13 @@ INSERT INTO subscriptions (
     current_period_start,
     current_period_end,
     cancel_at_period_end,
+    payment_method,
     metadata
-) VALUES ($1, $2, $3, $4, $5, false, $6)
-RETURNING *;
+) VALUES ($1, $2, $3, $4, $5, false, $6, $7)
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at;
 
 -- name: GetSubscriptionByID :one
-SELECT * FROM subscriptions
+SELECT id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at FROM subscriptions
 WHERE organization_id = $1 AND id = $2
 LIMIT 1;
 
@@ -26,7 +27,7 @@ WHERE organization_id = $1 AND id = $2
 FOR UPDATE;
 
 -- name: ListSubscriptions :many
-SELECT * FROM subscriptions
+SELECT id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at FROM subscriptions
 WHERE organization_id = $1
   AND (sqlc.narg('customer_id')::uuid IS NULL OR customer_id = sqlc.narg('customer_id'))
   AND (sqlc.narg('created_from')::timestamptz IS NULL OR created_at >= sqlc.narg('created_from'))
@@ -45,13 +46,19 @@ WHERE organization_id = $1
 UPDATE subscriptions
 SET status = $3, updated_at = NOW()
 WHERE organization_id = $1 AND id = $2
-RETURNING *;
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at;
 
 -- name: SetCancelAtPeriodEnd :one
 UPDATE subscriptions
 SET cancel_at_period_end = $3, updated_at = NOW()
 WHERE organization_id = $1 AND id = $2
-RETURNING *;
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at;
+
+-- name: AdvanceSubscriptionPeriod :one
+UPDATE subscriptions
+SET current_period_start = $3, current_period_end = $4, billing_locked_until = NULL, updated_at = NOW()
+WHERE organization_id = $1 AND id = $2
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at;
 
 -- =============================================================================
 -- Subscription Items

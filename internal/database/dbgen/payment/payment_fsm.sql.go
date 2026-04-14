@@ -48,10 +48,10 @@ func (q *Queries) CountPayments(ctx context.Context, arg CountPaymentsParams) (i
 
 const createPayment = `-- name: CreatePayment :one
 INSERT INTO payments (
-    organization_id, customer_id, payment_method, amount_cents,
+    organization_id, customer_id, subscription_id, payment_method, amount_cents,
     status, currency, gateway_name, idempotency_key
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, organization_id, customer_id, invoice_id, gateway_name,
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, organization_id, customer_id, invoice_id, subscription_id, gateway_name,
           gateway_reference, payment_method, amount_cents, status,
           currency, idempotency_key, error_log, created_at, updated_at
 `
@@ -59,6 +59,7 @@ RETURNING id, organization_id, customer_id, invoice_id, gateway_name,
 type CreatePaymentParams struct {
 	OrganizationID uuid.UUID         `json:"organization_id"`
 	CustomerID     uuid.UUID         `json:"customer_id"`
+	SubscriptionID uuid.NullUUID     `json:"subscription_id"`
 	PaymentMethod  sql.NullString    `json:"payment_method"`
 	AmountCents    int32             `json:"amount_cents"`
 	Status         PaymentStatusType `json:"status"`
@@ -71,6 +72,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 	row := q.db.QueryRowContext(ctx, createPayment,
 		arg.OrganizationID,
 		arg.CustomerID,
+		arg.SubscriptionID,
 		arg.PaymentMethod,
 		arg.AmountCents,
 		arg.Status,
@@ -84,6 +86,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 		&i.OrganizationID,
 		&i.CustomerID,
 		&i.InvoiceID,
+		&i.SubscriptionID,
 		&i.GatewayName,
 		&i.GatewayReference,
 		&i.PaymentMethod,
@@ -99,7 +102,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 }
 
 const getPaymentByID = `-- name: GetPaymentByID :one
-SELECT id, organization_id, customer_id, invoice_id, gateway_name,
+SELECT id, organization_id, customer_id, invoice_id, subscription_id, gateway_name,
        gateway_reference, payment_method, amount_cents, status,
        currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
@@ -119,6 +122,7 @@ func (q *Queries) GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) 
 		&i.OrganizationID,
 		&i.CustomerID,
 		&i.InvoiceID,
+		&i.SubscriptionID,
 		&i.GatewayName,
 		&i.GatewayReference,
 		&i.PaymentMethod,
@@ -240,7 +244,7 @@ func (q *Queries) ListPaymentHistory(ctx context.Context, arg ListPaymentHistory
 }
 
 const listPayments = `-- name: ListPayments :many
-SELECT id, organization_id, customer_id, invoice_id, gateway_name,
+SELECT id, organization_id, customer_id, invoice_id, subscription_id, gateway_name,
        gateway_reference, payment_method, amount_cents, status,
        currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
@@ -288,6 +292,7 @@ func (q *Queries) ListPayments(ctx context.Context, arg ListPaymentsParams) ([]P
 			&i.OrganizationID,
 			&i.CustomerID,
 			&i.InvoiceID,
+			&i.SubscriptionID,
 			&i.GatewayName,
 			&i.GatewayReference,
 			&i.PaymentMethod,

@@ -46,24 +46,30 @@ func setupDatabase(cfg *config.Config, logger *slog.Logger) (*database.DB, *data
 	return db, healthCheck, nil
 }
 
-func setupInfrastructure(cfg *config.Config, logger *slog.Logger) (domain.Queue, domain.Gateway, config.FlagProvider) {
-	jobQueue := queue.New("memory", cfg.WebhookQueueBufferSize)
+func setupInfrastructure(cfg *config.Config, logger *slog.Logger) (jobQueue, recurrenceQueue domain.Queue, paymentGateway domain.Gateway, featureFlags config.FlagProvider) {
+	jobQueue = queue.New("memory", cfg.WebhookQueueBufferSize)
 	if jobQueue == nil {
 		logger.Error("failed to initialize job queue")
 		os.Exit(1)
 	}
 
-	paymentGateway := gateway.New(cfg.GatewayProviderName, cfg.GatewayProviderAPIKey)
+	recurrenceQueue = queue.New("memory", cfg.RecurrenceQueueBufferSize)
+	if recurrenceQueue == nil {
+		logger.Error("failed to initialize recurrence queue")
+		os.Exit(1)
+	}
+
+	paymentGateway = gateway.New(cfg.GatewayProviderName, cfg.GatewayProviderAPIKey)
 	if paymentGateway == nil {
 		logger.Warn("no payment gateway configured; gateway operations will be unavailable",
 			"provider", cfg.GatewayProviderName)
 	}
 
-	featureFlags := config.NewEnvFlagProvider(
+	featureFlags = config.NewEnvFlagProvider(
 		config.FlagMaintenance,
 	)
 
-	return jobQueue, paymentGateway, featureFlags
+	return
 }
 
 func startWorkers(ctx context.Context, db *database.DB, jobQueue domain.Queue, cfg *config.Config) {
@@ -103,16 +109,18 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	jobQueue, paymentGateway, featureFlags := setupInfrastructure(cfg, logger)
+	jobQueue, recurrenceQueue, paymentGateway, featureFlags := setupInfrastructure(cfg, logger)
 
 	startWorkers(ctx, db, jobQueue, cfg)
 
 	r := router.NewRouter(cfg, logger, router.Adapters{
-		DB:          db,
-		HealthCheck: healthCheck,
-		Queue:       jobQueue,
-		Gateway:     paymentGateway,
-		Flags:       featureFlags,
+		DB:              db,
+		HealthCheck:     healthCheck,
+		Queue:           jobQueue,
+		RecurrenceQueue: recurrenceQueue,
+		Gateway:         paymentGateway,
+		Flags:           featureFlags,
+		Context:         ctx,
 	})
 
 	if err := r.Run(":" + cfg.ServerPort); err != nil {

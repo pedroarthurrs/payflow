@@ -11,6 +11,7 @@ import (
 // SubscriptionStatus represents the lifecycle state of a subscription.
 type SubscriptionStatus string
 
+// Subscription status constants.
 const (
 	SubStatusTrialing   SubscriptionStatus = "trialing"
 	SubStatusActive     SubscriptionStatus = "active"
@@ -29,6 +30,8 @@ type SubscriptionRepository interface {
 	Count(ctx context.Context, organizationID uuid.UUID, params SubscriptionListParams) (int64, error)
 	UpdateStatus(ctx context.Context, organizationID, subscriptionID uuid.UUID, newStatus SubscriptionStatus, reason string) (*Subscription, error)
 	SetCancelAtPeriodEnd(ctx context.Context, organizationID, subscriptionID uuid.UUID, value bool) (*Subscription, error)
+	// AdvancePeriod moves the subscription to the next billing period and clears billing_locked_until.
+	AdvancePeriod(ctx context.Context, orgID, subID uuid.UUID, newStart, newEnd time.Time) (*Subscription, error)
 }
 
 // SubscriptionItemRepository defines persistence for subscription items.
@@ -59,6 +62,8 @@ type Subscription struct {
 	CurrentPeriodStart time.Time
 	CurrentPeriodEnd   time.Time
 	CancelAtPeriodEnd  bool
+	PaymentMethod      string
+	BillingLockedUntil *time.Time
 	Metadata           json.RawMessage
 	Items              []SubscriptionItem
 	CreatedAt          time.Time
@@ -104,10 +109,11 @@ type SubscriptionSchedule struct {
 // Status, CurrentPeriodStart and CurrentPeriodEnd are computed by the service
 // before calling the repository.
 type CreateSubscriptionInput struct {
-	CustomerID uuid.UUID
-	TrialEnd   *time.Time
-	Metadata   json.RawMessage
-	Items      []SubscriptionItemInput
+	CustomerID    uuid.UUID
+	TrialEnd      *time.Time
+	Metadata      json.RawMessage
+	Items         []SubscriptionItemInput
+	PaymentMethod string
 	// Computed by service
 	Status             SubscriptionStatus
 	CurrentPeriodStart time.Time

@@ -131,3 +131,8 @@ CREATE INDEX IF NOT EXISTS idx_commission_settings_customer_id
 -- Idempotency Keys
 CREATE INDEX IF NOT EXISTS idx_idempotency_expires_at
     ON idempotency_keys (expires_at);
+
+-- Recurrence billing
+CREATE INDEX IF NOT EXISTS idx_subscriptions_billing
+    ON subscriptions(current_period_end)
+    WHERE status IN ('active', 'past_due', 'trialing') AND billing_locked_until IS NULL;

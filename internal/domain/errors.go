@@ -36,4 +36,8 @@ var (
 	ErrGatewayRefundFailed = errors.New("gateway refund failed")
 	ErrGatewayCancelFailed = errors.New("gateway cancel failed")
 	ErrGatewayUnavailable  = errors.New("gateway unavailable")
+
+	// Recurrence errors
+	ErrSubscriptionAlreadyLocked = errors.New("subscription billing is already locked")
+	ErrBillingAmountZero         = errors.New("subscription billing amount is zero")
 )

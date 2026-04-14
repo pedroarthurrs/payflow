@@ -34,10 +34,12 @@ func (r *PaymentRepo) Create(ctx context.Context, organizationID uuid.UUID, inpu
 	row, err := r.q.CreatePayment(ctx, paymentdb.CreatePaymentParams{
 		OrganizationID: organizationID,
 		CustomerID:     input.CustomerID,
+		SubscriptionID: toNullUUID(input.SubscriptionID),
 		PaymentMethod:  sql.NullString{String: input.PaymentMethod, Valid: input.PaymentMethod != ""},
 		AmountCents:    input.AmountCents,
 		Status:         paymentdb.PaymentStatusTypePending,
 		Currency:       sql.NullString{String: currency, Valid: true},
+		IdempotencyKey: sql.NullString{String: input.IdempotencyKey, Valid: input.IdempotencyKey != ""},
 	})
 	if err != nil {
 		slog.Error("failed to create payment", "organization_id", organizationID, "error", err)
@@ -115,6 +117,11 @@ func toDomainPayment(row paymentdb.Payment) *domain.Payment {
 	if row.InvoiceID.Valid {
 		id := row.InvoiceID.UUID
 		p.InvoiceID = &id
+	}
+
+	if row.SubscriptionID.Valid {
+		id := row.SubscriptionID.UUID
+		p.SubscriptionID = &id
 	}
 
 	if row.GatewayName.Valid {

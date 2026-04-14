@@ -14,6 +14,45 @@ import (
 	"github.com/sqlc-dev/pqtype"
 )
 
+const advanceSubscriptionPeriod = `-- name: AdvanceSubscriptionPeriod :one
+UPDATE subscriptions
+SET current_period_start = $3, current_period_end = $4, billing_locked_until = NULL, updated_at = NOW()
+WHERE organization_id = $1 AND id = $2
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at
+`
+
+type AdvanceSubscriptionPeriodParams struct {
+	OrganizationID     uuid.UUID `json:"organization_id"`
+	ID                 uuid.UUID `json:"id"`
+	CurrentPeriodStart time.Time `json:"current_period_start"`
+	CurrentPeriodEnd   time.Time `json:"current_period_end"`
+}
+
+func (q *Queries) AdvanceSubscriptionPeriod(ctx context.Context, arg AdvanceSubscriptionPeriodParams) (Subscription, error) {
+	row := q.db.QueryRowContext(ctx, advanceSubscriptionPeriod,
+		arg.OrganizationID,
+		arg.ID,
+		arg.CurrentPeriodStart,
+		arg.CurrentPeriodEnd,
+	)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CustomerID,
+		&i.Status,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.CancelAtPeriodEnd,
+		&i.PaymentMethod,
+		&i.BillingLockedUntil,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const cancelSchedule = `-- name: CancelSchedule :exec
 UPDATE subscription_schedules
 SET applied_at = NOW(), updated_at = NOW()
@@ -66,9 +105,10 @@ INSERT INTO subscriptions (
     current_period_start,
     current_period_end,
     cancel_at_period_end,
+    payment_method,
     metadata
-) VALUES ($1, $2, $3, $4, $5, false, $6)
-RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, metadata, created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, false, $6, $7)
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at
 `
 
 type CreateSubscriptionParams struct {
@@ -77,6 +117,7 @@ type CreateSubscriptionParams struct {
 	Status             SubscriptionStatusType `json:"status"`
 	CurrentPeriodStart time.Time              `json:"current_period_start"`
 	CurrentPeriodEnd   time.Time              `json:"current_period_end"`
+	PaymentMethod      string                 `json:"payment_method"`
 	Metadata           pqtype.NullRawMessage  `json:"metadata"`
 }
 
@@ -90,6 +131,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		arg.Status,
 		arg.CurrentPeriodStart,
 		arg.CurrentPeriodEnd,
+		arg.PaymentMethod,
 		arg.Metadata,
 	)
 	var i Subscription
@@ -101,6 +143,8 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
+		&i.PaymentMethod,
+		&i.BillingLockedUntil,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -237,7 +281,7 @@ func (q *Queries) GetPendingSchedule(ctx context.Context, arg GetPendingSchedule
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, metadata, created_at, updated_at FROM subscriptions
+SELECT id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at FROM subscriptions
 WHERE organization_id = $1 AND id = $2
 LIMIT 1
 `
@@ -258,6 +302,8 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, arg GetSubscriptionBy
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
+		&i.PaymentMethod,
+		&i.BillingLockedUntil,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -381,7 +427,7 @@ func (q *Queries) ListSubscriptionItems(ctx context.Context, arg ListSubscriptio
 }
 
 const listSubscriptions = `-- name: ListSubscriptions :many
-SELECT id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, metadata, created_at, updated_at FROM subscriptions
+SELECT id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at FROM subscriptions
 WHERE organization_id = $1
   AND ($4::uuid IS NULL OR customer_id = $4)
   AND ($5::timestamptz IS NULL OR created_at >= $5)
@@ -423,6 +469,8 @@ func (q *Queries) ListSubscriptions(ctx context.Context, arg ListSubscriptionsPa
 			&i.CurrentPeriodStart,
 			&i.CurrentPeriodEnd,
 			&i.CancelAtPeriodEnd,
+			&i.PaymentMethod,
+			&i.BillingLockedUntil,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -444,7 +492,7 @@ const setCancelAtPeriodEnd = `-- name: SetCancelAtPeriodEnd :one
 UPDATE subscriptions
 SET cancel_at_period_end = $3, updated_at = NOW()
 WHERE organization_id = $1 AND id = $2
-RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, metadata, created_at, updated_at
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at
 `
 
 type SetCancelAtPeriodEndParams struct {
@@ -464,6 +512,8 @@ func (q *Queries) SetCancelAtPeriodEnd(ctx context.Context, arg SetCancelAtPerio
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
+		&i.PaymentMethod,
+		&i.BillingLockedUntil,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -475,7 +525,7 @@ const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one
 UPDATE subscriptions
 SET status = $3, updated_at = NOW()
 WHERE organization_id = $1 AND id = $2
-RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, metadata, created_at, updated_at
+RETURNING id, organization_id, customer_id, status, current_period_start, current_period_end, cancel_at_period_end, payment_method, billing_locked_until, metadata, created_at, updated_at
 `
 
 type UpdateSubscriptionStatusParams struct {
@@ -495,6 +545,8 @@ func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscr
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
 		&i.CancelAtPeriodEnd,
+		&i.PaymentMethod,
+		&i.BillingLockedUntil,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,

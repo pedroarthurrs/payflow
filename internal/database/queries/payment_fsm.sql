@@ -29,22 +29,22 @@ ORDER BY created_at ASC;
 
 -- name: CreatePayment :one
 INSERT INTO payments (
-    organization_id, customer_id, payment_method, amount_cents,
+    organization_id, customer_id, subscription_id, payment_method, amount_cents,
     status, currency, gateway_name, idempotency_key
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, organization_id, customer_id, invoice_id, gateway_name,
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, organization_id, customer_id, invoice_id, subscription_id, gateway_name,
           gateway_reference, payment_method, amount_cents, status,
           currency, idempotency_key, error_log, created_at, updated_at;
 
 -- name: GetPaymentByID :one
-SELECT id, organization_id, customer_id, invoice_id, gateway_name,
+SELECT id, organization_id, customer_id, invoice_id, subscription_id, gateway_name,
        gateway_reference, payment_method, amount_cents, status,
        currency, idempotency_key, error_log, created_at, updated_at
 FROM payments
 WHERE organization_id = $1 AND id = $2;
 
 -- name: ListPayments :many
-SELECT id, organization_id, customer_id, invoice_id, gateway_name,
+SELECT id, organization_id, customer_id, invoice_id, subscription_id, gateway_name,
        gateway_reference, payment_method, amount_cents, status,
        currency, idempotency_key, error_log, created_at, updated_at
 FROM payments

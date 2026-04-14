@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"i9pay/internal/domain"
 	"i9pay/internal/monitor"
 	"i9pay/internal/service"
+	"i9pay/internal/worker"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,11 +26,13 @@ const refreshTokenTTL = 7 * 24 * time.Hour
 // and injected into the router. Keeping them in a struct avoids a long parameter
 // list and makes it easy to add new adapters without changing the function signature.
 type Adapters struct {
-	DB          *database.DB
-	HealthCheck *database.HealthChecker
-	Queue       domain.Queue
-	Gateway     domain.Gateway
-	Flags       config.FlagProvider
+	DB              *database.DB
+	HealthCheck     *database.HealthChecker
+	Queue           domain.Queue
+	RecurrenceQueue domain.Queue
+	Gateway         domain.Gateway
+	Flags           config.FlagProvider
+	Context         context.Context
 }
 
 // NewRouter constructs and returns a configured Gin engine with all routes and middleware registered.
@@ -103,6 +107,24 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 		customerRepo,
 		txManager,
 	)
+
+	// Recurrence engine
+	recurrenceRepo := repository.NewRecurrenceRepo(adapters.DB.DB, adapters.DB.RecurrenceQ)
+	recurrenceSvc := service.NewRecurrenceService(
+		subscriptionRepo,
+		subscriptionItemRepo,
+		subscriptionSchRepo,
+		planRepo,
+		recurrenceRepo,
+		paymentRepo,
+		gatewaySvc,
+		txManager,
+		cfg.RecurrenceMaxAttempts,
+	)
+	recurrenceWorker := worker.NewRecurrenceWorker(adapters.RecurrenceQueue, recurrenceSvc, cfg.RecurrenceWorkerCount, cfg.RecurrenceMaxAttempts)
+	recurrenceScheduler := worker.NewRecurrenceScheduler(recurrenceRepo, adapters.RecurrenceQueue, cfg.RecurrenceBatchSize, cfg.RecurrenceScanCron)
+	go recurrenceWorker.Start(adapters.Context)
+	go recurrenceScheduler.Start(adapters.Context)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")

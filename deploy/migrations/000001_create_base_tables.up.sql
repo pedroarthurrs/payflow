@@ -223,6 +223,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     current_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
     current_period_end TIMESTAMP WITH TIME ZONE NOT NULL,
     cancel_at_period_end BOOLEAN DEFAULT false,
+    payment_method VARCHAR(50) NOT NULL DEFAULT '',
+    billing_locked_until TIMESTAMPTZ NULL,
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -376,6 +378,7 @@ CREATE TABLE IF NOT EXISTS payments (
     organization_id UUID NOT NULL REFERENCES organizations(id),
     customer_id UUID NOT NULL REFERENCES customers(id), -- Associação direta ao cliente.
     invoice_id UUID,
+    subscription_id UUID NULL,
 
     gateway_name VARCHAR(50),       -- Gateway que processou o pagamento.
     gateway_reference VARCHAR(255), -- Identificador externo atribuído pelo gateway.
@@ -391,7 +394,11 @@ CREATE TABLE IF NOT EXISTS payments (
 
     CONSTRAINT fk_payments_invoice_organization
         FOREIGN KEY (organization_id, invoice_id)
-        REFERENCES invoices (organization_id, id) ON DELETE SET NULL
+        REFERENCES invoices (organization_id, id) ON DELETE SET NULL,
+
+    CONSTRAINT fk_payments_subscription_organization
+        FOREIGN KEY (organization_id, subscription_id)
+        REFERENCES subscriptions (organization_id, id) ON DELETE SET NULL
 );
 
 -- Controle de idempotência das requisições.

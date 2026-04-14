@@ -153,3 +153,14 @@ sql:
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/recurrence.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "recurrencedb"
+        out: "internal/database/dbgen/recurrence"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true

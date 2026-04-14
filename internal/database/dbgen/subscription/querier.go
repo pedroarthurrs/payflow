@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	AdvanceSubscriptionPeriod(ctx context.Context, arg AdvanceSubscriptionPeriodParams) (Subscription, error)
 	CancelSchedule(ctx context.Context, arg CancelScheduleParams) error
 	CountSubscriptions(ctx context.Context, arg CountSubscriptionsParams) (int64, error)
 	// =============================================================================

@@ -84,5 +84,9 @@ func (h *txHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository {
 	return NewSubscriptionItemRepo(h.subscriptionQ)
 }
 
+func (h *txHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
+	return NewSubscriptionScheduleRepo(h.subscriptionQ)
+}
+
 var _ domain.TxManager = (*TxManager)(nil)
 var _ domain.TxHandle = (*txHandle)(nil)

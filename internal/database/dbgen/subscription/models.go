@@ -395,6 +395,7 @@ type Payment struct {
 	OrganizationID   uuid.UUID             `json:"organization_id"`
 	CustomerID       uuid.UUID             `json:"customer_id"`
 	InvoiceID        uuid.NullUUID         `json:"invoice_id"`
+	SubscriptionID   uuid.NullUUID         `json:"subscription_id"`
 	GatewayName      sql.NullString        `json:"gateway_name"`
 	GatewayReference sql.NullString        `json:"gateway_reference"`
 	PaymentMethod    sql.NullString        `json:"payment_method"`
@@ -466,6 +467,8 @@ type Subscription struct {
 	CurrentPeriodStart time.Time              `json:"current_period_start"`
 	CurrentPeriodEnd   time.Time              `json:"current_period_end"`
 	CancelAtPeriodEnd  sql.NullBool           `json:"cancel_at_period_end"`
+	PaymentMethod      string                 `json:"payment_method"`
+	BillingLockedUntil sql.NullTime           `json:"billing_locked_until"`
 	Metadata           pqtype.NullRawMessage  `json:"metadata"`
 	CreatedAt          sql.NullTime           `json:"created_at"`
 	UpdatedAt          sql.NullTime           `json:"updated_at"`

@@ -15,6 +15,7 @@ type Payment struct {
 	OrganizationID   uuid.UUID
 	CustomerID       uuid.UUID
 	InvoiceID        *uuid.UUID
+	SubscriptionID   *uuid.UUID
 	GatewayName      *string
 	GatewayReference *string
 	PaymentMethod    *string
@@ -29,11 +30,13 @@ type Payment struct {
 
 // PaymentInput represents the input for creating a payment.
 type PaymentInput struct {
-	CustomerID    uuid.UUID
-	PaymentMethod string
-	AmountCents   int32
+	CustomerID     uuid.UUID
+	SubscriptionID *uuid.UUID
+	PaymentMethod  string
+	AmountCents    int32
 	// Currency defaults to "BRL" when empty.
-	Currency string
+	Currency       string
+	IdempotencyKey string
 }
 
 // PaymentListParams carries optional filters for listing payments.

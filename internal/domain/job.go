@@ -13,6 +13,9 @@ type JobType string
 // JobTypeWebhook is the job type for webhook delivery jobs.
 const JobTypeWebhook JobType = "webhook"
 
+// JobTypeRecurringBilling is the job type for recurring subscription billing.
+const JobTypeRecurringBilling JobType = "recurring_billing"
+
 // Job is the generic unit of work stored in the queue.
 // The job-specific data is serialized as JSON by the producer and stored in Payload.
 type Job struct {
