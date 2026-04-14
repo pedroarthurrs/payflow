@@ -88,6 +88,19 @@ Um `HealthMonitor` em background faz ping no banco a cada 15 segundos e cacheia 
 
 ---
 
+### GET /v1/status
+
+Retorna o estado atual do modo manutenção.
+
+**Resposta (200 OK):**
+```json
+{
+  "maintenance": false
+}
+```
+
+---
+
 ### POST /v1/auth/login
 
 Autentica e emite um par de tokens. Suporta dois modos de autenticação:
@@ -830,6 +843,363 @@ Remove um usuário da organization (soft delete). Requer role `owner`.
 
 ---
 
+### POST /v1/payments
+
+Cria um pagamento e executa a cobrança no gateway imediatamente.
+
+**Requisição:**
+```json
+{
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "payment_method": "card",
+  "amount_cents": 9900,
+  "currency": "BRL"
+}
+```
+
+`currency` é opcional e usa `BRL` como padrão. `amount_cents` deve ser positivo.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440050",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "payment_method": "card",
+  "amount_cents": 9900,
+  "status": "succeeded",
+  "currency": "BRL",
+  "gateway_name": "stripe",
+  "gateway_reference": "pi_abc123",
+  "created_at": "2026-04-13T10:00:00Z",
+  "updated_at": "2026-04-13T10:00:00Z"
+}
+```
+
+**Resposta (402 Payment Required):** cobrança rejeitada pelo gateway.
+
+**Resposta (503 Service Unavailable):** gateway indisponível.
+
+---
+
+### GET /v1/payments
+
+Lista pagamentos da organization com paginação por offset e filtros opcionais.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset para paginação (padrão: 0) |
+| `status` | string | Filtrar por status (`pending`, `authorized`, `succeeded`, `failed`, `canceled`, `disputed`, `refunded`, `partially_refunded`) |
+| `customer_id` | UUID | Filtrar por cliente |
+| `payment_method` | string | Filtrar por método de pagamento |
+| `from` | string | Timestamp ISO 8601 (início do intervalo de criação) |
+| `to` | string | Timestamp ISO 8601 (fim do intervalo de criação) |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440050",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+      "payment_method": "card",
+      "amount_cents": 9900,
+      "status": "succeeded",
+      "currency": "BRL",
+      "created_at": "2026-04-13T10:00:00Z",
+      "updated_at": "2026-04-13T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### GET /v1/payments/:payment_id
+
+Retorna um pagamento pelo ID.
+
+**Resposta (200 OK):** mesmo formato de um item do array `data` acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "payment not found"
+}
+```
+
+---
+
+### GET /v1/payments/:payment_id/history
+
+Lista o histórico de transições de status de um pagamento (FSM).
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440051",
+    "payment_id": "550e8400-e29b-41d4-a716-446655440050",
+    "old_status": "pending",
+    "new_status": "succeeded",
+    "event_source": "gateway",
+    "reason": "charge completed",
+    "created_at": "2026-04-13T10:00:00Z"
+  }
+]
+```
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "payment not found"
+}
+```
+
+---
+
+### POST /v1/payments/:payment_id/refund
+
+Inicia um reembolso para o pagamento. Requer role `member` ou superior.
+
+**Requisição (opcional):**
+```json
+{
+  "reason": "customer request"
+}
+```
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/payments/:payment_id` com status atualizado.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "payment not found"
+}
+```
+
+---
+
+### POST /v1/payments/:payment_id/cancel
+
+Cancela um pagamento pendente. Requer role `member` ou superior.
+
+**Requisição (opcional):**
+```json
+{
+  "reason": "duplicate order"
+}
+```
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/payments/:payment_id` com status atualizado.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "payment not found"
+}
+```
+
+---
+
+### POST /v1/webhooks
+
+Cria um novo endpoint de webhook. Requer role `admin` ou superior.
+
+A URL deve usar HTTPS.
+
+**Requisição:**
+```json
+{
+  "url": "https://meu-sistema.com/webhooks/i9pay",
+  "description": "Notificações de pagamento",
+  "enabled_events": ["invoice.paid", "invoice.payment_failed"],
+  "environment": "production"
+}
+```
+
+`description` e `environment` são opcionais. `environment` deve ser `test` ou `production` (padrão: `production`).
+
+**Event types válidos:**
+```
+customer.created    customer.updated    customer.deleted
+invoice.created     invoice.paid        invoice.payment_failed
+subscription.created  subscription.updated  subscription.canceled
+```
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440060",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+  "url": "https://meu-sistema.com/webhooks/i9pay",
+  "description": "Notificações de pagamento",
+  "enabled_events": ["invoice.paid", "invoice.payment_failed"],
+  "environment": "production",
+  "is_active": true,
+  "created_at": "2026-04-13T10:00:00Z",
+  "updated_at": "2026-04-13T10:00:00Z"
+}
+```
+
+---
+
+### GET /v1/webhooks
+
+Lista os endpoints de webhook da organization. Requer role `admin` ou superior.
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440060",
+    "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+    "url": "https://meu-sistema.com/webhooks/i9pay",
+    "description": "Notificações de pagamento",
+    "enabled_events": ["invoice.paid", "invoice.payment_failed"],
+    "environment": "production",
+    "is_active": true,
+    "created_at": "2026-04-13T10:00:00Z",
+    "updated_at": "2026-04-13T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/webhooks/events
+
+Lista todos os event types suportados. Requer role `admin` ou superior.
+
+**Resposta (200 OK):**
+```json
+[
+  "customer.created",
+  "customer.updated",
+  "customer.deleted",
+  "invoice.created",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "subscription.created",
+  "subscription.updated",
+  "subscription.canceled"
+]
+```
+
+---
+
+### GET /v1/webhooks/:webhook_id
+
+Retorna um endpoint pelo ID. Requer role `admin` ou superior.
+
+**Resposta (200 OK):** mesmo formato de um item da listagem acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "webhook endpoint not found"
+}
+```
+
+---
+
+### PUT /v1/webhooks/:webhook_id
+
+Atualiza um endpoint de webhook. Requer role `admin` ou superior. Todos os campos são opcionais.
+
+**Requisição:**
+```json
+{
+  "url": "https://meu-sistema.com/webhooks/v2",
+  "enabled_events": ["invoice.paid"],
+  "is_active": false
+}
+```
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/webhooks/:webhook_id`.
+
+---
+
+### DELETE /v1/webhooks/:webhook_id
+
+Remove um endpoint de webhook. Requer role `owner`.
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "webhook endpoint not found"
+}
+```
+
+---
+
+### GET /v1/webhooks/logs
+
+Lista os logs de entrega de webhooks da organization. Requer role `admin` ou superior.
+
+Suporta paginação por cursor e filtros opcionais.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `cursor` | string | Cursor opaco da página anterior |
+| `from` | string | Timestamp ISO 8601 (início do intervalo) |
+| `to` | string | Timestamp ISO 8601 (fim do intervalo) |
+| `endpoint_id` | UUID | Filtrar por endpoint |
+| `event_type` | string | Filtrar por event type |
+| `success` | bool | Filtrar por resultado (`true`/`false`) |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440070",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "endpoint_id": "550e8400-e29b-41d4-a716-446655440060",
+      "event_type": "invoice.paid",
+      "payload": { "invoice_id": "..." },
+      "response_body": "OK",
+      "response_status": 200,
+      "duration_ms": 120,
+      "attempt_number": 1,
+      "success": true,
+      "created_at": "2026-04-13T10:05:00Z"
+    }
+  ],
+  "next_cursor": "eyJ0IjoiMjAyNi0wNC0xM1QxMDowNTowMFoiLCJpIjoiNTUwZTg0MDAifQ",
+  "limit": 20
+}
+```
+
+---
+
+### GET /v1/webhooks/logs/:log_id
+
+Retorna um log de entrega específico pelo ID. Requer role `admin` ou superior.
+
+**Resposta (200 OK):** mesmo formato de um item do array `data` acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "webhook log not found"
+}
+```
+
+---
+
 ## Controle de Acesso (RBAC)
 
 Endpoints protegidos podem exigir um role mínimo. A hierarquia de roles é:
@@ -856,6 +1226,20 @@ owner (3) > admin (2) > member (1)
 | `GET /v1/products/:product_id` | Qualquer role |
 | `PUT /v1/products/:product_id` | Qualquer role |
 | `DELETE /v1/products/:product_id` | Qualquer role |
+| `POST /v1/payments` | Qualquer role |
+| `GET /v1/payments` | Qualquer role |
+| `GET /v1/payments/:payment_id` | Qualquer role |
+| `GET /v1/payments/:payment_id/history` | Qualquer role |
+| `POST /v1/payments/:payment_id/refund` | member |
+| `POST /v1/payments/:payment_id/cancel` | member |
+| `POST /v1/webhooks` | admin |
+| `GET /v1/webhooks` | admin |
+| `GET /v1/webhooks/events` | admin |
+| `GET /v1/webhooks/:webhook_id` | admin |
+| `PUT /v1/webhooks/:webhook_id` | admin |
+| `DELETE /v1/webhooks/:webhook_id` | owner |
+| `GET /v1/webhooks/logs` | admin |
+| `GET /v1/webhooks/logs/:log_id` | admin |
 | Demais rotas protegidas | Qualquer role (autenticação JWT válida) |
 
 Tokens gerados via API Key (`auth_type: "system"`) não possuem role e recebem `403 Forbidden` em endpoints que exigem role.

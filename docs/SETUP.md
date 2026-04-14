@@ -49,15 +49,19 @@ A execução local deve ser sempre feita com Docker para padronizar o ambiente.
 make build-dev
 ```
 
-Este comando constrói as imagens Docker, sobe os containers (API + PostgreSQL) e aplica as migrations automaticamente.
+Este comando constrói as imagens Docker, sobe os containers (API + PostgreSQL + frontend) e aplica as migrations automaticamente.
 
 No ambiente de desenvolvimento, um usuário de teste é criado automaticamente no primeiro bootstrap do banco:
 - Email: `dev@i9pay.local`
 - Senha: `Dev@123456`
 - Role: `owner`
 
-- API: `http://localhost:8080`
-- Banco de dados: `localhost:5433`
+| Serviço | URL |
+|---------|-----|
+| API | `http://localhost:8080` |
+| Frontend | `http://localhost:3000` |
+| Banco de dados | `localhost:5433` |
+| Adminer (DB UI) | `http://localhost:8081` |
 
 **Parar os containers:**
 ```bash
@@ -197,7 +201,7 @@ docker ps
 make dev
 
 # Verifique os logs
-docker logs $(docker ps -q --filter "ancestor=postgres:15")
+docker logs $(docker ps -q --filter "ancestor=postgres:18-alpine")
 ```
 
 ### JWT_SECRET não configurada
@@ -242,7 +246,7 @@ pipelines:
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:18-alpine
     variables:
       POSTGRES_DB: i9pay_test
       POSTGRES_PASSWORD: password

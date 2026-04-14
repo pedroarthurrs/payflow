@@ -98,6 +98,62 @@ Atualiza `internal/database/dbgen/<domain>/*.go`. Cada domínio tem seu próprio
 
 ---
 
+## Frontend
+
+Todos os comandos abaixo devem ser executados dentro do diretório `web/`.
+
+### Instalar dependências
+
+```bash
+cd web && pnpm install
+```
+
+### `pnpm dev`
+
+Inicia o servidor Vite em modo desenvolvimento com hot-reload.
+
+```bash
+cd web && pnpm dev
+```
+
+Frontend disponível em `http://localhost:3000`. Em desenvolvimento usa o proxy Vite para redirecionar `/api/*` à API Go.
+
+### `pnpm build`
+
+Compila o bundle de produção (type-check + vite build).
+
+```bash
+cd web && pnpm build
+```
+
+Saída gerada em `web/dist/`.
+
+### `pnpm preview`
+
+Serve o bundle de produção localmente para validação.
+
+```bash
+cd web && pnpm preview
+```
+
+### `pnpm test`
+
+Executa os testes com Vitest uma vez.
+
+```bash
+cd web && pnpm test
+```
+
+### `pnpm test:watch`
+
+Executa os testes em modo watch.
+
+```bash
+cd web && pnpm test:watch
+```
+
+---
+
 ## Go
 
 ### `make tidy`

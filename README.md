@@ -6,7 +6,7 @@ API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-ten
 
 i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
 
-Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Docker
+Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Vue 3 | TypeScript | Docker
 
 ## Início Rápido
 
@@ -39,6 +39,7 @@ curl http://localhost:8080/v1/live
 - [SECURITY_OBSERVABILITY.md](docs/SECURITY_OBSERVABILITY.md) — rate limiting, logging e validação
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) — guia de contribuição e adição de features
 - [COMMANDS.md](docs/COMMANDS.md) — referência de comandos disponíveis
+- [FEATURES.md](docs/FEATURES.md) — funcionalidades a implementar e requisitos
 
 ---
 
@@ -70,8 +71,18 @@ i9pay/
 │       ├── repository/       — implementações de repositórios
 │       └── dbgen/            — código gerado pelo SQLC
 ├── Makefile                  — comandos de build e desenvolvimento
-├── go.mod / go.sum           — dependências
-└── sqlc.yml                  — configuração SQLC
+├── go.mod / go.sum           — dependências Go
+├── sqlc.yml                  — configuração SQLC
+└── web/                      — frontend Vue 3 + TypeScript
+    ├── src/
+    │   ├── views/            — páginas (customers, users, dashboard, login)
+    │   ├── components/       — componentes reutilizáveis
+    │   ├── stores/           — Pinia stores (auth, status)
+    │   ├── services/         — cliente HTTP Axios
+    │   ├── composables/      — composables (useAuth, useCrud, useToast)
+    │   ├── types/            — TypeScript DTO types
+    │   └── router/           — Vue Router com guards de autenticação
+    └── package.json
 ```
 
 ---
@@ -86,6 +97,7 @@ i9pay/
 - Gerenciamento de produtos (CRUD com soft/hard delete)
 - Gerenciamento de credenciais (API Keys: criar, rotacionar, revogar)
 - Audit trail de credenciais (log de requisições autenticadas via API Key)
+- Gerenciamento de pagamentos com FSM de status e integração com gateway (Stripe)
 - Webhooks (endpoints CRUD, entrega assíncrona com retry, logs de entrega)
 - Arquitetura multi-organization com isolamento de dados
 - Health check com status de dependências (monitor em background)

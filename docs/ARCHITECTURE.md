@@ -135,6 +135,19 @@ Resposta JSON
 - Enfileira um `WebhookJob` por endpoint via `Queue.Enqueue`
 - Falhas de enqueue são logadas e não interrompem o processamento dos demais endpoints
 
+**PaymentService** (`service/payment.go`)
+- `Create()` — persiste o registro de pagamento com status `pending`
+- `GetByID()`, `List()` — consultas com filtros (status, customer, método, datas) e paginação offset
+
+**PaymentFSMService** (`service/payment_fsm.go`)
+- `Transition()` — valida a transição via FSM, persiste novo status + histórico atomicamente (`SELECT FOR UPDATE`)
+- `AllowedTransitions()` — retorna transições válidas a partir do status atual
+- `ListHistory()` — retorna o histórico de transições de um pagamento
+
+**GatewayService** (`service/gateway.go`)
+- `Charge()` — chama o gateway, persiste a referência externa e aciona `Transition` para `authorized`/`succeeded`/`failed`
+- `Refund()`, `Cancel()` — idem, com transições FSM correspondentes
+
 ---
 
 ### Camada de Domínio (`domain/`)
@@ -575,3 +588,58 @@ internal/
 4. Implemente service dependendo de interfaces de domínio
 5. Implemente handler com `RegisterRoutes`
 6. Registre no `router.go` (composition root)
+
+---
+
+## Frontend (Vue 3 + TypeScript)
+
+O frontend em `web/` é servido pelo Vite em desenvolvimento e consome a API Go diretamente.
+
+### Stack
+
+- **Framework**: Vue 3 com Composition API
+- **Roteamento**: Vue Router 4 com navigation guards de autenticação e RBAC
+- **Estado global**: Pinia (`stores/auth.ts`, `stores/status.ts`)
+- **HTTP**: Axios com interceptores de token e refresh automático
+- **UI**: Tailwind CSS 4 + shadcn/vue (radix-vue, reka-ui) + lucide-vue-next
+- **Testes**: Vitest + @vue/test-utils + fast-check (property-based)
+- **Gerenciador de pacotes**: pnpm
+
+### Estrutura (`web/src/`)
+
+```
+web/src/
+├── router/         — rotas com guards de autenticação (isAuthenticated, hasRole)
+├── views/          — páginas por recurso (customers/, users/, addresses/)
+├── components/     — componentes reutilizáveis (DataTable, FormField, etc.)
+│   └── ui/         — biblioteca de UI (button, input, dialog, table, etc.)
+├── composables/    — useAuth, useCrud, useToast, useErrorHandler
+├── stores/         — Pinia: auth (tokens, role, login/logout) e status (maintenance)
+├── services/
+│   └── http.ts     — Axios instance: base URL /api, interceptor de Bearer token, refresh on 401
+├── types/          — DTOs TypeScript espelhando as respostas da API Go
+└── lib/utils.ts    — helpers utilitários
+```
+
+### Comunicação com a API
+
+O Vite proxia `/api` para `VITE_API_PROXY_TARGET` (padrão: `http://api:8080`) em desenvolvimento. O browser usa `VITE_API_BASE_URL` (ou `http://<host>:8080` como fallback) em produção.
+
+### Rotas do Frontend
+
+| Rota | Acesso | Descrição |
+|------|--------|-----------|
+| `/login` | público | Login com email/senha |
+| `/dashboard` | autenticado | Painel principal |
+| `/customers` | autenticado | Lista de clientes |
+| `/customers/new` | autenticado | Criação de cliente |
+| `/customers/:id` | autenticado | Detalhes do cliente |
+| `/customers/:id/edit` | autenticado | Edição de cliente |
+| `/customers/:id/addresses/new` | autenticado | Novo endereço |
+| `/customers/:id/addresses/:addressId/edit` | autenticado | Edição de endereço |
+| `/users` | admin+ | Lista de usuários |
+| `/users/new` | owner | Criação de usuário |
+| `/users/:id/edit` | owner | Edição de usuário |
+| `/maintenance` | público | Modo manutenção |
+| `/403` | público | Acesso negado |
+
