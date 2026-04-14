@@ -261,6 +261,14 @@ func (m *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository {
 	return &mockPaymentFSMRepo{}
 }
 
+func (m *mockTxHandle) SubscriptionRepo() domain.SubscriptionRepository {
+	return nil
+}
+
+func (m *mockTxHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository {
+	return nil
+}
+
 // ============================================================
 // Mock PaymentFSMRepository (stub for TxHandle compliance)
 // ============================================================

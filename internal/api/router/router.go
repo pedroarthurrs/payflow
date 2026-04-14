@@ -73,6 +73,10 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	paymentFSMRepo := repository.NewPaymentFSMRepo(adapters.DB.PaymentQ)
 	txManager := repository.NewTxManager(adapters.DB)
 	planRepo := repository.NewPlanRepo(adapters.DB.PlanQ)
+	subscriptionRepo := repository.NewSubscriptionRepo(adapters.DB.SubscriptionQ)
+	subscriptionItemRepo := repository.NewSubscriptionItemRepo(adapters.DB.SubscriptionQ)
+	subscriptionSchRepo := repository.NewSubscriptionScheduleRepo(adapters.DB.SubscriptionQ)
+	subscriptionHistRepo := repository.NewSubscriptionHistoryRepo(adapters.DB.SubscriptionQ)
 
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
@@ -90,6 +94,15 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
 	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, adapters.Gateway)
 	planSvc := service.NewPlanService(planRepo)
+	subscriptionSvc := service.NewSubscriptionService(
+		subscriptionRepo,
+		subscriptionItemRepo,
+		subscriptionSchRepo,
+		subscriptionHistRepo,
+		planRepo,
+		customerRepo,
+		txManager,
+	)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -107,6 +120,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentFSMSvc, gatewaySvc)
 	planHandler := handler.NewPlanHandler(planSvc)
+	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -135,6 +149,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	webhookHandler.RegisterRoutes(protected)
 	paymentHandler.RegisterRoutes(protected)
 	planHandler.RegisterRoutes(protected)
+	subscriptionHandler.RegisterRoutes(protected)
 
 	// SPA: serve o frontend embutido para todas as rotas não mapeadas pela API.
 	r.NoRoute(SPAHandler())

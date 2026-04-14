@@ -142,3 +142,14 @@ sql:
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/subscription.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "subscriptiondb"
+        out: "internal/database/dbgen/subscription"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true

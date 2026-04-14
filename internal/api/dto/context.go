@@ -94,3 +94,23 @@ func PlanID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// SubscriptionID parses the ":subscription_id" path parameter as a UUID.
+func SubscriptionID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("subscription_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid subscription id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}
+
+// ScheduleID parses the ":schedule_id" path parameter as a UUID.
+func ScheduleID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("schedule_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid schedule id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}

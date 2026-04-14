@@ -23,6 +23,14 @@ var (
 	ErrPlanNotFound            = errors.New("plan not found")
 	ErrPlanInUse               = errors.New("plan is referenced by active subscriptions")
 
+	// Subscription errors
+	ErrSubscriptionNotFound          = errors.New("subscription not found")
+	ErrInvalidSubscriptionTransition = errors.New("invalid subscription status transition")
+	ErrSubscriptionCanceled          = errors.New("subscription is already canceled")
+	ErrNoSubscriptionItems           = errors.New("subscription must have at least one item")
+	ErrScheduleAlreadyPending        = errors.New("subscription already has a pending schedule")
+	ErrScheduleNotFound              = errors.New("subscription schedule not found")
+
 	// Gateway errors
 	ErrGatewayChargeFailed = errors.New("gateway charge failed")
 	ErrGatewayRefundFailed = errors.New("gateway refund failed")

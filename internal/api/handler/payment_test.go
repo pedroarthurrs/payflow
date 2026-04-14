@@ -36,10 +36,12 @@ type mockTxHandle struct {
 	fsmRepo domain.PaymentFSMRepository
 }
 
-func (h *mockTxHandle) CustomerRepo() domain.CustomerRepository     { return nil }
-func (h *mockTxHandle) AddressRepo() domain.AddressRepository       { return nil }
-func (h *mockTxHandle) CredentialRepo() domain.CredentialRepository { return nil }
-func (h *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository { return h.fsmRepo }
+func (h *mockTxHandle) CustomerRepo() domain.CustomerRepository                 { return nil }
+func (h *mockTxHandle) AddressRepo() domain.AddressRepository                   { return nil }
+func (h *mockTxHandle) CredentialRepo() domain.CredentialRepository             { return nil }
+func (h *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository             { return h.fsmRepo }
+func (h *mockTxHandle) SubscriptionRepo() domain.SubscriptionRepository         { return nil }
+func (h *mockTxHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository { return nil }
 
 // ── mock payment querier ──────────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import (
 
 	addressdb "i9pay/internal/database/dbgen/address"
 
+	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"
 )
 
@@ -39,4 +40,12 @@ func toNullAddressType(s *string) addressdb.NullAddressType {
 		return addressdb.NullAddressType{}
 	}
 	return addressdb.NullAddressType{AddressType: addressdb.AddressType(*s), Valid: true}
+}
+
+// toNullUUID converts a *uuid.UUID to uuid.NullUUID.
+func toNullUUID(id *uuid.UUID) uuid.NullUUID {
+	if id == nil {
+		return uuid.NullUUID{}
+	}
+	return uuid.NullUUID{UUID: *id, Valid: true}
 }

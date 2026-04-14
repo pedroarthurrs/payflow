@@ -17,6 +17,7 @@ import (
 	paymentdb "i9pay/internal/database/dbgen/payment"
 	plandb "i9pay/internal/database/dbgen/plan"
 	productdb "i9pay/internal/database/dbgen/product"
+	subscriptiondb "i9pay/internal/database/dbgen/subscription"
 	userdb "i9pay/internal/database/dbgen/user"
 	webhookdb "i9pay/internal/database/dbgen/webhook"
 	webhooklogdb "i9pay/internal/database/dbgen/webhooklog"
@@ -40,6 +41,7 @@ type DB struct {
 	IdempotencyQ   idempotencydb.Querier
 	PaymentQ       paymentdb.Querier
 	PlanQ          plandb.Querier
+	SubscriptionQ  subscriptiondb.Querier
 }
 
 // New opens and verifies a database connection using the provided application config.
@@ -83,6 +85,7 @@ func New(cfg *config.Config) (*DB, error) {
 		IdempotencyQ:   idempotencydb.New(db),
 		PaymentQ:       paymentdb.New(db),
 		PlanQ:          plandb.New(db),
+		SubscriptionQ:  subscriptiondb.New(db),
 	}, nil
 }
 
