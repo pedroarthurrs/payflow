@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"i9pay/internal/domain"
 
@@ -232,6 +233,10 @@ type mockTxHandle struct {
 	customers   domain.CustomerRepository
 	addresses   domain.AddressRepository
 	credentials domain.CredentialRepository
+	paymentFSM  domain.PaymentFSMRepository
+	subs        domain.SubscriptionRepository
+	subItems    domain.SubscriptionItemRepository
+	subSchedule domain.SubscriptionScheduleRepository
 }
 
 var _ domain.TxHandle = (*mockTxHandle)(nil)
@@ -258,18 +263,80 @@ func (m *mockTxHandle) CredentialRepo() domain.CredentialRepository {
 }
 
 func (m *mockTxHandle) PaymentFSMRepo() domain.PaymentFSMRepository {
+	if m.paymentFSM != nil {
+		return m.paymentFSM
+	}
 	return &mockPaymentFSMRepo{}
 }
 
 func (m *mockTxHandle) SubscriptionRepo() domain.SubscriptionRepository {
-	return nil
+	if m.subs != nil {
+		return m.subs
+	}
+	return &mockSubscriptionRepoStub{}
 }
 
 func (m *mockTxHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository {
-	return nil
+	if m.subItems != nil {
+		return m.subItems
+	}
+	return &mockSubscriptionItemRepoStub{}
 }
 
 func (m *mockTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
+	if m.subSchedule != nil {
+		return m.subSchedule
+	}
+	return &mockSubscriptionScheduleRepoStub{}
+}
+
+// Stub implementations for TxHandle that delegate to the outer mock when needed.
+
+type mockSubscriptionRepoStub struct{}
+
+func (s *mockSubscriptionRepoStub) Create(_ context.Context, _ uuid.UUID, _ domain.CreateSubscriptionInput) (*domain.Subscription, error) {
+	return &domain.Subscription{ID: uuid.New()}, nil
+}
+func (s *mockSubscriptionRepoStub) GetByID(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
+	return nil, domain.ErrSubscriptionNotFound
+}
+func (s *mockSubscriptionRepoStub) List(_ context.Context, _ uuid.UUID, _ domain.SubscriptionListParams) ([]domain.Subscription, error) {
+	return nil, nil
+}
+func (s *mockSubscriptionRepoStub) Count(_ context.Context, _ uuid.UUID, _ domain.SubscriptionListParams) (int64, error) {
+	return 0, nil
+}
+func (s *mockSubscriptionRepoStub) UpdateStatus(_ context.Context, _, _ uuid.UUID, _ domain.SubscriptionStatus, _ string) (*domain.Subscription, error) {
+	return nil, nil
+}
+func (s *mockSubscriptionRepoStub) SetCancelAtPeriodEnd(_ context.Context, _, _ uuid.UUID, _ bool) (*domain.Subscription, error) {
+	return nil, nil
+}
+func (s *mockSubscriptionRepoStub) AdvancePeriod(_ context.Context, _, _ uuid.UUID, _, _ time.Time) (*domain.Subscription, error) {
+	return nil, nil
+}
+
+type mockSubscriptionItemRepoStub struct{}
+
+func (s *mockSubscriptionItemRepoStub) CreateItems(_ context.Context, _, _ uuid.UUID, _ []domain.SubscriptionItemInput) ([]domain.SubscriptionItem, error) {
+	return nil, nil
+}
+func (s *mockSubscriptionItemRepoStub) ReplaceItems(_ context.Context, _, _ uuid.UUID, _ []domain.SubscriptionItemInput) ([]domain.SubscriptionItem, error) {
+	return nil, nil
+}
+func (s *mockSubscriptionItemRepoStub) ListBySubscription(_ context.Context, _, _ uuid.UUID) ([]domain.SubscriptionItem, error) {
+	return nil, nil
+}
+
+type mockSubscriptionScheduleRepoStub struct{}
+
+func (s *mockSubscriptionScheduleRepoStub) Create(_ context.Context, _ uuid.UUID, _ domain.CreateScheduleInput) (*domain.SubscriptionSchedule, error) {
+	return nil, nil
+}
+func (s *mockSubscriptionScheduleRepoStub) GetPending(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionSchedule, error) {
+	return nil, domain.ErrScheduleNotFound
+}
+func (s *mockSubscriptionScheduleRepoStub) Cancel(_ context.Context, _, _ uuid.UUID) error {
 	return nil
 }
 
