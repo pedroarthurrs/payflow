@@ -172,15 +172,10 @@ func setupPaymentRouter(repo domain.PaymentRepository, orgID string) *gin.Engine
 
 func setupPaymentRouterWithFSM(repo domain.PaymentRepository, fsmRepo domain.PaymentFSMRepository, orgID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	svc := service.NewPaymentService(repo)
-	var fsmSvc *service.PaymentFSMService
-	var gatewaySvc *service.GatewayService
-	if fsmRepo != nil {
-		txMgr := &mockTxManager{fsmRepo: fsmRepo}
-		fsmSvc = service.NewPaymentFSMService(txMgr, fsmRepo)
-		gatewaySvc = service.NewGatewayService(repo, fsmSvc, &noopGateway{})
-	}
-	h := NewPaymentHandler(svc, fsmSvc, gatewaySvc)
+	txMgr := &mockTxManager{fsmRepo: fsmRepo}
+	svc := service.NewPaymentService(repo, txMgr, fsmRepo)
+	gatewaySvc := service.NewGatewayService(svc, &noopGateway{})
+	h := NewPaymentHandler(svc, gatewaySvc)
 	r := gin.New()
 	r.Use(middleware.Errors())
 	v1 := r.Group("/v1")

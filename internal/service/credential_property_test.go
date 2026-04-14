@@ -28,7 +28,7 @@ func TestProperty_Credential_RawKeyFormat(t *testing.T) {
 				}, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		_, rawKey, err := svc.Create(context.Background(), uuid.New(), domain.CreateCredentialInput{
 			Name: "k", Environment: env,
 		})
@@ -67,7 +67,7 @@ func TestProperty_Credential_HashRoundTrip(t *testing.T) {
 				}, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, pepper)
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, pepper)
 		_, rawKey, err := svc.Create(context.Background(), uuid.New(), domain.CreateCredentialInput{
 			Name: "k", Environment: env,
 		})
@@ -98,7 +98,7 @@ func TestProperty_Credential_KeyPrefixIsPrefix(t *testing.T) {
 				}, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		_, rawKey, err := svc.Create(context.Background(), uuid.New(), domain.CreateCredentialInput{
 			Name: "k", Environment: env,
 		})
@@ -131,7 +131,7 @@ func TestProperty_Credential_ExpiresAtOptional(t *testing.T) {
 				}, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		inp := domain.CreateCredentialInput{Name: "k", Environment: "test"}
 		var expectedExpiry *time.Time
 		if hasExpiry {
@@ -174,7 +174,7 @@ func TestProperty_Credential_ListReturnsOnlyActive(t *testing.T) {
 				return records, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		keys, err := svc.List(context.Background(), orgID, domain.ListParams{})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -214,7 +214,7 @@ func TestProperty_Credential_SoftDeleteRemovesFromList(t *testing.T) {
 				return &domain.CredentialRecord{ID: k, OrganizationID: o}, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		if err := svc.Revoke(context.Background(), orgID, credID); err != nil {
 			t.Fatalf("unexpected revoke error: %v", err)
 		}
@@ -256,7 +256,7 @@ func TestProperty_Credential_MultiTenantIsolation(t *testing.T) {
 				return domain.ErrCredentialNotFound
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		_, err := svc.GetByID(context.Background(), orgB, credID)
 		if !errors.Is(err, domain.ErrCredentialNotFound) {
 			t.Fatalf("GetByID: expected ErrCredentialNotFound for orgB, got %v", err)
@@ -287,7 +287,7 @@ func TestProperty_Credential_RevokedKeyNotReturned(t *testing.T) {
 				return &domain.CredentialRecord{ID: credID, OrganizationID: orgID}, nil
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		if err := svc.Revoke(context.Background(), orgID, credID); err != nil {
 			t.Fatalf("unexpected revoke error: %v", err)
 		}
@@ -325,7 +325,7 @@ func TestProperty_Credential_CreateGetRoundTrip(t *testing.T) {
 				return nil, domain.ErrCredentialNotFound
 			},
 		}
-		svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+		svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 		inp := domain.CreateCredentialInput{Name: name, Environment: env}
 		var expectedExpiry *time.Time
 		if hasExpiry {
@@ -396,7 +396,7 @@ func TestProperty_Credential_RotationInvariant(t *testing.T) {
 				})
 			},
 		}
-		svc := NewCredentialService(repo, txMgr, "test-pepper")
+		svc := NewCredentialService(repo, nil, txMgr, "test-pepper")
 		newRec, rawKey, err := svc.Rotate(context.Background(), orgID, credID)
 		if err != nil {
 			t.Fatalf("rotate error: %v", err)

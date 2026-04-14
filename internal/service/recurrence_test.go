@@ -313,8 +313,8 @@ func newRecurrenceHarness() *recurrenceTestHarness {
 		},
 	}
 
-	paymentFSMSvc := NewPaymentFSMService(txMgr, fsmRepo)
-	gatewaySvc := NewGatewayService(payments, paymentFSMSvc, gw)
+	paymentSvc := NewPaymentService(payments, txMgr, fsmRepo)
+	gatewaySvc := NewGatewayService(paymentSvc, gw)
 
 	svc := NewRecurrenceService(subs, items, schedules, plans, recRepo, payments, gatewaySvc, txMgr, 4)
 

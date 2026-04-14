@@ -87,8 +87,8 @@ func TestCredentialLogService_List_NextCursorPresent(t *testing.T) {
 		},
 	}
 
-	svc := NewCredentialLogService(repo)
-	records, nextCursor, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{Limit: 2})
+	svc := NewCredentialService(nil, repo, nil, "test-pepper")
+	records, nextCursor, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{Limit: 2})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -113,8 +113,8 @@ func TestCredentialLogService_List_NoNextCursor(t *testing.T) {
 		},
 	}
 
-	svc := NewCredentialLogService(repo)
-	records, nextCursor, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{Limit: 20})
+	svc := NewCredentialService(nil, repo, nil, "test-pepper")
+	records, nextCursor, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{Limit: 20})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,8 +132,8 @@ func TestCredentialLogService_List_Empty(t *testing.T) {
 			return nil, nil
 		},
 	}
-	svc := NewCredentialLogService(repo)
-	records, nextCursor, err := svc.List(context.Background(), uuid.New(), domain.ListCredentialLogsInput{Limit: 20})
+	svc := NewCredentialService(nil, repo, nil, "test-pepper")
+	records, nextCursor, err := svc.ListLogs(context.Background(), uuid.New(), domain.ListCredentialLogsInput{Limit: 20})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -159,8 +159,8 @@ func TestCredentialLogService_List_FilterPassthrough(t *testing.T) {
 		},
 	}
 
-	svc := NewCredentialLogService(repo)
-	_, _, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{
+	svc := NewCredentialService(nil, repo, nil, "test-pepper")
+	_, _, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{
 		Limit:      10,
 		Method:     &method,
 		StatusCode: &sc,
@@ -199,8 +199,8 @@ func TestCredentialLogService_GetByID_Found(t *testing.T) {
 		},
 	}
 
-	svc := NewCredentialLogService(repo)
-	rec, err := svc.GetByID(context.Background(), orgID, logID)
+	svc := NewCredentialService(nil, repo, nil, "test-pepper")
+	rec, err := svc.GetLogByID(context.Background(), orgID, logID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,8 +211,8 @@ func TestCredentialLogService_GetByID_Found(t *testing.T) {
 
 func TestCredentialLogService_GetByID_NotFound(t *testing.T) {
 	repo := &mockCredentialLogRepo{}
-	svc := NewCredentialLogService(repo)
-	_, err := svc.GetByID(context.Background(), uuid.New(), uuid.New())
+	svc := NewCredentialService(nil, repo, nil, "test-pepper")
+	_, err := svc.GetLogByID(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, domain.ErrCredentialLogNotFound) {
 		t.Fatalf("expected ErrCredentialLogNotFound, got %v", err)
 	}

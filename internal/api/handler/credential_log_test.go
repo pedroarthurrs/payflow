@@ -41,9 +41,9 @@ func setupCredentialLogRouter(svc *mockCredentialLogService, orgID string) *gin.
 	gin.SetMode(gin.TestMode)
 
 	repo := &credentialLogRepoAdapter{svc: svc}
-	realSvc := service.NewCredentialLogService(repo)
+	realSvc := service.NewCredentialService(nil, repo, nil, "test-pepper")
 
-	h := NewCredentialHandler(nil, realSvc)
+	h := NewCredentialHandler(realSvc)
 	r := gin.New()
 	r.Use(middleware.Errors())
 	r.Use(withClaimsAndRole(orgID, "admin"))

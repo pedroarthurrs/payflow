@@ -13,6 +13,7 @@ import (
 // CredentialService handles credential business logic.
 type CredentialService struct {
 	repo         domain.CredentialRepository
+	logRepo      domain.CredentialLogRepository
 	txMgr        domain.TxManager
 	keyGenerator *crypto.KeyGenerator
 	hasher       *crypto.Hasher
@@ -20,13 +21,14 @@ type CredentialService struct {
 }
 
 // NewCredentialService creates a CredentialService.
-// Panics if pepper is empty — the application must not start without this security secret.
-func NewCredentialService(repo domain.CredentialRepository, txMgr domain.TxManager, pepper string) *CredentialService {
-	if pepper == "" {
+// Panics if repo is non-nil and pepper is empty — the application must not start without this security secret.
+func NewCredentialService(repo domain.CredentialRepository, logRepo domain.CredentialLogRepository, txMgr domain.TxManager, pepper string) *CredentialService {
+	if repo != nil && pepper == "" {
 		panic("CredentialService: pepper must not be empty")
 	}
 	return &CredentialService{
 		repo:         repo,
+		logRepo:      logRepo,
 		txMgr:        txMgr,
 		keyGenerator: crypto.NewKeyGenerator(),
 		hasher:       crypto.NewHasher(),
@@ -117,4 +119,31 @@ func (s *CredentialService) Rotate(ctx context.Context, orgID, credentialID uuid
 	}
 
 	return newRecord, newRawKey, nil
+}
+
+// ListLogs returns a page of credential log records and an optional next_cursor string.
+// It fetches limit+1 rows to determine whether a next page exists.
+func (s *CredentialService) ListLogs(ctx context.Context, orgID uuid.UUID, input domain.ListCredentialLogsInput) ([]domain.CredentialLogRecord, *string, error) {
+	fetchInput := input
+	fetchInput.Limit = input.Limit + 1
+
+	rows, err := s.logRepo.List(ctx, orgID, fetchInput)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var nextCursor *string
+	if len(rows) > input.Limit {
+		last := rows[input.Limit-1]
+		c := EncodeCursor(last.CreatedAt, last.ID)
+		nextCursor = &c
+		rows = rows[:input.Limit]
+	}
+
+	return rows, nextCursor, nil
+}
+
+// GetLogByID returns a single credential log by ID scoped to an organization.
+func (s *CredentialService) GetLogByID(ctx context.Context, orgID, logID uuid.UUID) (*domain.CredentialLogRecord, error) {
+	return s.logRepo.GetByID(ctx, orgID, logID)
 }

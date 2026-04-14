@@ -23,7 +23,7 @@ func TestCredentialCreate_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	rec, rawKey, err := svc.Create(context.Background(), orgID, domain.CreateCredentialInput{
 		Name: "My Key", Environment: "production",
 	})
@@ -56,7 +56,7 @@ func TestCredentialCreate_TestEnvironment_Prefix(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	_, rawKey, err := svc.Create(context.Background(), orgID, domain.CreateCredentialInput{
 		Name: "Test Key", Environment: "test",
 	})
@@ -78,7 +78,7 @@ func TestCredentialList_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	keys, err := svc.List(context.Background(), orgID, domain.ListParams{Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -95,7 +95,7 @@ func TestCredentialList_Empty(t *testing.T) {
 			return []domain.CredentialRecord{}, nil
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	keys, err := svc.List(context.Background(), orgID, domain.ListParams{Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -116,7 +116,7 @@ func TestCredentialGetByID_Found(t *testing.T) {
 			return nil, domain.ErrCredentialNotFound
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	rec, err := svc.GetByID(context.Background(), orgID, credID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -128,7 +128,7 @@ func TestCredentialGetByID_Found(t *testing.T) {
 
 func TestCredentialGetByID_NotFound(t *testing.T) {
 	repo := &mockCredentialRepo{}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	_, err := svc.GetByID(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, domain.ErrCredentialNotFound) {
 		t.Fatalf("expected ErrCredentialNotFound, got %v", err)
@@ -147,7 +147,7 @@ func TestCredentialRevoke_Success(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	err := svc.Revoke(context.Background(), orgID, credID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -163,7 +163,7 @@ func TestCredentialRevoke_NotFound(t *testing.T) {
 			return domain.ErrCredentialNotFound
 		},
 	}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	err := svc.Revoke(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, domain.ErrCredentialNotFound) {
 		t.Fatalf("expected ErrCredentialNotFound, got %v", err)
@@ -204,7 +204,7 @@ func TestCredentialRotate_Success(t *testing.T) {
 			})
 		},
 	}
-	svc := NewCredentialService(repo, txMgr, "test-pepper")
+	svc := NewCredentialService(repo, nil, txMgr, "test-pepper")
 	newRec, rawKey, err := svc.Rotate(context.Background(), orgID, credID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -229,7 +229,7 @@ func TestCredentialRotate_Success(t *testing.T) {
 
 func TestCredentialRotate_NotFound(t *testing.T) {
 	repo := &mockCredentialRepo{}
-	svc := NewCredentialService(repo, &mockTxManager{}, "test-pepper")
+	svc := NewCredentialService(repo, nil, &mockTxManager{}, "test-pepper")
 	_, _, err := svc.Rotate(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, domain.ErrCredentialNotFound) {
 		t.Fatalf("expected ErrCredentialNotFound, got %v", err)
@@ -242,5 +242,5 @@ func TestNewCredentialService_PanicOnEmptyPepper(t *testing.T) {
 			t.Fatal("expected panic on empty pepper")
 		}
 	}()
-	NewCredentialService(&mockCredentialRepo{}, &mockTxManager{}, "")
+	NewCredentialService(&mockCredentialRepo{}, nil, &mockTxManager{}, "")
 }

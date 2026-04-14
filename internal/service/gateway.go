@@ -13,23 +13,21 @@ import (
 
 // GatewayService orchestrates gateway calls with FSM state transitions.
 type GatewayService struct {
-	payments domain.PaymentRepository
-	fsmSvc   *PaymentFSMService
-	gateway  domain.Gateway
+	paymentSvc *PaymentService
+	gateway    domain.Gateway
 }
 
 // NewGatewayService creates a GatewayService.
-func NewGatewayService(payments domain.PaymentRepository, fsmSvc *PaymentFSMService, gateway domain.Gateway) *GatewayService {
+func NewGatewayService(paymentSvc *PaymentService, gateway domain.Gateway) *GatewayService {
 	return &GatewayService{
-		payments: payments,
-		fsmSvc:   fsmSvc,
-		gateway:  gateway,
+		paymentSvc: paymentSvc,
+		gateway:    gateway,
 	}
 }
 
 // Charge retrieves the payment, calls the gateway, persists the reference, and drives the FSM.
 func (s *GatewayService) Charge(ctx context.Context, orgID, paymentID uuid.UUID, reason string) (*domain.Payment, error) {
-	payment, err := s.payments.GetByID(ctx, orgID, paymentID)
+	payment, err := s.paymentSvc.GetByID(ctx, orgID, paymentID)
 	if err != nil {
 		return nil, err
 	}
@@ -44,11 +42,11 @@ func (s *GatewayService) Charge(ctx context.Context, orgID, paymentID uuid.UUID,
 		if errors.Is(err, domain.ErrGatewayChargeFailed) {
 			// Persist error log; log failure but don't block FSM transition
 			errLog, _ := json.Marshal(map[string]string{"error": err.Error()})
-			if logErr := s.payments.UpdateErrorLog(ctx, orgID, paymentID, errLog); logErr != nil {
+			if logErr := s.paymentSvc.payments.UpdateErrorLog(ctx, orgID, paymentID, errLog); logErr != nil {
 				slog.Error("failed to persist error log after charge failure",
 					"organization_id", orgID, "payment_id", paymentID, "error", logErr)
 			}
-			_ = s.fsmSvc.Transition(ctx, orgID, paymentID, domain.StatusFailed,
+			_ = s.paymentSvc.Transition(ctx, orgID, paymentID, domain.StatusFailed,
 				domain.TransitionEvent{Source: "gateway", Reason: reason})
 			return nil, err
 		}
@@ -57,27 +55,27 @@ func (s *GatewayService) Charge(ctx context.Context, orgID, paymentID uuid.UUID,
 	}
 
 	// Persist gateway reference before FSM transition
-	if err := s.payments.UpdateGatewayReference(ctx, orgID, paymentID, result.GatewayName, result.GatewayReference); err != nil {
+	if err := s.paymentSvc.payments.UpdateGatewayReference(ctx, orgID, paymentID, result.GatewayName, result.GatewayReference); err != nil {
 		return nil, domain.ErrInternal
 	}
 
-	if err := s.fsmSvc.Transition(ctx, orgID, paymentID, result.Status,
+	if err := s.paymentSvc.Transition(ctx, orgID, paymentID, result.Status,
 		domain.TransitionEvent{Source: "gateway", Reason: reason}); err != nil {
 		return nil, err
 	}
 
-	return s.payments.GetByID(ctx, orgID, paymentID)
+	return s.paymentSvc.GetByID(ctx, orgID, paymentID)
 }
 
 // Refund validates the FSM transition, calls the gateway, and drives the FSM to StatusRefunded.
 func (s *GatewayService) Refund(ctx context.Context, orgID, paymentID uuid.UUID, reason string) (*domain.Payment, error) {
-	payment, err := s.payments.GetByID(ctx, orgID, paymentID)
+	payment, err := s.paymentSvc.GetByID(ctx, orgID, paymentID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pre-validate FSM transition without committing
-	allowed := s.fsmSvc.AllowedTransitions(payment.Status)
+	allowed := s.paymentSvc.AllowedTransitions(payment.Status)
 	if !contains(allowed, domain.StatusRefunded) {
 		return nil, &domain.InvalidTransitionError{From: payment.Status, To: domain.StatusRefunded}
 	}
@@ -87,23 +85,23 @@ func (s *GatewayService) Refund(ctx context.Context, orgID, paymentID uuid.UUID,
 		return nil, err
 	}
 
-	if err := s.fsmSvc.Transition(ctx, orgID, paymentID, domain.StatusRefunded,
+	if err := s.paymentSvc.Transition(ctx, orgID, paymentID, domain.StatusRefunded,
 		domain.TransitionEvent{Source: "gateway", Reason: reason}); err != nil {
 		return nil, err
 	}
 
-	return s.payments.GetByID(ctx, orgID, paymentID)
+	return s.paymentSvc.GetByID(ctx, orgID, paymentID)
 }
 
 // Cancel validates the FSM transition, calls the gateway, and drives the FSM to StatusCanceled.
 func (s *GatewayService) Cancel(ctx context.Context, orgID, paymentID uuid.UUID, reason string) (*domain.Payment, error) {
-	payment, err := s.payments.GetByID(ctx, orgID, paymentID)
+	payment, err := s.paymentSvc.GetByID(ctx, orgID, paymentID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pre-validate FSM transition without committing
-	allowed := s.fsmSvc.AllowedTransitions(payment.Status)
+	allowed := s.paymentSvc.AllowedTransitions(payment.Status)
 	if !contains(allowed, domain.StatusCanceled) {
 		return nil, &domain.InvalidTransitionError{From: payment.Status, To: domain.StatusCanceled}
 	}
@@ -113,12 +111,12 @@ func (s *GatewayService) Cancel(ctx context.Context, orgID, paymentID uuid.UUID,
 		return nil, err
 	}
 
-	if err := s.fsmSvc.Transition(ctx, orgID, paymentID, domain.StatusCanceled,
+	if err := s.paymentSvc.Transition(ctx, orgID, paymentID, domain.StatusCanceled,
 		domain.TransitionEvent{Source: "gateway", Reason: reason}); err != nil {
 		return nil, err
 	}
 
-	return s.payments.GetByID(ctx, orgID, paymentID)
+	return s.paymentSvc.GetByID(ctx, orgID, paymentID)
 }
 
 // buildGatewayRequest constructs a GatewayRequest from a domain.Payment.

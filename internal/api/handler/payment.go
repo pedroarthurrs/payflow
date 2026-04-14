@@ -18,13 +18,12 @@ import (
 // PaymentHandler handles payment-related HTTP endpoints.
 type PaymentHandler struct {
 	paymentSvc *service.PaymentService
-	fsmSvc     *service.PaymentFSMService
 	gatewaySvc *service.GatewayService
 }
 
 // NewPaymentHandler creates a PaymentHandler.
-func NewPaymentHandler(paymentSvc *service.PaymentService, fsmSvc *service.PaymentFSMService, gatewaySvc *service.GatewayService) *PaymentHandler {
-	return &PaymentHandler{paymentSvc: paymentSvc, fsmSvc: fsmSvc, gatewaySvc: gatewaySvc}
+func NewPaymentHandler(paymentSvc *service.PaymentService, gatewaySvc *service.GatewayService) *PaymentHandler {
+	return &PaymentHandler{paymentSvc: paymentSvc, gatewaySvc: gatewaySvc}
 }
 
 // RegisterRoutes registers the payment handler routes.
@@ -257,7 +256,7 @@ func (h *PaymentHandler) ListHistory(c *gin.Context) {
 		return
 	}
 
-	history, err := h.fsmSvc.ListHistory(c.Request.Context(), orgID, pid)
+	history, err := h.paymentSvc.ListHistory(c.Request.Context(), orgID, pid)
 	if err != nil {
 		if errors.Is(err, domain.ErrPaymentNotFound) {
 			_ = c.Error(apierr.NotFound("payment not found"))

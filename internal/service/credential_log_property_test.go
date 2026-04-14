@@ -81,7 +81,7 @@ func TestProperty_CredentialLog_PaginationCompleteness(t *testing.T) {
 			},
 		}
 
-		svc := NewCredentialLogService(repo)
+		svc := NewCredentialService(nil, repo, nil, "test-pepper")
 		seen := make(map[uuid.UUID]bool)
 		var cursor *string
 
@@ -95,7 +95,7 @@ func TestProperty_CredentialLog_PaginationCompleteness(t *testing.T) {
 				input.Cursor = ct
 			}
 
-			records, nextCursor, err := svc.List(context.Background(), orgID, input)
+			records, nextCursor, err := svc.ListLogs(context.Background(), orgID, input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -157,8 +157,8 @@ func TestProperty_CredentialLog_FilterStatusCode(t *testing.T) {
 			},
 		}
 
-		svc := NewCredentialLogService(repo)
-		records, _, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{
+		svc := NewCredentialService(nil, repo, nil, "test-pepper")
+		records, _, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{
 			Limit:      100,
 			StatusCode: &targetSC,
 		})
@@ -211,8 +211,8 @@ func TestProperty_CredentialLog_FilterMethod(t *testing.T) {
 			},
 		}
 
-		svc := NewCredentialLogService(repo)
-		records, _, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{
+		svc := NewCredentialService(nil, repo, nil, "test-pepper")
+		records, _, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{
 			Limit:  100,
 			Method: &targetMethod,
 		})
@@ -270,8 +270,8 @@ func TestProperty_CredentialLog_FilterPathPrefix(t *testing.T) {
 			},
 		}
 
-		svc := NewCredentialLogService(repo)
-		records, _, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{
+		svc := NewCredentialService(nil, repo, nil, "test-pepper")
+		records, _, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{
 			Limit:      100,
 			PathPrefix: &prefix,
 		})
@@ -329,8 +329,8 @@ func TestProperty_CredentialLog_FilterDateRange(t *testing.T) {
 			},
 		}
 
-		svc := NewCredentialLogService(repo)
-		records, _, err := svc.List(context.Background(), orgID, domain.ListCredentialLogsInput{
+		svc := NewCredentialService(nil, repo, nil, "test-pepper")
+		records, _, err := svc.ListLogs(context.Background(), orgID, domain.ListCredentialLogsInput{
 			Limit: 100,
 			From:  &from,
 			To:    &to,
@@ -395,10 +395,10 @@ func TestProperty_CredentialLog_TenantIsolation(t *testing.T) {
 			},
 		}
 
-		svc := NewCredentialLogService(repo)
+		svc := NewCredentialService(nil, repo, nil, "test-pepper")
 
 		// orgB list must be empty.
-		records, _, err := svc.List(context.Background(), orgB, domain.ListCredentialLogsInput{Limit: 100})
+		records, _, err := svc.ListLogs(context.Background(), orgB, domain.ListCredentialLogsInput{Limit: 100})
 		if err != nil {
 			t.Fatalf("unexpected list error: %v", err)
 		}
@@ -408,7 +408,7 @@ func TestProperty_CredentialLog_TenantIsolation(t *testing.T) {
 
 		// orgB GetByID for orgA's logs must return not-found.
 		for _, r := range logsA {
-			_, err := svc.GetByID(context.Background(), orgB, r.ID)
+			_, err := svc.GetLogByID(context.Background(), orgB, r.ID)
 			if err != domain.ErrCredentialLogNotFound {
 				t.Fatalf("expected ErrCredentialLogNotFound for orgB accessing orgA log %v, got %v", r.ID, err)
 			}

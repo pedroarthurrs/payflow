@@ -89,14 +89,12 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
 	productSvc := service.NewProductService(productRepo)
 	userSvc := service.NewUserService(userRepo)
-	credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
-	credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
+	credentialSvc := service.NewCredentialService(credentialRepo, credentialLogRepo, txManager, cfg.APIKeyPepper)
 	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
 	webhookScheduler := worker.NewWebhookScheduler(webhookRepo, orgSecretReader, adapters.Queue)
 	_ = webhookScheduler // TODO: inject into handler that triggers webhook events
-	paymentSvc := service.NewPaymentService(paymentRepo)
-	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
-	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, adapters.Gateway)
+	paymentSvc := service.NewPaymentService(paymentRepo, txManager, paymentFSMRepo)
+	gatewaySvc := service.NewGatewayService(paymentSvc, adapters.Gateway)
 	planSvc := service.NewPlanService(planRepo)
 	subscriptionSvc := service.NewSubscriptionService(
 		subscriptionRepo,
@@ -138,9 +136,9 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	addressHandler := handler.NewAddressHandler(addressSvc)
 	productHandler := handler.NewProductHandler(productSvc)
 	userHandler := handler.NewUserHandler(userSvc)
-	credentialHandler := handler.NewCredentialHandler(credentialSvc, credentialLogSvc)
+	credentialHandler := handler.NewCredentialHandler(credentialSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
-	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentFSMSvc, gatewaySvc)
+	paymentHandler := handler.NewPaymentHandler(paymentSvc, gatewaySvc)
 	planHandler := handler.NewPlanHandler(planSvc)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionSvc)
 

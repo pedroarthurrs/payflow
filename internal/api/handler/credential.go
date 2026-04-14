@@ -18,13 +18,12 @@ import (
 
 // CredentialHandler handles credential and credential-log HTTP endpoints.
 type CredentialHandler struct {
-	credentialSvc    *service.CredentialService
-	credentialLogSvc *service.CredentialLogService
+	credentialSvc *service.CredentialService
 }
 
 // NewCredentialHandler creates a CredentialHandler.
-func NewCredentialHandler(credentialSvc *service.CredentialService, credentialLogSvc *service.CredentialLogService) *CredentialHandler {
-	return &CredentialHandler{credentialSvc: credentialSvc, credentialLogSvc: credentialLogSvc}
+func NewCredentialHandler(credentialSvc *service.CredentialService) *CredentialHandler {
+	return &CredentialHandler{credentialSvc: credentialSvc}
 }
 
 // RegisterRoutes registers the credential and credential-log routes.
@@ -288,7 +287,7 @@ func (h *CredentialHandler) ListLogs(c *gin.Context) {
 		PathPrefix: dto.ParseString(c, "path"),
 	}
 
-	records, nextCursor, err := h.credentialLogSvc.List(c.Request.Context(), orgID, input)
+	records, nextCursor, err := h.credentialSvc.ListLogs(c.Request.Context(), orgID, input)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -317,7 +316,7 @@ func (h *CredentialHandler) GetLogByID(c *gin.Context) {
 		return
 	}
 
-	record, err := h.credentialLogSvc.GetByID(c.Request.Context(), orgID, logID)
+	record, err := h.credentialSvc.GetLogByID(c.Request.Context(), orgID, logID)
 	if err != nil {
 		if errors.Is(err, domain.ErrCredentialLogNotFound) {
 			_ = c.Error(apierr.NotFound("credential log not found"))
