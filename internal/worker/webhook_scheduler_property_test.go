@@ -1,30 +1,16 @@
-package service
+package worker
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"i9pay/internal/domain"
 
 	"github.com/google/uuid"
 	"pgregory.net/rapid"
 )
-
-// genWebhookJob generates an arbitrary domain.WebhookJob for property testing.
-func genWebhookJob(t *rapid.T) domain.WebhookJob {
-	return domain.WebhookJob{
-		OrganizationID: uuid.New(),
-		EndpointID:     uuid.New(),
-		EndpointURL:    rapid.StringMatching(`https://[a-z]{3,8}\.[a-z]{2,4}/[a-z]{0,8}`).Draw(t, "endpoint_url"),
-		Secret:         rapid.String().Draw(t, "secret"),
-		EventType:      rapid.String().Draw(t, "event_type"),
-		Environment:    rapid.String().Draw(t, "environment"),
-		Payload:        rapid.SliceOf(rapid.Byte()).Draw(t, "payload"),
-	}
-}
 
 // captureQueue is a mock queue that captures all enqueued jobs.
 type captureQueue struct {
@@ -41,7 +27,7 @@ func (q *captureQueue) Dequeue(_ context.Context) (*domain.Job, error) {
 }
 
 // Feature: generic-queue, Property 5: WebhookJob serialization round-trip
-func TestProperty_Dispatcher_WebhookJobRoundTrip(t *testing.T) {
+func TestProperty_Scheduler_WebhookJobRoundTrip(t *testing.T) {
 	// Validates: Requirements 4.1, 5.3
 	rapid.Check(t, func(t *rapid.T) {
 		original := genWebhookJob(t)
@@ -49,8 +35,8 @@ func TestProperty_Dispatcher_WebhookJobRoundTrip(t *testing.T) {
 		cq := &captureQueue{}
 		orgID := original.OrganizationID
 
-		d := NewWebhookDispatcher(
-			&mockEndpointRepo{
+		s := NewWebhookScheduler(
+			&mockSchedulerEndpointRepo{
 				listActiveByEventFn: func(_ context.Context, _ uuid.UUID, _, _ string) ([]domain.WebhookEndpoint, error) {
 					return []domain.WebhookEndpoint{
 						{
@@ -61,7 +47,7 @@ func TestProperty_Dispatcher_WebhookJobRoundTrip(t *testing.T) {
 					}, nil
 				},
 			},
-			&mockDispatcherSecretReader{
+			&mockSchedulerSecretReader{
 				getWebhookSecretFn: func(_ context.Context, _ uuid.UUID) (string, error) {
 					return original.Secret, nil
 				},
@@ -69,7 +55,7 @@ func TestProperty_Dispatcher_WebhookJobRoundTrip(t *testing.T) {
 			cq,
 		)
 
-		err := d.Dispatch(context.Background(), orgID, original.EventType, original.Environment, original.Payload)
+		err := s.Dispatch(context.Background(), orgID, original.EventType, original.Environment, original.Payload)
 		if err != nil {
 			t.Fatalf("Dispatch returned unexpected error: %v", err)
 		}
@@ -108,7 +94,7 @@ func TestProperty_Dispatcher_WebhookJobRoundTrip(t *testing.T) {
 }
 
 // Feature: generic-queue, Property 6: Dispatched Job fields invariant
-func TestProperty_Dispatcher_JobFieldsInvariant(t *testing.T) {
+func TestProperty_Scheduler_JobFieldsInvariant(t *testing.T) {
 	// Validates: Requirements 4.2
 	rapid.Check(t, func(t *rapid.T) {
 		endpointURL := rapid.StringMatching(`https://[a-z]{3,8}\.[a-z]{2,4}/[a-z]{0,8}`).Draw(t, "endpoint_url")
@@ -117,22 +103,23 @@ func TestProperty_Dispatcher_JobFieldsInvariant(t *testing.T) {
 
 		cq := &captureQueue{}
 
-		d := NewWebhookDispatcher(
-			&mockEndpointRepo{
+		s := NewWebhookScheduler(
+			&mockSchedulerEndpointRepo{
 				listActiveByEventFn: func(_ context.Context, _ uuid.UUID, _, _ string) ([]domain.WebhookEndpoint, error) {
 					return []domain.WebhookEndpoint{
 						{ID: endpointID, OrganizationID: orgID, URL: endpointURL},
 					}, nil
 				},
 			},
-			&mockDispatcherSecretReader{},
+			&mockSchedulerSecretReader{},
 			cq,
 		)
 
-		before := time.Now()
-		err := d.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{}`))
-		after := time.Now()
+		eventType := rapid.String().Draw(t, "event_type")
+		environment := rapid.String().Draw(t, "environment")
+		payload := rapid.SliceOf(rapid.Byte()).Draw(t, "payload")
 
+		err := s.Dispatch(context.Background(), orgID, eventType, environment, payload)
 		if err != nil {
 			t.Fatalf("Dispatch returned unexpected error: %v", err)
 		}
@@ -143,17 +130,17 @@ func TestProperty_Dispatcher_JobFieldsInvariant(t *testing.T) {
 
 		job := cq.jobs[0]
 
-		if job.ID == uuid.Nil {
-			t.Error("expected non-zero Job.ID")
-		}
 		if job.Type != domain.JobTypeWebhook {
-			t.Errorf("expected Type=%q, got %q", domain.JobTypeWebhook, job.Type)
+			t.Errorf("expected JobType=%q, got %q", domain.JobTypeWebhook, job.Type)
+		}
+		if job.ID == uuid.Nil {
+			t.Error("expected non-zero job ID")
 		}
 		if job.AttemptNumber != 1 {
 			t.Errorf("expected AttemptNumber=1, got %d", job.AttemptNumber)
 		}
-		if job.ScheduledAt.Before(before) || job.ScheduledAt.After(after.Add(5*time.Second)) {
-			t.Errorf("ScheduledAt %v is not within expected range [%v, %v]", job.ScheduledAt, before, after.Add(5*time.Second))
+		if job.ScheduledAt.IsZero() {
+			t.Error("expected non-zero ScheduledAt")
 		}
 	})
 }

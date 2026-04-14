@@ -1,4 +1,4 @@
-package service
+package worker
 
 import (
 	"context"
@@ -12,48 +12,48 @@ import (
 	"github.com/google/uuid"
 )
 
-// ── mock repos for dispatcher tests ───────────────────────────────────────────
+// ── mock repos for scheduler tests ────────────────────────────────────────────
 
-type mockEndpointRepo struct {
+type mockSchedulerEndpointRepo struct {
 	listActiveByEventFn func(ctx context.Context, orgID uuid.UUID, eventType string, env string) ([]domain.WebhookEndpoint, error)
 }
 
-var _ domain.WebhookEndpointRepository = (*mockEndpointRepo)(nil)
+var _ domain.WebhookEndpointRepository = (*mockSchedulerEndpointRepo)(nil)
 
-func (m *mockEndpointRepo) Create(_ context.Context, _ uuid.UUID, _ domain.CreateWebhookEndpointInput) (*domain.WebhookEndpoint, error) {
+func (m *mockSchedulerEndpointRepo) Create(_ context.Context, _ uuid.UUID, _ domain.CreateWebhookEndpointInput) (*domain.WebhookEndpoint, error) {
 	return nil, nil
 }
-func (m *mockEndpointRepo) GetByID(_ context.Context, _, _ uuid.UUID) (*domain.WebhookEndpoint, error) {
+func (m *mockSchedulerEndpointRepo) GetByID(_ context.Context, _, _ uuid.UUID) (*domain.WebhookEndpoint, error) {
 	return nil, nil
 }
-func (m *mockEndpointRepo) List(_ context.Context, _ uuid.UUID, _ domain.ListParams) ([]domain.WebhookEndpoint, error) {
+func (m *mockSchedulerEndpointRepo) List(_ context.Context, _ uuid.UUID, _ domain.ListParams) ([]domain.WebhookEndpoint, error) {
 	return nil, nil
 }
-func (m *mockEndpointRepo) Update(_ context.Context, _, _ uuid.UUID, _ domain.UpdateWebhookEndpointInput) (*domain.WebhookEndpoint, error) {
+func (m *mockSchedulerEndpointRepo) Update(_ context.Context, _, _ uuid.UUID, _ domain.UpdateWebhookEndpointInput) (*domain.WebhookEndpoint, error) {
 	return nil, nil
 }
-func (m *mockEndpointRepo) SoftDelete(_ context.Context, _, _ uuid.UUID) error { return nil }
-func (m *mockEndpointRepo) ListActiveByEvent(ctx context.Context, orgID uuid.UUID, eventType, env string) ([]domain.WebhookEndpoint, error) {
+func (m *mockSchedulerEndpointRepo) SoftDelete(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (m *mockSchedulerEndpointRepo) ListActiveByEvent(ctx context.Context, orgID uuid.UUID, eventType, env string) ([]domain.WebhookEndpoint, error) {
 	if m.listActiveByEventFn != nil {
 		return m.listActiveByEventFn(ctx, orgID, eventType, env)
 	}
 	return nil, nil
 }
 
-type mockDispatcherSecretReader struct {
+type mockSchedulerSecretReader struct {
 	getWebhookSecretFn func(ctx context.Context, orgID uuid.UUID) (string, error)
 }
 
-var _ domain.OrganizationSecretReader = (*mockDispatcherSecretReader)(nil)
+var _ domain.OrganizationSecretReader = (*mockSchedulerSecretReader)(nil)
 
-func (m *mockDispatcherSecretReader) GetWebhookSecret(ctx context.Context, orgID uuid.UUID) (string, error) {
+func (m *mockSchedulerSecretReader) GetWebhookSecret(ctx context.Context, orgID uuid.UUID) (string, error) {
 	if m.getWebhookSecretFn != nil {
 		return m.getWebhookSecretFn(ctx, orgID)
 	}
 	return "test-secret", nil
 }
 
-type mockQueue struct {
+type mockWebhookSchedulerQueue struct {
 	mu        sync.Mutex
 	enqueueFn func(ctx context.Context, job domain.Job) error
 	dequeueFn func(ctx context.Context) (*domain.Job, error)
@@ -61,9 +61,9 @@ type mockQueue struct {
 	calls     int
 }
 
-var _ domain.Queue = (*mockQueue)(nil)
+var _ domain.Queue = (*mockWebhookSchedulerQueue)(nil)
 
-func (m *mockQueue) Enqueue(ctx context.Context, job domain.Job) error {
+func (m *mockWebhookSchedulerQueue) Enqueue(ctx context.Context, job domain.Job) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
@@ -78,50 +78,50 @@ func (m *mockQueue) Enqueue(ctx context.Context, job domain.Job) error {
 	return nil
 }
 
-func (m *mockQueue) Dequeue(ctx context.Context) (*domain.Job, error) {
+func (m *mockWebhookSchedulerQueue) Dequeue(ctx context.Context) (*domain.Job, error) {
 	if m.dequeueFn != nil {
 		return m.dequeueFn(ctx)
 	}
 	return nil, errors.New("not implemented")
 }
 
-// ── Task 11.1: NewWebhookDispatcher construction ─────────────────────────────
+// ── Task 11.1: NewWebhookScheduler construction ───────────────────────────────
 
-func TestNewWebhookDispatcher_Construction(t *testing.T) {
-	repo := &mockEndpointRepo{}
-	secret := &mockDispatcherSecretReader{}
-	q := &mockQueue{}
+func TestNewWebhookScheduler_Construction(t *testing.T) {
+	repo := &mockSchedulerEndpointRepo{}
+	secret := &mockSchedulerSecretReader{}
+	q := &mockWebhookSchedulerQueue{}
 
-	d := NewWebhookDispatcher(repo, secret, q)
+	s := NewWebhookScheduler(repo, secret, q)
 
-	if d == nil {
-		t.Fatal("expected non-nil dispatcher")
+	if s == nil {
+		t.Fatal("expected non-nil scheduler")
 		return
 	}
-	if d.endpointRepo == nil {
+	if s.endpointRepo == nil {
 		t.Fatal("expected endpointRepo to be set")
 	}
-	if d.secretReader == nil {
+	if s.secretReader == nil {
 		t.Fatal("expected secretReader to be set")
 	}
-	if d.queue == nil {
+	if s.queue == nil {
 		t.Fatal("expected queue to be set")
 	}
 }
 
 // ── Task 11.2: Dispatch with zero active endpoints enqueues no jobs ──────────
 
-func TestDispatch_ZeroEndpoints_NoJobsEnqueued(t *testing.T) {
+func TestWebhookScheduler_Dispatch_ZeroEndpoints_NoJobsEnqueued(t *testing.T) {
 	orgID := uuid.New()
-	q := &mockQueue{}
+	q := &mockWebhookSchedulerQueue{}
 
-	d := NewWebhookDispatcher(
-		&mockEndpointRepo{
+	s := NewWebhookScheduler(
+		&mockSchedulerEndpointRepo{
 			listActiveByEventFn: func(_ context.Context, _ uuid.UUID, _, _ string) ([]domain.WebhookEndpoint, error) {
 				return []domain.WebhookEndpoint{}, nil
 			},
 		},
-		&mockDispatcherSecretReader{
+		&mockSchedulerSecretReader{
 			getWebhookSecretFn: func(_ context.Context, _ uuid.UUID) (string, error) {
 				return "valid-secret", nil
 			},
@@ -129,7 +129,7 @@ func TestDispatch_ZeroEndpoints_NoJobsEnqueued(t *testing.T) {
 		q,
 	)
 
-	err := d.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{"id":"1"}`))
+	err := s.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{"id":"1"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestDispatch_ZeroEndpoints_NoJobsEnqueued(t *testing.T) {
 
 // ── Task 11.3: Dispatch with N endpoints enqueues exactly N jobs ─────────────
 
-func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
+func TestWebhookScheduler_Dispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 	orgID := uuid.New()
 	endpoints := []domain.WebhookEndpoint{
 		{ID: uuid.New(), OrganizationID: orgID, URL: "https://example.com/hook1"},
@@ -151,15 +151,15 @@ func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 		{ID: uuid.New(), OrganizationID: orgID, URL: "https://example.com/hook3"},
 	}
 
-	q := &mockQueue{}
+	q := &mockWebhookSchedulerQueue{}
 
-	d := NewWebhookDispatcher(
-		&mockEndpointRepo{
+	s := NewWebhookScheduler(
+		&mockSchedulerEndpointRepo{
 			listActiveByEventFn: func(_ context.Context, _ uuid.UUID, _, _ string) ([]domain.WebhookEndpoint, error) {
 				return endpoints, nil
 			},
 		},
-		&mockDispatcherSecretReader{
+		&mockSchedulerSecretReader{
 			getWebhookSecretFn: func(_ context.Context, _ uuid.UUID) (string, error) {
 				return "test-secret", nil
 			},
@@ -167,7 +167,7 @@ func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 		q,
 	)
 
-	err := d.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{"id":"1"}`))
+	err := s.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{"id":"1"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,7 +180,6 @@ func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 	}
 
 	for i, job := range q.jobs {
-		// Verify domain.Job fields
 		if job.Type != domain.JobTypeWebhook {
 			t.Errorf("job[%d]: expected Type=%q, got %q", i, domain.JobTypeWebhook, job.Type)
 		}
@@ -191,7 +190,6 @@ func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 			t.Errorf("job[%d]: expected non-zero ID", i)
 		}
 
-		// Verify payload is valid JSON that unmarshals back to WebhookJob
 		var wj domain.WebhookJob
 		if err := json.Unmarshal(job.Payload, &wj); err != nil {
 			t.Errorf("job[%d]: payload is not valid WebhookJob JSON: %v", i, err)
@@ -211,7 +209,7 @@ func TestDispatch_NEndpoints_EnqueuesNJobs(t *testing.T) {
 
 // ── Task 11.4: Dispatch continues enqueuing when Enqueue fails for a subset ──
 
-func TestDispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
+func TestWebhookScheduler_Dispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
 	orgID := uuid.New()
 	endpoints := []domain.WebhookEndpoint{
 		{ID: uuid.New(), OrganizationID: orgID, URL: "https://example.com/hook1"},
@@ -220,7 +218,7 @@ func TestDispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
 	}
 
 	callCount := 0
-	q := &mockQueue{
+	q := &mockWebhookSchedulerQueue{
 		enqueueFn: func(_ context.Context, _ domain.Job) error {
 			callCount++
 			if callCount == 2 {
@@ -230,13 +228,13 @@ func TestDispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
 		},
 	}
 
-	d := NewWebhookDispatcher(
-		&mockEndpointRepo{
+	s := NewWebhookScheduler(
+		&mockSchedulerEndpointRepo{
 			listActiveByEventFn: func(_ context.Context, _ uuid.UUID, _, _ string) ([]domain.WebhookEndpoint, error) {
 				return endpoints, nil
 			},
 		},
-		&mockDispatcherSecretReader{
+		&mockSchedulerSecretReader{
 			getWebhookSecretFn: func(_ context.Context, _ uuid.UUID) (string, error) {
 				return "test-secret", nil
 			},
@@ -244,7 +242,7 @@ func TestDispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
 		q,
 	)
 
-	err := d.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{"id":"1"}`))
+	err := s.Dispatch(context.Background(), orgID, "customer.created", "production", []byte(`{"id":"1"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -256,8 +254,3 @@ func TestDispatch_EnqueuePartialFailure_ContinuesAll(t *testing.T) {
 		t.Fatalf("expected 3 enqueue attempts, got %d", q.calls)
 	}
 }
-
-// ── Task 11.5: No-op — old deliver/deliverWithRetry/sign tests removed ───────
-// The methods deliver, deliverWithRetry, and sign have been moved to WebhookWorker.
-// There were no pre-existing tests for these methods in the new dispatcher;
-// the old tests that referenced them have been removed as part of this refactor.

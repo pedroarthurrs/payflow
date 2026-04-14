@@ -1,4 +1,4 @@
-package service
+package worker
 
 import (
 	"context"
@@ -11,20 +11,22 @@ import (
 	"github.com/google/uuid"
 )
 
-// WebhookDispatcher handles asynchronous webhook delivery by enqueuing jobs to a Queue.
-type WebhookDispatcher struct {
+// WebhookScheduler enqueues webhook delivery jobs when domain events occur.
+// It resolves the active endpoints for an event and places a WebhookJob into
+// the queue for each one, leaving delivery to WebhookWorker.
+type WebhookScheduler struct {
 	endpointRepo domain.WebhookEndpointRepository
 	secretReader domain.OrganizationSecretReader
 	queue        domain.Queue
 }
 
-// NewWebhookDispatcher creates a WebhookDispatcher.
-func NewWebhookDispatcher(
+// NewWebhookScheduler creates a WebhookScheduler.
+func NewWebhookScheduler(
 	endpointRepo domain.WebhookEndpointRepository,
 	secretReader domain.OrganizationSecretReader,
 	q domain.Queue,
-) *WebhookDispatcher {
-	return &WebhookDispatcher{
+) *WebhookScheduler {
+	return &WebhookScheduler{
 		endpointRepo: endpointRepo,
 		secretReader: secretReader,
 		queue:        q,
@@ -33,14 +35,14 @@ func NewWebhookDispatcher(
 
 // Dispatch finds all active endpoints matching the event and environment, then enqueues
 // a WebhookJob for each one. Enqueue failures are logged and do not stop processing.
-func (d *WebhookDispatcher) Dispatch(ctx context.Context, orgID uuid.UUID, eventType, environment string, payload []byte) error {
-	secret, err := d.secretReader.GetWebhookSecret(ctx, orgID)
+func (s *WebhookScheduler) Dispatch(ctx context.Context, orgID uuid.UUID, eventType, environment string, payload []byte) error {
+	secret, err := s.secretReader.GetWebhookSecret(ctx, orgID)
 	if err != nil {
 		slog.Error("failed to get webhook secret", "organization_id", orgID, "error", err)
 		return err
 	}
 
-	endpoints, err := d.endpointRepo.ListActiveByEvent(ctx, orgID, eventType, environment)
+	endpoints, err := s.endpointRepo.ListActiveByEvent(ctx, orgID, eventType, environment)
 	if err != nil {
 		slog.Error("failed to list active endpoints", "organization_id", orgID, "event_type", eventType, "error", err)
 		return err
@@ -68,7 +70,7 @@ func (d *WebhookDispatcher) Dispatch(ctx context.Context, orgID uuid.UUID, event
 			ScheduledAt:   time.Now(),
 			AttemptNumber: 1,
 		}
-		if err := d.queue.Enqueue(ctx, job); err != nil {
+		if err := s.queue.Enqueue(ctx, job); err != nil {
 			slog.Error("failed to enqueue webhook job", "endpoint_id", endpoints[i].ID, "error", err)
 			continue
 		}

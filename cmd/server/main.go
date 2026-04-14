@@ -47,13 +47,13 @@ func setupDatabase(cfg *config.Config, logger *slog.Logger) (*database.DB, *data
 }
 
 func setupInfrastructure(cfg *config.Config, logger *slog.Logger) (jobQueue, recurrenceQueue domain.Queue, paymentGateway domain.Gateway, featureFlags config.FlagProvider) {
-	jobQueue = queue.New("memory", cfg.WebhookQueueBufferSize)
+	jobQueue = queue.New("memory", config.WebhookQueueBufferSize)
 	if jobQueue == nil {
 		logger.Error("failed to initialize job queue")
 		os.Exit(1)
 	}
 
-	recurrenceQueue = queue.New("memory", cfg.RecurrenceQueueBufferSize)
+	recurrenceQueue = queue.New("memory", config.RecurrenceQueueBufferSize)
 	if recurrenceQueue == nil {
 		logger.Error("failed to initialize recurrence queue")
 		os.Exit(1)
@@ -72,9 +72,9 @@ func setupInfrastructure(cfg *config.Config, logger *slog.Logger) (jobQueue, rec
 	return
 }
 
-func startWorkers(ctx context.Context, db *database.DB, jobQueue domain.Queue, cfg *config.Config) {
+func startWorkers(ctx context.Context, db *database.DB, jobQueue domain.Queue) {
 	webhookLogRepo := repository.NewWebhookLogRepo(db.WebhookLogQ)
-	webhookWorker := worker.NewWebhookWorker(jobQueue, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, cfg.WebhookWorkerCount)
+	webhookWorker := worker.NewWebhookWorker(jobQueue, webhookLogRepo, &http.Client{Timeout: 30 * time.Second}, config.WebhookWorkerCount)
 	go webhookWorker.Start(ctx)
 
 	cleanupRepo := repository.NewCleanupRepo(db.CredentialLogQ, db.WebhookLogQ, db.IdempotencyQ)
@@ -111,7 +111,7 @@ func run() error {
 
 	jobQueue, recurrenceQueue, paymentGateway, featureFlags := setupInfrastructure(cfg, logger)
 
-	startWorkers(ctx, db, jobQueue, cfg)
+	startWorkers(ctx, db, jobQueue)
 
 	r := router.NewRouter(cfg, logger, router.Adapters{
 		DB:              db,

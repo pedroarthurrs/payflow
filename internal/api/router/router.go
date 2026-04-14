@@ -57,9 +57,9 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	r.Use(middleware.Errors())
 
 	// Rate limiter windows
-	ipWindow := time.Duration(cfg.RateLimitWindowSeconds) * time.Second
-	loginWindow := time.Duration(cfg.RateLimitLoginWindowSeconds) * time.Second
-	organizationWindow := time.Duration(cfg.RateLimitOrganizationWindowSeconds) * time.Second
+	ipWindow := config.RateLimitWindow
+	loginWindow := config.RateLimitLoginWindow
+	organizationWindow := config.RateLimitOrganizationWindow
 
 	// Repositories
 	customerRepo := repository.NewCustomerRepo(adapters.DB.CustomerQ)
@@ -92,8 +92,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	credentialSvc := service.NewCredentialService(credentialRepo, txManager, cfg.APIKeyPepper)
 	credentialLogSvc := service.NewCredentialLogService(credentialLogRepo)
 	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
-	dispatcher := service.NewWebhookDispatcher(webhookRepo, orgSecretReader, adapters.Queue)
-	_ = dispatcher // TODO: inject into handler that triggers webhook events
+	webhookScheduler := worker.NewWebhookScheduler(webhookRepo, orgSecretReader, adapters.Queue)
+	_ = webhookScheduler // TODO: inject into handler that triggers webhook events
 	paymentSvc := service.NewPaymentService(paymentRepo)
 	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
 	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, adapters.Gateway)
@@ -119,15 +119,15 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 		paymentRepo,
 		gatewaySvc,
 		txManager,
-		cfg.RecurrenceMaxAttempts,
+		config.RecurrenceMaxAttempts,
 	)
-	recurrenceWorker := worker.NewRecurrenceWorker(adapters.RecurrenceQueue, recurrenceSvc, cfg.RecurrenceWorkerCount, cfg.RecurrenceMaxAttempts)
-	recurrenceScheduler := worker.NewRecurrenceScheduler(recurrenceRepo, adapters.RecurrenceQueue, cfg.RecurrenceBatchSize, cfg.RecurrenceScanCron)
+	recurrenceWorker := worker.NewRecurrenceWorker(adapters.RecurrenceQueue, recurrenceSvc, config.RecurrenceWorkerCount, config.RecurrenceMaxAttempts)
+	recurrenceScheduler := worker.NewRecurrenceScheduler(recurrenceRepo, adapters.RecurrenceQueue, config.RecurrenceBatchSize, config.RecurrenceScanCron)
 	go recurrenceWorker.Start(adapters.Context)
 	go recurrenceScheduler.Start(adapters.Context)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
-	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
+	loginRL := middleware.RateLimitByIP(loginStore, config.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
 
 	// Handlers
 	rootHandler := handler.NewRootHandler()
@@ -149,7 +149,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 
 	// Grupo de versão /v1
 	v1 := r.Group("/v1")
-	v1.Use(middleware.RateLimitByIP(ipStore, cfg.RateLimitMaxRequests, ipWindow, "too many requests, try again later"))
+	v1.Use(middleware.RateLimitByIP(ipStore, config.RateLimitMaxRequests, ipWindow, "too many requests, try again later"))
 
 	// Rotas públicas
 	healthHandler.RegisterRoutes(v1)
@@ -160,7 +160,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	protected.Use(middleware.Auth(tokenSvc))
 	protected.Use(middleware.Idempotency(idempotencyRepo))
 	protected.Use(middleware.CredentialLog(credentialLogRepo))
-	protected.Use(middleware.RateLimitByOrganization(organizationStore, cfg.RateLimitOrganizationMaxRequests, organizationWindow))
+	protected.Use(middleware.RateLimitByOrganization(organizationStore, config.RateLimitOrganizationMaxRequests, organizationWindow))
 
 	meHandler.RegisterRoutes(protected)
 	customerHandler.RegisterRoutes(protected)
