@@ -84,3 +84,13 @@ func PaymentID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// PlanID parses the ":plan_id" path parameter as a UUID.
+func PlanID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("plan_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid plan id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}

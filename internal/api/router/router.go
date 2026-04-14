@@ -72,6 +72,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	paymentRepo := repository.NewPaymentRepo(adapters.DB.PaymentQ)
 	paymentFSMRepo := repository.NewPaymentFSMRepo(adapters.DB.PaymentQ)
 	txManager := repository.NewTxManager(adapters.DB)
+	planRepo := repository.NewPlanRepo(adapters.DB.PlanQ)
 
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
@@ -88,6 +89,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	paymentSvc := service.NewPaymentService(paymentRepo)
 	paymentFSMSvc := service.NewPaymentFSMService(txManager, paymentFSMRepo)
 	gatewaySvc := service.NewGatewayService(paymentRepo, paymentFSMSvc, adapters.Gateway)
+	planSvc := service.NewPlanService(planRepo)
 
 	// Middleware de login rate limiting (injetado no AuthHandler)
 	loginRL := middleware.RateLimitByIP(loginStore, cfg.RateLimitLoginMaxRequests, loginWindow, "too many login attempts, try again later")
@@ -104,6 +106,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	credentialHandler := handler.NewCredentialHandler(credentialSvc, credentialLogSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, paymentFSMSvc, gatewaySvc)
+	planHandler := handler.NewPlanHandler(planSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -131,6 +134,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	credentialHandler.RegisterRoutes(protected)
 	webhookHandler.RegisterRoutes(protected)
 	paymentHandler.RegisterRoutes(protected)
+	planHandler.RegisterRoutes(protected)
 
 	// SPA: serve o frontend embutido para todas as rotas não mapeadas pela API.
 	r.NoRoute(SPAHandler())
