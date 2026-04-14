@@ -568,7 +568,7 @@ Atualiza um produto. Todos os campos obrigatórios devem ser enviados.
 
 ### DELETE /v1/products/:product_id
 
-Remove um produto (soft delete).
+Remove um produto (soft delete). Para remoção permanente use `?hard=true`.
 
 **Resposta (204 No Content):** sem body.
 
@@ -577,6 +577,349 @@ Remove um produto (soft delete).
 {
   "error": "product not found"
 }
+```
+
+---
+
+### POST /v1/products/:product_id/plans
+
+Cria um plano de preço vinculado a um produto. Requer role `admin` ou superior.
+
+**Requisição:**
+```json
+{
+  "name": "Pro Mensal",
+  "amount_cents": 4900,
+  "currency": "BRL",
+  "interval": "month",
+  "interval_count": 1,
+  "active": true
+}
+```
+
+`interval` deve ser um de: `day`, `week`, `month`, `year`. `slug` é opcional.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440050",
+  "product_id": "550e8400-e29b-41d4-a716-446655440020",
+  "name": "Pro Mensal",
+  "amount_cents": 4900,
+  "currency": "BRL",
+  "interval": "month",
+  "interval_count": 1,
+  "active": true,
+  "version": 1,
+  "created_at": "2026-04-13T10:00:00Z",
+  "updated_at": "2026-04-13T10:00:00Z"
+}
+```
+
+---
+
+### GET /v1/products/:product_id/plans
+
+Lista os planos de um produto.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Padrão: 20, máximo: 100 |
+| `offset` | int | Padrão: 0 |
+| `active` | bool | Filtra por `active=true` ou `active=false` |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440050",
+      "product_id": "550e8400-e29b-41d4-a716-446655440020",
+      "name": "Pro Mensal",
+      "amount_cents": 4900,
+      "currency": "BRL",
+      "interval": "month",
+      "interval_count": 1,
+      "active": true,
+      "version": 1,
+      "created_at": "2026-04-13T10:00:00Z",
+      "updated_at": "2026-04-13T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### GET /v1/products/:product_id/plans/:plan_id
+
+Retorna um plano pelo ID.
+
+**Resposta (200 OK):** mesmo formato de um item da listagem acima.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "plan not found" }
+```
+
+---
+
+### PUT /v1/products/:product_id/plans/:plan_id
+
+Atualiza um plano. Requer role `admin` ou superior. Alterações em `amount_cents`, `interval` ou `interval_count` incrementam `version` automaticamente.
+
+**Requisição:** mesmo formato do `POST /v1/products/:product_id/plans`.
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/products/:product_id/plans/:plan_id`.
+
+---
+
+### DELETE /v1/products/:product_id/plans/:plan_id
+
+Soft delete do plano. Para remoção permanente use `?hard=true`. Requer role `admin`.
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (409 Conflict)** — hard delete com assinaturas ativas:
+```json
+{ "error": "plan is referenced by active subscriptions" }
+```
+
+---
+
+### POST /v1/subscriptions
+
+Cria uma nova assinatura para um cliente.
+
+**Requisição:**
+```json
+{
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "trial_end": "2026-04-20T00:00:00Z",
+  "metadata": { "source": "checkout" },
+  "items": [
+    { "plan_id": "550e8400-e29b-41d4-a716-446655440050", "quantity": 1 }
+  ]
+}
+```
+
+`trial_end` é opcional. Se fornecido e no futuro, o status inicial é `trialing`; caso contrário, `incomplete`.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440060",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "status": "trialing",
+  "current_period_start": "2026-04-13T00:00:00Z",
+  "current_period_end": "2026-05-13T00:00:00Z",
+  "cancel_at_period_end": false,
+  "metadata": { "source": "checkout" },
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440061",
+      "plan_id": "550e8400-e29b-41d4-a716-446655440050",
+      "quantity": 1,
+      "created_at": "2026-04-13T10:00:00Z"
+    }
+  ],
+  "created_at": "2026-04-13T10:00:00Z",
+  "updated_at": "2026-04-13T10:00:00Z"
+}
+```
+
+---
+
+### GET /v1/subscriptions
+
+Lista assinaturas da organization.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Padrão: 20, máximo: 100 |
+| `offset` | int | Padrão: 0 |
+| `customer_id` | UUID | Filtra por cliente |
+| `status` | string (repetível) | `?status=active&status=past_due` |
+| `from` | RFC3339 | Início do intervalo de criação |
+| `to` | RFC3339 | Fim do intervalo de criação |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [ /* array de subscriptions */ ],
+  "limit": 20,
+  "offset": 0,
+  "total": 5
+}
+```
+
+---
+
+### GET /v1/subscriptions/:subscription_id
+
+Retorna uma assinatura pelo ID, com seus itens.
+
+**Resposta (200 OK):** mesmo formato da resposta do `POST /v1/subscriptions`.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "subscription not found" }
+```
+
+---
+
+### POST /v1/subscriptions/:subscription_id/cancel
+
+Cancela uma assinatura. Requer role `member` ou superior.
+
+**Requisição:**
+```json
+{
+  "reason": "customer request",
+  "cancel_at_period_end": false
+}
+```
+
+Se `cancel_at_period_end = true`, a assinatura permanece `active` até o fim do período antes de ser cancelada.
+
+**Resposta (200 OK):** subscription atualizada.
+
+**Resposta (422 Unprocessable Entity)** — já cancelada:
+```json
+{ "error": "subscription is already canceled" }
+```
+
+---
+
+### POST /v1/subscriptions/:subscription_id/pause
+
+Pausa uma assinatura ativa. Requer role `member` ou superior.
+
+**Requisição (opcional):**
+```json
+{ "reason": "customer request" }
+```
+
+**Resposta (200 OK):** subscription com `status: "paused"`.
+
+**Resposta (409 Conflict)** — transição inválida pela FSM:
+```json
+{ "error": "invalid subscription status transition: active → paused" }
+```
+
+---
+
+### POST /v1/subscriptions/:subscription_id/resume
+
+Retoma uma assinatura pausada. Requer role `member` ou superior.
+
+**Resposta (200 OK):** subscription com `status: "active"`.
+
+---
+
+### PUT /v1/subscriptions/:subscription_id/items
+
+Substitui todos os itens da assinatura atomicamente. Requer role `admin` ou superior.
+
+**Requisição:**
+```json
+[
+  { "plan_id": "uuid", "quantity": 1 },
+  { "plan_id": "uuid", "quantity": 2 }
+]
+```
+
+**Resposta (200 OK):** array com os novos itens.
+
+---
+
+### GET /v1/subscriptions/:subscription_id/items
+
+Lista os itens de uma assinatura.
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "uuid",
+    "plan_id": "uuid",
+    "quantity": 1,
+    "created_at": "2026-04-13T10:00:00Z",
+    "updated_at": "2026-04-13T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/subscriptions/:subscription_id/history
+
+Retorna o histórico de mudanças de status da assinatura. Requer role `admin` ou superior.
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "uuid",
+    "old_status": "trialing",
+    "new_status": "active",
+    "reason": "",
+    "created_at": "2026-04-13T10:05:00Z"
+  }
+]
+```
+
+---
+
+### POST /v1/subscriptions/:subscription_id/schedules
+
+Cria um agendamento de mudança futura. Requer role `admin` ou superior. Apenas um agendamento pendente por assinatura.
+
+**Requisição:**
+```json
+{
+  "scheduled_at": "2026-05-01T00:00:00Z",
+  "target_status": "canceled"
+}
+```
+
+Exatamente um de `target_status` ou `target_plan_id` deve ser fornecido.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "uuid",
+  "subscription_id": "uuid",
+  "scheduled_at": "2026-05-01T00:00:00Z",
+  "target_status": "canceled",
+  "created_at": "2026-04-13T10:00:00Z"
+}
+```
+
+**Resposta (409 Conflict)** — agendamento pendente já existe:
+```json
+{ "error": "subscription already has a pending schedule" }
+```
+
+---
+
+### DELETE /v1/subscriptions/:subscription_id/schedules/pending
+
+Cancela o agendamento pendente da assinatura. Requer role `admin` ou superior.
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "no pending schedule found" }
 ```
 
 ---
@@ -1226,6 +1569,22 @@ owner (3) > admin (2) > member (1)
 | `GET /v1/products/:product_id` | Qualquer role |
 | `PUT /v1/products/:product_id` | Qualquer role |
 | `DELETE /v1/products/:product_id` | Qualquer role |
+| `POST /v1/products/:product_id/plans` | admin |
+| `GET /v1/products/:product_id/plans` | Qualquer role |
+| `GET /v1/products/:product_id/plans/:plan_id` | Qualquer role |
+| `PUT /v1/products/:product_id/plans/:plan_id` | admin |
+| `DELETE /v1/products/:product_id/plans/:plan_id` | admin |
+| `POST /v1/subscriptions` | Qualquer role |
+| `GET /v1/subscriptions` | Qualquer role |
+| `GET /v1/subscriptions/:subscription_id` | Qualquer role |
+| `POST /v1/subscriptions/:subscription_id/cancel` | member |
+| `POST /v1/subscriptions/:subscription_id/pause` | member |
+| `POST /v1/subscriptions/:subscription_id/resume` | member |
+| `PUT /v1/subscriptions/:subscription_id/items` | admin |
+| `GET /v1/subscriptions/:subscription_id/items` | Qualquer role |
+| `GET /v1/subscriptions/:subscription_id/history` | admin |
+| `POST /v1/subscriptions/:subscription_id/schedules` | admin |
+| `DELETE /v1/subscriptions/:subscription_id/schedules/pending` | admin |
 | `POST /v1/payments` | Qualquer role |
 | `GET /v1/payments` | Qualquer role |
 | `GET /v1/payments/:payment_id` | Qualquer role |

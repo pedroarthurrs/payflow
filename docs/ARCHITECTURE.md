@@ -148,6 +148,18 @@ Resposta JSON
 - `Charge()` — chama o gateway, persiste a referência externa e aciona `Transition` para `authorized`/`succeeded`/`failed`
 - `Refund()`, `Cancel()` — idem, com transições FSM correspondentes
 
+**PlanService** (`service/plan.go`)
+- CRUD de planos com validação de product ownership
+- `version` é incrementado automaticamente quando `amount_cents`, `interval` ou `interval_count` são alterados
+- Hard delete bloqueado com `ErrPlanInUse` se há `subscription_items` não cancelados referenciando o plano
+
+**SubscriptionService** (`service/subscription.go`)
+- `Create()` — cria subscription + items atomicamente via `TxManager`
+- `SubscriptionStateMachine` valida todas as transições de status
+- `Cancel()` suporta `cancel_at_period_end`; quando `true`, status permanece `active` até o fim do período
+- `ReplaceItems()` — substitui todos os itens atomicamente via `TxManager`
+- `calculatePeriodEnd()` — calcula `current_period_end` baseado no `interval`/`interval_count` do plano
+
 ---
 
 ### Camada de Domínio (`domain/`)
@@ -166,9 +178,12 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `idempotency.go`: `IdempotencyRecord`, `IdempotencyStorage` — chave de idempotência e interface de persistência
 - `payment.go`: modelos de pagamento (`Payment`, status, tipos)
 - `payment_fsm.go`: `PaymentFSMRepository`, `TransitionHistory`, `ErrInvalidTransition` — FSM de pagamentos
+- `plan.go`: `PlanRepository`, modelo `Plan`, `PlanInput`, `PlanUpdateInput`, `PlanListParams`
+- `subscription.go`: `SubscriptionRepository`, `SubscriptionItemRepository`, `SubscriptionScheduleRepository`, `SubscriptionHistoryRepository`, modelos `Subscription`, `SubscriptionItem`, `SubscriptionStatusHistory`, `SubscriptionSchedule`, inputs e params
+- `subscription_fsm.go`: `SubscriptionStateMachine` — FSM de assinaturas com grafo de transições; `Validate(from, to)`, `IsTerminal(status)`
 - `webhook.go`: `WebhookEndpointRepository`, `WebhookLogRepository`, `OrganizationSecretReader`, modelos `WebhookEndpoint` e `WebhookLog`, event types
-- `tx.go`: contratos transacionais (`TxManager`, `TxHandle`)
-- `errors.go`: erros de domínio tipados (ErrNotFound, ErrConflict, ErrForbidden, etc.)
+- `tx.go`: contratos transacionais (`TxManager`, `TxHandle`); `TxHandle` expõe `CustomerRepo()`, `AddressRepo()`, `CredentialRepo()`, `PaymentFSMRepo()`, `SubscriptionRepo()`, `SubscriptionItemRepo()`
+- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, etc.)
 
 **Roles disponíveis:**
 ```
@@ -404,6 +419,8 @@ Cada domínio possui seu próprio subpacote gerado:
 | `dbgen/user` | Usuários |
 | `dbgen/webhook` | Endpoints de webhook |
 | `dbgen/webhooklog` | Logs de webhook |
+| `dbgen/plan` | Planos de preço |
+| `dbgen/subscription` | Assinaturas, itens, histórico, schedules |
 
 **Repositórios** (`database/repository/`)
 - Implementam os contratos da camada de domínio
@@ -411,7 +428,7 @@ Cada domínio possui seu próprio subpacote gerado:
 - `tx.go`: `TxManager` e `txHandle` para operações atômicas com `defer sqlTx.Rollback()`
 
 **SQL** (`database/queries/`)
-- Um arquivo `.sql` por domínio
+- Um arquivo `.sql` por domínio: `customer.sql`, `address.sql`, `product.sql`, `plan.sql` (8 queries), `subscription.sql` (15 queries, cobrindo assinaturas, itens, histórico e schedules), `credential.sql`, `user.sql`, `payment.sql`, `payment_fsm.sql`, `webhook.sql`, `webhooklog.sql`, `idempotency.sql`, `cleanup.sql`
 - Queries geram código Go via `make sqlc`
 
 ---
