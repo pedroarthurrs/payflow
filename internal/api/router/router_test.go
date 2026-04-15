@@ -336,7 +336,7 @@ func TestProperty_RBACUserRoutes(t *testing.T) {
 		{http.MethodDelete, "/api/v1/users/user1", domain.RoleOwner},
 	}
 
-	allRoles := []domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleMember}
+	allRoles := []domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleDeveloper, domain.RoleSupport}
 
 	r := buildRBACTestEngine()
 

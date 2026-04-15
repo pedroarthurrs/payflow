@@ -136,3 +136,31 @@ CREATE INDEX IF NOT EXISTS idx_idempotency_expires_at
 CREATE INDEX IF NOT EXISTS idx_subscriptions_billing
     ON subscriptions(current_period_end)
     WHERE status IN ('active', 'past_due', 'trialing') AND billing_locked_until IS NULL;
+
+-- User
+CREATE INDEX IF NOT EXISTS idx_user_email
+    ON "user" (email);
+
+-- Organization Members
+CREATE INDEX IF NOT EXISTS idx_org_members_org
+    ON organization_members (organization_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_org_members_user
+    ON organization_members (user_id) WHERE deleted_at IS NULL;
+
+-- Member Permissions
+CREATE INDEX IF NOT EXISTS idx_member_permissions_member
+    ON member_permissions (member_id);
+
+CREATE INDEX IF NOT EXISTS idx_member_permissions_org
+    ON member_permissions (organization_id);
+
+-- Member Logs
+CREATE INDEX IF NOT EXISTS idx_member_logs_member
+    ON member_logs (member_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_member_logs_org
+    ON member_logs (organization_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_member_logs_created_at
+    ON member_logs (created_at DESC);

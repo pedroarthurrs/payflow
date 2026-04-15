@@ -10,6 +10,7 @@ var (
 	ErrAddressNotFound         = errors.New("address not found")
 	ErrCredentialNotFound      = errors.New("credential not found")
 	ErrCredentialLogNotFound   = errors.New("credential log not found")
+	ErrMemberLogNotFound       = errors.New("member log not found")
 	ErrUnauthorized            = errors.New("invalid credentials")
 	ErrBadRequest              = errors.New("organization_id, email and password or api_key required")
 	ErrNotFound                = errors.New("not found")
@@ -40,4 +41,11 @@ var (
 	// Recurrence errors
 	ErrSubscriptionAlreadyLocked = errors.New("subscription billing is already locked")
 	ErrBillingAmountZero         = errors.New("subscription billing amount is zero")
+
+	// Member / permission errors
+	ErrAlreadyMember        = errors.New("user is already a member of this organization")
+	ErrOwnerCannotLeave     = errors.New("owner cannot be removed from organization")
+	ErrPermissionNotFound   = errors.New("permission not found")
+	ErrOrgSelectionRequired = errors.New("organization selection required")
+	ErrInvalidSessionToken  = errors.New("invalid or expired session token")
 )

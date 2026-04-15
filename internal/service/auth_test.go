@@ -25,6 +25,8 @@ type mockTokenProvider struct {
 	newPairWithClaimsFn func(input token.ClaimsInput) (*token.Pair, error)
 	refreshFn           func(refreshToken string) (*token.Pair, error)
 	refreshWithClaimsFn func(refreshToken string) (*token.Pair, error)
+	newOrgSelectTokenFn func(userAccountID string) (string, error)
+	verifyFn            func(tokenString string, expectedType token.TokenType) (*token.Claims, error)
 }
 
 func (m *mockTokenProvider) NewPair(organizationID string) (*token.Pair, error) {
@@ -60,6 +62,36 @@ func (m *mockTokenProvider) RefreshWithClaims(refreshToken string) (*token.Pair,
 	return nil, nil
 }
 
+func (m *mockTokenProvider) NewOrgSelectToken(userAccountID string) (string, error) {
+	if m.newOrgSelectTokenFn != nil {
+		return m.newOrgSelectTokenFn(userAccountID)
+	}
+	return "session-token-" + userAccountID, nil
+}
+
+func (m *mockTokenProvider) Verify(tokenString string, expectedType token.TokenType) (*token.Claims, error) {
+	if m.verifyFn != nil {
+		return m.verifyFn(tokenString, expectedType)
+	}
+	return nil, errors.New("not implemented")
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+// singleMembershipRepo returns a mockAuthRepo wired for a user with one org membership.
+func singleMembershipRepo(account *domain.AuthUserAccount, membership domain.AuthMembership) *mockAuthRepo {
+	return &mockAuthRepo{
+		getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
+			return account, nil
+		},
+		listMembershipsForUserFn: func(_ context.Context, _ uuid.UUID) ([]domain.AuthMembership, error) {
+			return []domain.AuthMembership{membership}, nil
+		},
+	}
+}
+
 // ============================================================
 // Unit tests - Login (user mode)
 // ============================================================
@@ -70,16 +102,10 @@ func TestLogin_UserMode_Success(t *testing.T) {
 	password := "s3cret"
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 
-	auth := &mockAuthRepo{
-		getUserByEmailFn: func(_ context.Context, email string) (*domain.AuthUser, error) {
-			return &domain.AuthUser{
-				ID:             userID,
-				OrganizationID: organizationID,
-				Password:       string(hash),
-				Role:           domain.RoleAdmin,
-			}, nil
-		},
-	}
+	auth := singleMembershipRepo(
+		&domain.AuthUserAccount{ID: userID, Password: string(hash)},
+		domain.AuthMembership{OrganizationID: organizationID, Role: domain.RoleAdmin},
+	)
 
 	var capturedInput token.ClaimsInput
 	mock := &mockTokenProvider{
@@ -90,7 +116,7 @@ func TestLogin_UserMode_Success(t *testing.T) {
 	}
 
 	svc := NewAuthService(mock, auth)
-	pair, err := svc.Login(context.Background(), domain.LoginRequest{
+	result, err := svc.Login(context.Background(), domain.LoginRequest{
 		Email:    "user@example.com",
 		Password: password,
 	})
@@ -98,8 +124,8 @@ func TestLogin_UserMode_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if pair == nil {
-		t.Fatal("expected token pair, got nil")
+	if result == nil || result.TokenPair == nil {
+		t.Fatal("expected token pair in result")
 	}
 	if capturedInput.AuthType != domain.AuthTypeUser {
 		t.Fatalf("expected auth_type=user, got %s", capturedInput.AuthType)
@@ -112,12 +138,59 @@ func TestLogin_UserMode_Success(t *testing.T) {
 	}
 }
 
+func TestLogin_UserMode_MultiOrg(t *testing.T) {
+	userID := uuid.New()
+	password := "s3cret"
+	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+
+	orgs := []domain.AuthMembership{
+		{OrganizationID: uuid.New(), Role: domain.RoleAdmin},
+		{OrganizationID: uuid.New(), Role: domain.RoleAdmin},
+	}
+
+	auth := &mockAuthRepo{
+		getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
+			return &domain.AuthUserAccount{ID: userID, Password: string(hash)}, nil
+		},
+		listMembershipsForUserFn: func(_ context.Context, _ uuid.UUID) ([]domain.AuthMembership, error) {
+			return orgs, nil
+		},
+	}
+
+	var sessionTokenIssued string
+	mock := &mockTokenProvider{
+		newOrgSelectTokenFn: func(userAccountID string) (string, error) {
+			sessionTokenIssued = "session-" + userAccountID
+			return sessionTokenIssued, nil
+		},
+	}
+
+	svc := NewAuthService(mock, auth)
+	result, err := svc.Login(context.Background(), domain.LoginRequest{
+		Email:    "user@example.com",
+		Password: password,
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.TokenPair != nil {
+		t.Fatal("expected no token pair for multi-org login")
+	}
+	if result.SessionToken == nil || *result.SessionToken != sessionTokenIssued {
+		t.Fatalf("expected session token %q", sessionTokenIssued)
+	}
+	if len(result.Organizations) != 2 {
+		t.Fatalf("expected 2 organizations, got %d", len(result.Organizations))
+	}
+}
+
 func TestLogin_UserMode_WrongPassword(t *testing.T) {
 	hash, _ := bcrypt.GenerateFromPassword([]byte("correct"), bcrypt.MinCost)
 
 	auth := &mockAuthRepo{
-		getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
-			return &domain.AuthUser{Password: string(hash)}, nil
+		getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
+			return &domain.AuthUserAccount{Password: string(hash)}, nil
 		},
 	}
 
@@ -129,6 +202,26 @@ func TestLogin_UserMode_WrongPassword(t *testing.T) {
 
 	if !errors.Is(err, domain.ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestLogin_UserMode_NoMemberships(t *testing.T) {
+	hash, _ := bcrypt.GenerateFromPassword([]byte("pass"), bcrypt.MinCost)
+
+	auth := &mockAuthRepo{
+		getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
+			return &domain.AuthUserAccount{ID: uuid.New(), Password: string(hash)}, nil
+		},
+		listMembershipsForUserFn: func(_ context.Context, _ uuid.UUID) ([]domain.AuthMembership, error) {
+			return nil, nil // no memberships
+		},
+	}
+
+	svc := NewAuthService(&mockTokenProvider{}, auth)
+	_, err := svc.Login(context.Background(), domain.LoginRequest{Email: "x@x.com", Password: "pass"})
+
+	if !errors.Is(err, domain.ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized for user with no memberships, got %v", err)
 	}
 }
 
@@ -156,12 +249,12 @@ func TestLogin_APIKeyMode_Success(t *testing.T) {
 	}
 
 	svc := NewAuthService(mock, auth)
-	pair, err := svc.Login(context.Background(), domain.LoginRequest{APIKey: apiKey})
+	result, err := svc.Login(context.Background(), domain.LoginRequest{APIKey: apiKey})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if pair == nil {
+	if result == nil || result.TokenPair == nil {
 		t.Fatal("expected token pair, got nil")
 	}
 	if capturedInput.AuthType != domain.AuthTypeSystem {
@@ -183,6 +276,93 @@ func TestLogin_BadRequest(t *testing.T) {
 	_, err := svc.Login(context.Background(), domain.LoginRequest{})
 	if !errors.Is(err, domain.ErrBadRequest) {
 		t.Fatalf("expected ErrBadRequest, got %v", err)
+	}
+}
+
+// ============================================================
+// Unit tests - SelectOrganization
+// ============================================================
+
+func TestSelectOrganization_Success(t *testing.T) {
+	userID := uuid.New()
+	orgID := uuid.New()
+
+	auth := &mockAuthRepo{
+		listMembershipsForUserFn: func(_ context.Context, id uuid.UUID) ([]domain.AuthMembership, error) {
+			if id != userID {
+				return nil, errors.New("not found")
+			}
+			return []domain.AuthMembership{
+				{OrganizationID: orgID, Role: domain.RoleAdmin},
+			}, nil
+		},
+	}
+
+	var capturedInput token.ClaimsInput
+	mock := &mockTokenProvider{
+		verifyFn: func(tokenString string, expectedType token.TokenType) (*token.Claims, error) {
+			return &token.Claims{OrganizationID: userID.String()}, nil
+		},
+		newPairWithClaimsFn: func(input token.ClaimsInput) (*token.Pair, error) {
+			capturedInput = input
+			return &token.Pair{AccessToken: "tok"}, nil
+		},
+	}
+
+	svc := NewAuthService(mock, auth)
+	pair, err := svc.SelectOrganization(context.Background(), "session-tok", orgID)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if pair == nil || pair.AccessToken != "tok" {
+		t.Fatal("expected token pair")
+	}
+	if capturedInput.OrganizationID != orgID.String() {
+		t.Fatalf("expected org_id=%s, got %s", orgID, capturedInput.OrganizationID)
+	}
+	if capturedInput.UserID != userID.String() {
+		t.Fatalf("expected user_id=%s, got %s", userID, capturedInput.UserID)
+	}
+}
+
+func TestSelectOrganization_InvalidToken(t *testing.T) {
+	mock := &mockTokenProvider{
+		verifyFn: func(_ string, _ token.TokenType) (*token.Claims, error) {
+			return nil, errors.New("token expired")
+		},
+	}
+
+	svc := NewAuthService(mock, &mockAuthRepo{})
+	_, err := svc.SelectOrganization(context.Background(), "bad-token", uuid.New())
+
+	if !errors.Is(err, domain.ErrInvalidSessionToken) {
+		t.Fatalf("expected ErrInvalidSessionToken, got %v", err)
+	}
+}
+
+func TestSelectOrganization_OrgNotInMemberships(t *testing.T) {
+	userID := uuid.New()
+
+	auth := &mockAuthRepo{
+		listMembershipsForUserFn: func(_ context.Context, _ uuid.UUID) ([]domain.AuthMembership, error) {
+			return []domain.AuthMembership{
+				{OrganizationID: uuid.New(), Role: domain.RoleAdmin},
+			}, nil
+		},
+	}
+
+	mock := &mockTokenProvider{
+		verifyFn: func(_ string, _ token.TokenType) (*token.Claims, error) {
+			return &token.Claims{OrganizationID: userID.String()}, nil
+		},
+	}
+
+	svc := NewAuthService(mock, auth)
+	_, err := svc.SelectOrganization(context.Background(), "tok", uuid.New())
+
+	if !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }
 
@@ -262,8 +442,8 @@ func TestProperty_APIKeyHashRoundTrip(t *testing.T) {
 	})
 }
 
-// For any valid user login, the emitted access token must have non-empty user_id,
-// non-empty role, and auth_type == "user".
+// For any valid single-org user login, the emitted access token must have
+// non-empty user_id, non-empty role, and auth_type == "user".
 func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 	const fixedPassword = "testpassword1"
 	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
@@ -273,16 +453,10 @@ func TestProperty_UserTokenClaimsComplete(t *testing.T) {
 		userID := uuid.New()
 		role := rapid.SampledFrom([]string{"owner", "admin", "member"}).Draw(t, "role")
 
-		auth := &mockAuthRepo{
-			getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
-				return &domain.AuthUser{
-					ID:             userID,
-					OrganizationID: organizationID,
-					Password:       string(fixedHash),
-					Role:           domain.Role(role),
-				}, nil
-			},
-		}
+		auth := singleMembershipRepo(
+			&domain.AuthUserAccount{ID: userID, Password: string(fixedHash)},
+			domain.AuthMembership{OrganizationID: organizationID, Role: domain.Role(role)},
+		)
 
 		var capturedInput token.ClaimsInput
 		mock := &mockTokenProvider{
@@ -376,12 +550,12 @@ func TestProperty_LoginModeDetection(t *testing.T) {
 				}
 				return nil, errors.New("not found")
 			},
-			getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
-				return &domain.AuthUser{
-					ID:             userID,
-					OrganizationID: organizationID,
-					Role:           "member",
-					Password:       string(fixedHash),
+			getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
+				return &domain.AuthUserAccount{ID: userID, Password: string(fixedHash)}, nil
+			},
+			listMembershipsForUserFn: func(_ context.Context, _ uuid.UUID) ([]domain.AuthMembership, error) {
+				return []domain.AuthMembership{
+					{OrganizationID: organizationID, Role: domain.RoleDeveloper},
 				}, nil
 			},
 		}
@@ -456,7 +630,7 @@ func TestProperty_RefreshPreservesUserClaims(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		organizationID := rapid.StringMatching(`[a-f0-9\-]{36}`).Draw(t, "organizationID")
 		userID := rapid.StringMatching(`[a-f0-9\-]{36}`).Draw(t, "userID")
-		role := rapid.SampledFrom([]domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleMember}).Draw(t, "role")
+		role := rapid.SampledFrom([]domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleDeveloper, domain.RoleSupport}).Draw(t, "role")
 
 		// Use the real token.Service so refresh actually parses and re-emits claims.
 		tokenSvc := token.NewService("test-secret-key-for-property-tests", 15*time.Minute, 7*24*time.Hour)
@@ -526,46 +700,6 @@ func TestProperty_RefreshTokenErrorPropagation(t *testing.T) {
 // Bug condition exploration test
 // ============================================================
 
-func TestLogin_BugCondition_EmailPasswordWithoutOrganizationID(t *testing.T) {
-	const fixedPassword = "testpassword1"
-	fixedHash, _ := bcrypt.GenerateFromPassword([]byte(fixedPassword), bcrypt.MinCost)
-
-	rapid.Check(t, func(t *rapid.T) {
-		email := rapid.StringMatching(`[a-zA-Z0-9]{3,10}@example\.com`).Draw(t, "email")
-
-		auth := &mockAuthRepo{
-			getUserByEmailFn: func(_ context.Context, email string) (*domain.AuthUser, error) {
-				return &domain.AuthUser{
-					ID:             uuid.New(),
-					OrganizationID: uuid.New(),
-					Password:       string(fixedHash),
-					Role:           "member",
-				}, nil
-			},
-		}
-
-		mock := &mockTokenProvider{
-			newPairWithClaimsFn: func(input token.ClaimsInput) (*token.Pair, error) {
-				return &token.Pair{AccessToken: "tok"}, nil
-			},
-		}
-
-		svc := NewAuthService(mock, auth)
-
-		pair, err := svc.Login(context.Background(), domain.LoginRequest{
-			Email:    email,
-			Password: fixedPassword,
-		})
-
-		if err != nil {
-			t.Fatalf("expected no error for email+password login without OrganizationID, got: %v", err)
-		}
-		if pair == nil {
-			t.Fatal("expected token pair, got nil")
-		}
-	})
-}
-
 // TestProperty_Preservation_NonBuggyInputs verifies non-bug-condition inputs
 // produce the same results before and after the fix.
 func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
@@ -626,13 +760,8 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 			email := rapid.StringMatching(`[a-zA-Z0-9]{3,10}@example\.com`).Draw(t, "email")
 
 			auth := &mockAuthRepo{
-				getUserByEmailFn: func(_ context.Context, email string) (*domain.AuthUser, error) {
-					return &domain.AuthUser{
-						ID:             uuid.New(),
-						OrganizationID: uuid.New(),
-						Password:       string(knownHash),
-						Role:           "member",
-					}, nil
+				getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
+					return &domain.AuthUserAccount{ID: uuid.New(), Password: string(knownHash)}, nil
 				},
 			}
 
@@ -655,7 +784,7 @@ func TestProperty_Preservation_NonBuggyInputs(t *testing.T) {
 			password := rapid.StringMatching(`[a-zA-Z0-9]{8,16}`).Draw(t, "password")
 
 			auth := &mockAuthRepo{
-				getUserByEmailFn: func(_ context.Context, _ string) (*domain.AuthUser, error) {
+				getUserAccountByEmailFn: func(_ context.Context, _ string) (*domain.AuthUserAccount, error) {
 					return nil, errors.New("not found")
 				},
 			}

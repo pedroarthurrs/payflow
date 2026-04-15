@@ -33,21 +33,6 @@ CREATE TABLE IF NOT EXISTS organizations (
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
--- Usuários com acesso ao painel de cada Organization.
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    email VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE,
-
-    CONSTRAINT unique_user_email_per_organization UNIQUE (organization_id, email)
-);
-
 -- Configurações globais atreladas a um Organization.
 CREATE TABLE IF NOT EXISTS organization_configs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -72,6 +57,7 @@ CREATE TABLE IF NOT EXISTS credentials (
     last_used_at TIMESTAMP WITH TIME ZONE,
     expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
 
     CONSTRAINT unique_credential_organization_id UNIQUE (organization_id, id)
@@ -430,6 +416,7 @@ CREATE TABLE IF NOT EXISTS subscription_status_history (
     metadata JSONB,
     event_source_id UUID,                         -- Entidade associada que disparou a mudança (payment ou invoice).
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     CONSTRAINT fk_sub_history_subscription_organization
         FOREIGN KEY (organization_id, subscription_id)
@@ -464,7 +451,8 @@ CREATE TABLE IF NOT EXISTS payment_status_history (
     event_source     VARCHAR(50),
     event_source_id  UUID,
     reason           TEXT,
-    created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 
@@ -530,7 +518,7 @@ CREATE TABLE IF NOT EXISTS commission_settings (
     organization_id UUID NOT NULL REFERENCES organizations(id),
 
     target_customer_id UUID NOT NULL REFERENCES customers(id),
-    
+
     type VARCHAR(20) NOT NULL CHECK (type IN ('percentage', 'fixed')),
     value NUMERIC(15,2) NOT NULL, -- Valor ou Porcentagem
     conditions JSONB,
@@ -539,4 +527,68 @@ CREATE TABLE IF NOT EXISTS commission_settings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Identidade global de usuário (desacoplada de org).
+-- Um mesmo login pode acessar múltiplas organizations via organization_members.
+CREATE TABLE IF NOT EXISTS "user" (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email      VARCHAR(255) NOT NULL UNIQUE,
+    name       VARCHAR(255) NOT NULL,
+    password   VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Vínculo entre um UserAccount e uma Organization, com role e audit.
+CREATE TABLE IF NOT EXISTS organization_members (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    role            VARCHAR(20) NOT NULL DEFAULT 'support'
+                    CHECK (role IN ('owner', 'admin', 'developer', 'support')),
+    invited_by      UUID REFERENCES "user"(id),
+    joined_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at      TIMESTAMP WITH TIME ZONE,
+
+    CONSTRAINT unique_member_per_org UNIQUE (organization_id, user_id)
+);
+
+-- Grants e revocations individuais sobre os defaults do role.
+-- granted=true  → concede permissão não prevista no role.
+-- granted=false → revoga permissão prevista no role.
+-- organization_id é desnormalizado para queries filtradas por org sem JOIN adicional.
+-- Integridade garantida pelo CASCADE em member_id.
+CREATE TABLE IF NOT EXISTS member_permissions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL,  -- desnormalizado de organization_members
+    member_id       UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+    permission      VARCHAR(50) NOT NULL,
+    granted         BOOLEAN NOT NULL DEFAULT true,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    CONSTRAINT unique_member_permission UNIQUE (member_id, permission)
+);
+
+-- Auditoria de ações de membros autenticados dentro de uma organização.
+-- Logs sem contexto de org (ex: autenticação pré-seleção) não são registrados aqui.
+-- organization_id é desnormalizado para queries filtradas por org sem JOIN adicional.
+CREATE TABLE IF NOT EXISTS member_logs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL,  -- desnormalizado de organization_members
+    member_id       UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+    action          VARCHAR(100) NOT NULL,
+    method          VARCHAR(10),
+    path            TEXT,
+    status_code     INTEGER,
+    latency_ms      INTEGER,
+    ip_address      VARCHAR(45),
+    user_agent      TEXT,
+    metadata        JSONB,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

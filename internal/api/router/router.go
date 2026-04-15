@@ -65,10 +65,10 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	customerRepo := repository.NewCustomerRepo(adapters.DB.CustomerQ)
 	addressRepo := repository.NewAddressRepo(adapters.DB.AddressQ)
 	productRepo := repository.NewProductRepo(adapters.DB.ProductQ)
-	userRepo := repository.NewUserRepo(adapters.DB.UserQ)
-	authRepo := repository.NewAuthRepo(adapters.DB.AuthQ)
+	authRepo := repository.NewAuthRepo(adapters.DB.AuthQ, adapters.DB.DB)
 	credentialRepo := repository.NewCredentialRepo(adapters.DB.CredentialQ)
 	credentialLogRepo := repository.NewCredentialLogRepo(adapters.DB.CredentialLogQ)
+	memberLogRepo := repository.NewMemberLogRepo(adapters.DB.MemberLogQ)
 	webhookRepo := repository.NewWebhookRepo(adapters.DB.WebhookQ)
 	webhookLogRepo := repository.NewWebhookLogRepo(adapters.DB.WebhookLogQ)
 	orgSecretReader := repository.NewOrganizationSecretReader(adapters.DB.OrganizationQ)
@@ -81,6 +81,9 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	subscriptionItemRepo := repository.NewSubscriptionItemRepo(adapters.DB.SubscriptionQ)
 	subscriptionSchRepo := repository.NewSubscriptionScheduleRepo(adapters.DB.SubscriptionQ)
 	subscriptionHistRepo := repository.NewSubscriptionHistoryRepo(adapters.DB.SubscriptionQ)
+	memberRepo := repository.NewMemberRepo(adapters.DB.DB)
+	userAccountRepo := repository.NewUserAccountRepo(adapters.DB.DB)
+	permissionRepo := repository.NewPermissionRepo(adapters.DB.DB)
 
 	// Services
 	tokenSvc := token.NewService(cfg.JwtSecret, accessTokenTTL, refreshTokenTTL)
@@ -88,7 +91,6 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	addressSvc := service.NewAddressService(customerRepo, addressRepo)
 	customerSvc := service.NewCustomerService(customerRepo, addressRepo, txManager)
 	productSvc := service.NewProductService(productRepo)
-	userSvc := service.NewUserService(userRepo)
 	credentialSvc := service.NewCredentialService(credentialRepo, credentialLogRepo, txManager, cfg.APIKeyPepper)
 	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
 	webhookScheduler := worker.NewWebhookScheduler(webhookRepo, orgSecretReader, adapters.Queue)
@@ -105,6 +107,8 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 		customerRepo,
 		txManager,
 	)
+	memberSvc := service.NewMemberServiceFull(memberRepo, userAccountRepo, memberLogRepo)
+	permSvc := service.NewPermissionService(memberRepo, permissionRepo)
 
 	// Recurrence engine
 	recurrenceRepo := repository.NewRecurrenceRepo(adapters.DB.DB, adapters.DB.RecurrenceQ)
@@ -131,16 +135,16 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	rootHandler := handler.NewRootHandler()
 	authHandler := handler.NewAuthHandler(authSvc, loginRL)
 	healthHandler := handler.NewHealthHandler(adapters.HealthCheck, maintenanceProvider)
-	meHandler := handler.NewMeHandler()
+	meHandler := handler.NewMeHandler(permSvc)
 	customerHandler := handler.NewCustomerHandler(customerSvc)
 	addressHandler := handler.NewAddressHandler(addressSvc)
 	productHandler := handler.NewProductHandler(productSvc)
-	userHandler := handler.NewUserHandler(userSvc)
 	credentialHandler := handler.NewCredentialHandler(credentialSvc)
 	webhookHandler := handler.NewWebhookHandler(webhookSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc, gatewaySvc)
 	planHandler := handler.NewPlanHandler(planSvc)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionSvc)
+	memberHandler := handler.NewMemberHandler(memberSvc, permSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -158,18 +162,19 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	protected.Use(middleware.Auth(tokenSvc))
 	protected.Use(middleware.Idempotency(idempotencyRepo))
 	protected.Use(middleware.CredentialLog(credentialLogRepo))
+	protected.Use(middleware.MemberLog(memberLogRepo))
 	protected.Use(middleware.RateLimitByOrganization(organizationStore, config.RateLimitOrganizationMaxRequests, organizationWindow))
 
 	meHandler.RegisterRoutes(protected)
 	customerHandler.RegisterRoutes(protected)
 	addressHandler.RegisterRoutes(protected)
 	productHandler.RegisterRoutes(protected)
-	userHandler.RegisterRoutes(protected)
 	credentialHandler.RegisterRoutes(protected)
 	webhookHandler.RegisterRoutes(protected)
 	paymentHandler.RegisterRoutes(protected)
 	planHandler.RegisterRoutes(protected)
 	subscriptionHandler.RegisterRoutes(protected)
+	memberHandler.RegisterRoutes(protected)
 
 	// SPA: serve o frontend embutido para todas as rotas não mapeadas pela API.
 	r.NoRoute(SPAHandler())

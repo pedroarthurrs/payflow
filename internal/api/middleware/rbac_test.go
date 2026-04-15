@@ -13,8 +13,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// validRoles holds the three recognized roles for use in generators.
-var validRoles = []domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleMember}
+// validRoles holds all four recognized roles for use in generators.
+var validRoles = []domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleDeveloper, domain.RoleSupport}
 
 // newTestEngine builds a minimal Gin engine (test mode) with a route that
 // applies RequireRole(minRole) before returning 200.
@@ -74,7 +74,7 @@ func TestProperty_RBACHierarchy(t *testing.T) {
 func TestRequireRole_MissingClaims(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/protected", RequireRole(domain.RoleMember), func(c *gin.Context) {
+	r.GET("/protected", RequireRole(domain.RoleSupport), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
@@ -93,7 +93,7 @@ func TestRequireRole_SystemToken(t *testing.T) {
 		Role:     "",
 		AuthType: domain.AuthTypeSystem,
 	}
-	engine := newTestEngine(domain.RoleMember, claims)
+	engine := newTestEngine(domain.RoleSupport, claims)
 	status := doRequest(engine)
 
 	if status != http.StatusForbidden {

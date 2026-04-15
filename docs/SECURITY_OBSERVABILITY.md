@@ -286,10 +286,8 @@ O middleware `RequireRole(minRole)` verifica:
 
 | Endpoint | Role Mínimo |
 |----------|-------------|
-| `POST /v1/users` | owner |
-| `PUT /v1/users/:user_id` | owner |
-| `DELETE /v1/users/:user_id` | owner |
-| `GET /v1/users` | admin |
+| `GET /v1/members/logs` | admin |
+| `GET /v1/members/logs/:log_id` | admin |
 | `POST /v1/credentials` | admin |
 | `GET /v1/credentials` | admin |
 | `GET /v1/credentials/:credential_id` | admin |

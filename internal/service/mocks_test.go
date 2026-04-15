@@ -117,80 +117,31 @@ func (m *mockAddressRepo) Delete(ctx context.Context, organizationID, customerID
 }
 
 // ============================================================
-// Mock UserRepository
-// ============================================================
-
-type mockUserRepo struct {
-	createFn           func(ctx context.Context, organizationID uuid.UUID, input domain.CreateUserInput) (*domain.User, error)
-	getByIDFn          func(ctx context.Context, organizationID, userID uuid.UUID) (*domain.User, error)
-	getByEmailAndOrgFn func(ctx context.Context, organizationID uuid.UUID, email string) (*domain.User, error)
-	listFn             func(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.User, error)
-	updateFn           func(ctx context.Context, organizationID, userID uuid.UUID, input domain.UpdateUserInput) (*domain.User, error)
-	softDeleteFn       func(ctx context.Context, organizationID, userID uuid.UUID) error
-}
-
-var _ domain.UserRepository = (*mockUserRepo)(nil)
-
-func (m *mockUserRepo) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateUserInput) (*domain.User, error) {
-	if m.createFn != nil {
-		return m.createFn(ctx, organizationID, input)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockUserRepo) GetByID(ctx context.Context, organizationID, userID uuid.UUID) (*domain.User, error) {
-	if m.getByIDFn != nil {
-		return m.getByIDFn(ctx, organizationID, userID)
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockUserRepo) GetByEmailAndOrg(ctx context.Context, organizationID uuid.UUID, email string) (*domain.User, error) {
-	if m.getByEmailAndOrgFn != nil {
-		return m.getByEmailAndOrgFn(ctx, organizationID, email)
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockUserRepo) List(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.User, error) {
-	if m.listFn != nil {
-		return m.listFn(ctx, organizationID, params)
-	}
-	return nil, nil
-}
-
-func (m *mockUserRepo) Update(ctx context.Context, organizationID, userID uuid.UUID, input domain.UpdateUserInput) (*domain.User, error) {
-	if m.updateFn != nil {
-		return m.updateFn(ctx, organizationID, userID, input)
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockUserRepo) SoftDelete(ctx context.Context, organizationID, userID uuid.UUID) error {
-	if m.softDeleteFn != nil {
-		return m.softDeleteFn(ctx, organizationID, userID)
-	}
-	return nil
-}
-
-// ============================================================
 // Mock AuthRepository
 // ============================================================
 
 type mockAuthRepo struct {
-	getUserByEmailFn       func(ctx context.Context, email string) (*domain.AuthUser, error)
-	getAPIKeyByHashFn      func(ctx context.Context, hash string) (*domain.APIKey, error)
-	updateAPIKeyLastUsedFn func(ctx context.Context, id uuid.UUID) error
-	lastUsedUpdated        bool
+	getUserAccountByEmailFn  func(ctx context.Context, email string) (*domain.AuthUserAccount, error)
+	listMembershipsForUserFn func(ctx context.Context, userAccountID uuid.UUID) ([]domain.AuthMembership, error)
+	getAPIKeyByHashFn        func(ctx context.Context, hash string) (*domain.APIKey, error)
+	updateAPIKeyLastUsedFn   func(ctx context.Context, id uuid.UUID) error
+	lastUsedUpdated          bool
 }
 
 var _ domain.AuthRepository = (*mockAuthRepo)(nil)
 
-func (m *mockAuthRepo) GetUserByEmail(ctx context.Context, email string) (*domain.AuthUser, error) {
-	if m.getUserByEmailFn != nil {
-		return m.getUserByEmailFn(ctx, email)
+func (m *mockAuthRepo) GetUserAccountByEmail(ctx context.Context, email string) (*domain.AuthUserAccount, error) {
+	if m.getUserAccountByEmailFn != nil {
+		return m.getUserAccountByEmailFn(ctx, email)
 	}
 	return nil, errors.New("not found")
+}
+
+func (m *mockAuthRepo) ListMembershipsForUser(ctx context.Context, userAccountID uuid.UUID) ([]domain.AuthMembership, error) {
+	if m.listMembershipsForUserFn != nil {
+		return m.listMembershipsForUserFn(ctx, userAccountID)
+	}
+	return nil, nil
 }
 
 func (m *mockAuthRepo) GetAPIKeyByHash(ctx context.Context, hash string) (*domain.APIKey, error) {
@@ -437,4 +388,94 @@ func (m *mockCredentialLogRepo) GetByID(ctx context.Context, orgID, logID uuid.U
 		return m.getByIDFn(ctx, orgID, logID)
 	}
 	return nil, domain.ErrCredentialLogNotFound
+}
+
+// ============================================================
+// Mock MemberRepository
+// ============================================================
+
+type mockMemberRepo struct {
+	addMemberFn        func(ctx context.Context, orgID, userAccountID uuid.UUID, role domain.Role, invitedBy *uuid.UUID) (*domain.OrganizationMember, error)
+	getMemberFn        func(ctx context.Context, orgID, userAccountID uuid.UUID) (*domain.OrganizationMember, error)
+	listMembersFn      func(ctx context.Context, orgID uuid.UUID, params domain.ListParams) ([]domain.OrganizationMember, int32, error)
+	updateMemberRoleFn func(ctx context.Context, orgID, userAccountID uuid.UUID, role domain.Role) (*domain.OrganizationMember, error)
+	removeMemberFn     func(ctx context.Context, orgID, userAccountID uuid.UUID) error
+	listOrgsForUserFn  func(ctx context.Context, userAccountID uuid.UUID) ([]domain.OrganizationRef, error)
+}
+
+var _ domain.MemberRepository = (*mockMemberRepo)(nil)
+
+func (m *mockMemberRepo) AddMember(ctx context.Context, orgID, userAccountID uuid.UUID, role domain.Role, invitedBy *uuid.UUID) (*domain.OrganizationMember, error) {
+	if m.addMemberFn != nil {
+		return m.addMemberFn(ctx, orgID, userAccountID, role, invitedBy)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockMemberRepo) GetMember(ctx context.Context, orgID, userAccountID uuid.UUID) (*domain.OrganizationMember, error) {
+	if m.getMemberFn != nil {
+		return m.getMemberFn(ctx, orgID, userAccountID)
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockMemberRepo) ListMembers(ctx context.Context, orgID uuid.UUID, params domain.ListParams) ([]domain.OrganizationMember, int32, error) {
+	if m.listMembersFn != nil {
+		return m.listMembersFn(ctx, orgID, params)
+	}
+	return nil, 0, nil
+}
+
+func (m *mockMemberRepo) UpdateMemberRole(ctx context.Context, orgID, userAccountID uuid.UUID, role domain.Role) (*domain.OrganizationMember, error) {
+	if m.updateMemberRoleFn != nil {
+		return m.updateMemberRoleFn(ctx, orgID, userAccountID, role)
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockMemberRepo) RemoveMember(ctx context.Context, orgID, userAccountID uuid.UUID) error {
+	if m.removeMemberFn != nil {
+		return m.removeMemberFn(ctx, orgID, userAccountID)
+	}
+	return nil
+}
+
+func (m *mockMemberRepo) ListOrganizationsForUser(ctx context.Context, userAccountID uuid.UUID) ([]domain.OrganizationRef, error) {
+	if m.listOrgsForUserFn != nil {
+		return m.listOrgsForUserFn(ctx, userAccountID)
+	}
+	return nil, nil
+}
+
+// ============================================================
+// Mock PermissionRepository
+// ============================================================
+
+type mockPermissionRepo struct {
+	upsertFn        func(ctx context.Context, memberID uuid.UUID, permission domain.Permission, granted bool) error
+	deleteFn        func(ctx context.Context, memberID uuid.UUID, permission domain.Permission) error
+	listForMemberFn func(ctx context.Context, memberID uuid.UUID) ([]domain.MemberPermission, error)
+}
+
+var _ domain.PermissionRepository = (*mockPermissionRepo)(nil)
+
+func (m *mockPermissionRepo) Upsert(ctx context.Context, memberID uuid.UUID, permission domain.Permission, granted bool) error {
+	if m.upsertFn != nil {
+		return m.upsertFn(ctx, memberID, permission, granted)
+	}
+	return nil
+}
+
+func (m *mockPermissionRepo) Delete(ctx context.Context, memberID uuid.UUID, permission domain.Permission) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, memberID, permission)
+	}
+	return nil
+}
+
+func (m *mockPermissionRepo) ListForMember(ctx context.Context, memberID uuid.UUID) ([]domain.MemberPermission, error) {
+	if m.listForMemberFn != nil {
+		return m.listForMemberFn(ctx, memberID)
+	}
+	return nil, nil
 }

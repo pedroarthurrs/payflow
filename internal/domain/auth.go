@@ -8,16 +8,26 @@ import (
 
 // AuthRepository defines persistence operations needed for authentication.
 type AuthRepository interface {
-	GetUserByEmail(ctx context.Context, email string) (*AuthUser, error)
+	// GetUserAccountByEmail looks up a global user account by email.
+	// Returns ErrUnauthorized-friendly errors when not found.
+	GetUserAccountByEmail(ctx context.Context, email string) (*AuthUserAccount, error)
+	// ListMembershipsForUser returns all org memberships for the given user account.
+	ListMembershipsForUser(ctx context.Context, userAccountID uuid.UUID) ([]AuthMembership, error)
 	GetAPIKeyByHash(ctx context.Context, hash string) (*APIKey, error)
 	UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error
 }
 
-// AuthUser holds the user data needed for authentication (includes password).
-type AuthUser struct {
-	ID             uuid.UUID
+// AuthUserAccount holds the global user account data needed for authentication.
+type AuthUserAccount struct {
+	ID       uuid.UUID
+	Password string
+}
+
+// AuthMembership holds org-membership data returned during login.
+type AuthMembership struct {
+	MemberID       uuid.UUID
 	OrganizationID uuid.UUID
-	Password       string
+	Name           string // Organization display name
 	Role           Role
 }
 
@@ -38,7 +48,7 @@ const (
 
 // LoginRequest represents the dynamic login payload.
 // Exactly one mode must be populated:
-//   - User mode: Email + Password (organization resolved from user record)
+//   - User mode: Email + Password (organization resolved from memberships)
 //   - System mode: APIKey
 type LoginRequest struct {
 	Email    string

@@ -58,8 +58,9 @@ Resposta JSON
 
 **Handlers** (`api/handler/`)
 - Um arquivo por recurso, todos no mesmo pacote `handler`
-- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CredentialHandler`, `CustomerHandler`, `UserHandler`, `WebhookHandler`, etc.
+- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CredentialHandler`, `CustomerHandler`, `MemberHandler`, `UserHandler`, `WebhookHandler`, etc.
 - `CredentialHandler` agrega tanto as rotas de credenciais quanto as de credential logs (handler unificado)
+- `MemberHandler` agrega rotas de membros e de permissões granulares (handler unificado)
 - Cada handler implementa `RegisterRoutes(rg *gin.RouterGroup)`
 - Responsáveis por receber requisições HTTP, validar payload e chamar services
 
@@ -73,11 +74,13 @@ Resposta JSON
 **Middleware** (`api/middleware/`)
 - `auth.go`: valida JWT e extrai claims
 - `credential_log.go`: intercepta requisições autenticadas via API Key e persiste log assíncrono
+- `user_log.go`: intercepta requisições autenticadas via JWT de usuário (`auth_type=user`) e persiste `UserLogRecord` de forma assíncrona com método, path, status, latência, IP e user-agent
+- `permission.go`: `RequirePermission(perm)` verifica permissão granular via `PermissionService`; `CachingPermissionResolver` usa TTL de 5 minutos para evitar acessos repetidos ao banco
 - `errors.go`: transforma erros de domínio em respostas HTTP
 - `idempotency.go`: previne operações duplicadas em POST/PATCH via `X-Idempotency-Key`
 - `maintenance.go`: bloqueia tráfego quando modo manutenção está ativo
 - `ratelimit.go`: rate limiting por IP e organization
-- `rbac.go`: controle de acesso baseado em roles
+- `rbac.go`: `RequireRole(minRole)` — controle de acesso baseado em hierarquia de roles
 - `requestid.go`: gera e propaga UUID v4 por requisição
 - `logger.go`: logging estruturado com slog
 
@@ -106,10 +109,11 @@ Resposta JSON
 - CRUD de endereços vinculados a clientes
 - Defaults automáticos: tipo `billing`, país `BR`, `is_main: true`
 
-**UserService** (`service/user.go`)
-- CRUD de usuários com validação de unicidade de email por organization
-- Hash de senha via `PasswordHasher.Hash` (bcrypt cost 12)
-- Bloqueio de criação de segundo `owner` por organization
+**MemberService** (`service/member.go`)
+- Convite, listagem, atualização de role e remoção de membros da organization
+- Criação automática de entrada em `user` ao convidar por email (senha temporária)
+- Listagem paginada de logs de atividade de membros com keyset pagination
+- Cursor opaco: `base64url(JSON{t: RFC3339Nano, i: UUID})`
 
 **ProductService** (`service/product.go`)
 - CRUD de produtos com soft/hard delete
@@ -160,6 +164,32 @@ Resposta JSON
 - `ReplaceItems()` — substitui todos os itens atomicamente via `TxManager`
 - `calculatePeriodEnd()` — calcula `current_period_end` baseado no `interval`/`interval_count` do plano
 
+**MemberService** (`service/member.go`)
+- `InviteMember()` — busca ou cria `UserAccount` pelo email, depois adiciona como membro da organization
+  - Quando a conta não existe, gera senha temporária (retornada uma única vez), cria a conta e adiciona o membro
+- `AddMember()` — vincula um `UserAccount` existente por UUID
+- `ListMembers()`, `GetMember()`, `UpdateMemberRole()`, `RemoveMember()` — CRUD de membros
+- Bloqueia convite de segundo `owner` por organization (`ErrForbidden`)
+- Bloqueia convite duplicado (`ErrAlreadyMember`)
+
+**PermissionService** (`service/permission.go`)
+- Resolve as **permissões efetivas** de um membro: padrões do role ± overrides individuais
+- `EffectivePermissions(orgID, userAccountID)` → lista completa das permissões efetivas
+- `HasPermission(orgID, userAccountID, perm)` → verifica override individual primeiro, depois fallback ao padrão do role
+- `SetPermission()` — cria/atualiza override via `PermissionRepository.Upsert`
+- `RemovePermission()` — deleta override, revertendo ao padrão do role
+
+**RecurrenceService** (`service/recurrence.go`)
+- `ProcessBillingCycle(orgID, subID, attemptNum)` — ciclo completo de cobrança recorrente:
+  1. Skip de estados terminais
+  2. Cancelamento automático quando `cancel_at_period_end` + período expirado
+  3. Transição `trialing → active` quando trial encerrou
+  4. Cálculo do valor total por itens da subscription
+  5. Criação do payment + cobrança via `GatewayService`
+  6. Sucesso: avança período (`AdvancePeriod`), restaura `past_due → active`, aplica schedules pendentes
+  7. Falha: `active → past_due` ou `past_due → unpaid`/`canceled` conforme `maxAttempts`
+- Usa `idempotency_key` baseada em `sub_<id>_<periodo>` para evitar cobranças duplicadas
+
 ---
 
 ### Camada de Domínio (`domain/`)
@@ -168,7 +198,8 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 
 - `organization.go`: entidade Organization
 - `auth.go`: `AuthRepository`, `AuthUser`, `APIKey`, `AuthType`, `LoginRequest`
-- `user.go`: `UserRepository`, modelo User e roles (owner/admin/member)
+- `user.go`: `UserAccountRepository`, `MemberRepository`, `PermissionRepository`; modelos `UserAccount`, `OrganizationMember`, `UserPermission`, `OrganizationRef`; `UserLogWriter`, `UserLogRepository`, `UserLogRecord`, `CreateUserLogInput`, `ListUserLogsInput`
+- `permission.go`: catálogo completo de `Permission` (22 permissões granulares no formato `{resource}:{action}`); `roleDefaultPermissions` mapeando os 4 roles; `DefaultPermissionsFor()`, `HasDefaultPermission()`
 - `customer.go`: `CustomerRepository`, modelo Customer, inputs de criação e atualização
 - `address.go`: `AddressRepository`, modelo Address, inputs de criação e atualização
 - `product.go`: `ProductRepository`, modelo Product, ProductInput
@@ -179,16 +210,44 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `payment.go`: modelos de pagamento (`Payment`, status, tipos)
 - `payment_fsm.go`: `PaymentFSMRepository`, `TransitionHistory`, `ErrInvalidTransition` — FSM de pagamentos
 - `plan.go`: `PlanRepository`, modelo `Plan`, `PlanInput`, `PlanUpdateInput`, `PlanListParams`
+- `recurrence.go`: `RecurrenceRepository`, `RecurringBillingJob`, `SubscriptionBillingCandidate` — contratos e tipos para o motor de cobrança recorrente
 - `subscription.go`: `SubscriptionRepository`, `SubscriptionItemRepository`, `SubscriptionScheduleRepository`, `SubscriptionHistoryRepository`, modelos `Subscription`, `SubscriptionItem`, `SubscriptionStatusHistory`, `SubscriptionSchedule`, inputs e params
 - `subscription_fsm.go`: `SubscriptionStateMachine` — FSM de assinaturas com grafo de transições; `Validate(from, to)`, `IsTerminal(status)`
 - `webhook.go`: `WebhookEndpointRepository`, `WebhookLogRepository`, `OrganizationSecretReader`, modelos `WebhookEndpoint` e `WebhookLog`, event types
 - `tx.go`: contratos transacionais (`TxManager`, `TxHandle`); `TxHandle` expõe `CustomerRepo()`, `AddressRepo()`, `CredentialRepo()`, `PaymentFSMRepo()`, `SubscriptionRepo()`, `SubscriptionItemRepo()`
-- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, etc.)
+- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrAlreadyMember`, `ErrUserLogNotFound`, `ErrBillingAmountZero`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, etc.)
 
 **Roles disponíveis:**
 ```
-owner (3) > admin (2) > member (1)
+owner (4) > admin (3) > developer (2) > support (1)
 ```
+
+**Permissões por role (padrão):**
+
+| Permissão | owner | admin | developer | support |
+|-----------|:-----:|:-----:|:---------:|:-------:|
+| `users:read` | ✓ | ✓ | — | — |
+| `users:invite` | ✓ | ✓ | — | — |
+| `users:manage` | ✓ | — | — | — |
+| `credentials:read` | ✓ | ✓ | ✓ | — |
+| `credentials:manage` | ✓ | ✓ | ✓ | — |
+| `customers:read` | ✓ | ✓ | ✓ | ✓ |
+| `customers:write` | ✓ | ✓ | ✓ | ✓ |
+| `customers:delete` | ✓ | ✓ | — | — |
+| `products:read` | ✓ | ✓ | ✓ | ✓ |
+| `products:write` | ✓ | ✓ | — | — |
+| `plans:read` | ✓ | ✓ | ✓ | ✓ |
+| `plans:write` | ✓ | ✓ | — | — |
+| `subscriptions:read` | ✓ | ✓ | ✓ | ✓ |
+| `subscriptions:write` | ✓ | ✓ | — | ✓ |
+| `subscriptions:items` | ✓ | ✓ | — | — |
+| `payments:read` | ✓ | ✓ | ✓ | ✓ |
+| `payments:charge` | ✓ | ✓ | ✓ | — |
+| `payments:refund` | ✓ | ✓ | — | ✓ |
+| `payments:cancel` | ✓ | ✓ | — | ✓ |
+| `webhooks:read` | ✓ | ✓ | ✓ | — |
+| `webhooks:manage` | ✓ | ✓ | ✓ | — |
+| `logs:read` | ✓ | ✓ | ✓ | — |
 
 **Tipos de autenticação:**
 - `user` — login por email + password (inclui role no token)
@@ -210,7 +269,7 @@ Centraliza todas as operações criptográficas do projeto. Nenhum serviço impo
 **PasswordHasher** (`crypto/crypto.go`)
 - `Hash(password)` → bcrypt hash com salt automático (cost configurável, padrão 12)
 - `Compare(hash, password)` → comparação segura contra hash armazenado
-- Usado em: `UserService.Create`, `AuthService.loginByUser`
+- Usado em: `MemberService.InviteMember`, `AuthService.loginByUser`
 
 **KeyGenerator** (`crypto/crypto.go`)
 - `GenerateRandomBytes(n)` → n bytes aleatórios via `crypto/rand` como hex string
@@ -273,6 +332,54 @@ Queue.Enqueue(job com AttemptNumber+1, ScheduledAt+backoff)
 
 ---
 
+### Sistema de Cobrança Recorrente
+
+O motor de recorrência é composto por três partes independentes:
+
+**1. RecurrenceScheduler** (`worker/recurrence_scheduler.go`)
+- Executa periodicamente via `robfig/cron` (intervalo configurável, ex: `* * * * *`)
+- `scan()`: consulta `RecurrenceRepository.ListDueForBilling` com `SELECT FOR UPDATE SKIP LOCKED` para evitar double processing
+- Para cada candidato, serializa um `RecurringBillingJob` e enfileira na fila de recorrência
+- Configura `billing_locked_until` antes de enfileirar para prevenir re-enfileiramento pela próxima execução do cron
+
+**2. RecurrenceWorker** (`worker/recurrence.go`)
+- Consome jobs da fila de recorrência com N goroutines paralelas (`workerCount`)
+- Respeita `job.ScheduledAt` — aguarda até a janela de execução (útil para retentativas com backoff)
+- Delega o processamento para `RecurrenceService.ProcessBillingCycle`
+- Retry com backoff exponencial: 2min → 10min → 30min → 2h
+
+**3. RecurrenceService** (`service/recurrence.go`)
+- Executa o ciclo completo de cobrança para uma subscription
+- Idempotente via `idempotency_key = "sub_{id}_{período}"` — reenvios não geram cobranças duplicadas
+- Trata transições de status automáticas (trial → active, active → past_due, past_due → unpaid/canceled)
+
+**Fluxo de cobrança recorrente:**
+```
+RecurrenceScheduler (cron)
+    ↓
+RecurrenceRepo.ListDueForBilling() [SELECT FOR UPDATE SKIP LOCKED]
+    ↓
+RecurrenceRepo.LockForBilling()    [previne reprocessamento]
+    ↓
+Queue.Enqueue(RecurringBillingJob)
+    ↓
+RecurrenceWorker.consume() [goroutines]
+    ↓
+RecurrenceService.ProcessBillingCycle()
+    ├─ [sucesso] SubscriptionRepo.AdvancePeriod() + desbloqueio
+    └─ [falha]   handleChargeFailure() + Queue.Enqueue(job+backoff)
+```
+
+**Estados possíveis após falha de cobrança:**
+
+| Estado anterior | Tentativa | Resultado |
+|-----------------|-----------|-----------|
+| `active` | qualquer | → `past_due` |
+| `past_due` | < maxAttempts | permanece `past_due`, re-enfileirado |
+| `past_due` | = maxAttempts | → `unpaid` ou `canceled` |
+
+---
+
 ### Cleanup Worker (`worker/cleanup.go`)
 
 Worker de background que executa tarefas periódicas de purga de dados.
@@ -287,6 +394,7 @@ Worker de background que executa tarefas periódicas de purga de dados.
 |-----|---------|----------|
 | `credential_logs` mais antigos que N dias | 02:00 diário | 90 dias |
 | `webhook_logs` mais antigos que N dias | 02:00 diário | 90 dias |
+| `user_logs` mais antigos que N dias | 02:00 diário | 90 dias |
 | `idempotency_keys` expiradas (`expires_at <= NOW()`) | 03:00 diário | — |
 
 ---
@@ -413,10 +521,13 @@ Cada domínio possui seu próprio subpacote gerado:
 | `dbgen/credentiallog` | Logs de credenciais |
 | `dbgen/customer` | Clientes |
 | `dbgen/idempotency` | Chaves de idempotência |
+| `dbgen/member` | Membros de organização |
 | `dbgen/organization` | Organizations |
 | `dbgen/payment` | Pagamentos e FSM de transações |
+| `dbgen/permission` | Permissões granulares por usuário |
 | `dbgen/product` | Produtos |
-| `dbgen/user` | Usuários |
+| `dbgen/recurrence` | Motor de cobrança recorrente |
+| `dbgen/userlog` | Logs de ações de usuários |
 | `dbgen/webhook` | Endpoints de webhook |
 | `dbgen/webhooklog` | Logs de webhook |
 | `dbgen/plan` | Planos de preço |
@@ -428,7 +539,7 @@ Cada domínio possui seu próprio subpacote gerado:
 - `tx.go`: `TxManager` e `txHandle` para operações atômicas com `defer sqlTx.Rollback()`
 
 **SQL** (`database/queries/`)
-- Um arquivo `.sql` por domínio: `customer.sql`, `address.sql`, `product.sql`, `plan.sql` (8 queries), `subscription.sql` (15 queries, cobrindo assinaturas, itens, histórico e schedules), `credential.sql`, `user.sql`, `payment.sql`, `payment_fsm.sql`, `webhook.sql`, `webhooklog.sql`, `idempotency.sql`, `cleanup.sql`
+- Um arquivo `.sql` por domínio: `customer.sql`, `address.sql`, `product.sql`, `plan.sql`, `subscription.sql` (cobrindo assinaturas, itens, histórico e schedules), `credential.sql`, `member.sql`, `permission.sql`, `user_log.sql`, `recurrence.sql`, `payment.sql`, `payment_fsm.sql`, `webhook.sql`, `webhooklog.sql`, `idempotency.sql`, `cleanup.sql`
 - Queries geram código Go via `make sqlc`
 
 ---
@@ -479,11 +590,17 @@ A ordem é crítica para segurança e observabilidade:
 12. RequireRole()                — RBAC por endpoint (onde aplicável)
 ```
 
-### RBAC
+### RBAC e Permissões Granulares
 
-`RequireRole(minRole)` em `api/middleware/rbac.go`:
+**`RequireRole(minRole)`** em `api/middleware/rbac.go`:
 - Tokens de sistema (`auth_type: system`) sem role recebem 403
-- Hierarquia: `owner (3) > admin (2) > member (1)`
+- Hierarquia: `owner (4) > admin (3) > developer (2) > support (1)`
+
+**`RequirePermission(perm)`** em `api/middleware/permission.go`:
+- Verifica se o usuário possui a permissão granular específica via `PermissionService.HasPermission`
+- Combina permissões padrão do role com overrides individuais (`user_permissions`)
+- Resultados cacheados em memória com TTL de 5 minutos (`CachingPermissionResolver`) para evitar acessos frequentes ao banco
+- Complementa (não substitui) o `RequireRole` — ambos podem ser combinados por endpoint
 
 ### Rate Limiting
 
@@ -565,7 +682,7 @@ Operações atômicas implementadas:
 - RBAC com hierarquia de roles
 - Rate limiting em 3 tiers
 - Audit trail assíncrono para requisições via API Key
-- Bloqueio de segundo owner por organization
+- Bloqueio de segundo `owner` por organization (via `MemberService`)
 
 ---
 
@@ -654,9 +771,8 @@ O Vite proxia `/api` para `VITE_API_PROXY_TARGET` (padrão: `http://api:8080`) e
 | `/customers/:id/edit` | autenticado | Edição de cliente |
 | `/customers/:id/addresses/new` | autenticado | Novo endereço |
 | `/customers/:id/addresses/:addressId/edit` | autenticado | Edição de endereço |
-| `/users` | admin+ | Lista de usuários |
-| `/users/new` | owner | Criação de usuário |
-| `/users/:id/edit` | owner | Edição de usuário |
+| `/members` | admin+ | Lista de membros da organization |
+| `/members/invite` | owner | Convite de novo membro |
 | `/maintenance` | público | Modo manutenção |
 | `/403` | público | Acesso negado |
 

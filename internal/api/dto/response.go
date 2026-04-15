@@ -16,6 +16,13 @@ type PagedResponse[T any] struct {
 	Total  int64 `json:"total"`
 }
 
+// CursorPagedResponse is a generic paginated list response for keyset pagination.
+type CursorPagedResponse[T any] struct {
+	Data       []T     `json:"data"`
+	NextCursor *string `json:"next_cursor,omitempty"`
+	Limit      int64   `json:"limit"`
+}
+
 // AddressResponse is the response DTO for an address.
 type AddressResponse struct {
 	ID           uuid.UUID `json:"id"`

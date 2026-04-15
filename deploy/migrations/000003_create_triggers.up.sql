@@ -105,6 +105,30 @@ CREATE TRIGGER tr_commission_settings_updated_at
     BEFORE UPDATE ON commission_settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER tr_user_updated_at
+    BEFORE UPDATE ON "user"
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER tr_organization_members_updated_at
+    BEFORE UPDATE ON organization_members
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER tr_member_permissions_updated_at
+    BEFORE UPDATE ON member_permissions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER tr_subscription_status_history_updated_at
+    BEFORE UPDATE ON subscription_status_history
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER tr_payment_status_history_updated_at
+    BEFORE UPDATE ON payment_status_history
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER tr_member_logs_updated_at
+    BEFORE UPDATE ON member_logs
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 ------------------------------- FIM ---------------------------------------
 
 

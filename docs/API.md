@@ -113,7 +113,9 @@ Autentica e emite um par de tokens. Suporta dois modos de autenticação:
 }
 ```
 
-A organization é resolvida automaticamente a partir do registro do usuário. O token gerado inclui `auth_type: "user"` e o `role` do usuário.
+A conta global do usuário é buscada pelo email em `user`. Se o usuário for membro de exatamente uma organization, o token é emitido diretamente. Se for membro de múltiplas organizations, um `session_token` de 5 minutos é retornado — o cliente deve chamar `POST /v1/auth/select-organization` com esse token para obter o par completo.
+
+O token gerado inclui `auth_type: "user"` e o `role` do membro na organization selecionada.
 
 **Modo 2 — API Key (sistema):**
 ```json
@@ -1084,32 +1086,128 @@ Retorna um log específico pelo ID. Requer role `admin` ou superior.
 
 ---
 
-### POST /v1/users
+### GET /v1/members/logs
 
-Cria um novo usuário na organization. Requer role `owner`. Apenas um `owner` é permitido por organization.
+Lista os logs de atividade dos membros da organization. Requer role `admin` ou superior.
+
+Registra toda ação autenticada via JWT (`auth_type: "user"`), incluindo chamadas a endpoints protegidos.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `cursor` | string | Cursor opaco da página anterior |
+| `user_id` | UUID | Filtrar por usuário específico |
+| `action` | string | Filtrar por action (ex: `GET /v1/customers`) |
+| `from` | string | Timestamp ISO 8601 (início do intervalo) |
+| `to` | string | Timestamp ISO 8601 (fim do intervalo) |
+| `status_code` | int | Filtrar por código HTTP |
+| `method` | string | Filtrar por método HTTP (`GET`, `POST`, etc.) |
+| `path` | string | Filtrar por prefixo de path |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440080",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "user_id": "550e8400-e29b-41d4-a716-446655440010",
+      "action": "POST /v1/customers",
+      "method": "POST",
+      "path": "/v1/customers",
+      "status_code": 201,
+      "latency_ms": 45,
+      "ip_address": "203.0.113.42",
+      "user_agent": "Mozilla/5.0 ...",
+      "created_at": "2026-04-15T10:00:00Z"
+    }
+  ],
+  "next_cursor": "eyJ0IjoiMjAyNi0wNC0xNVQxMDowMDowMFoiLCJpIjoiNTUwZTg0MDAifQ",
+  "limit": 20
+}
+```
+
+---
+
+### GET /v1/members/logs/:log_id
+
+Retorna um log de atividade específico pelo ID. Requer role `admin` ou superior.
+
+**Resposta (200 OK):** mesmo formato de um item do array `data` acima.
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "user log not found"
+}
+```
+
+---
+
+### GET /v1/members
+
+Lista os membros da organization. Requer role `admin` ou superior.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset de paginação (padrão: 0) |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440090",
+      "user_id": "550e8400-e29b-41d4-a716-446655440010",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "email": "alice@example.com",
+      "name": "Alice",
+      "role": "developer",
+      "joined_at": "2026-03-17T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0
+}
+```
+
+---
+
+### POST /v1/members
+
+Convida um usuário para a organization pelo email. Se o email não possuir uma conta, uma conta é criada automaticamente com uma senha temporária retornada na resposta. Requer role `owner`.
+
+Não é possível convidar um segundo `owner`.
 
 **Requisição:**
 ```json
 {
-  "name": "Alice",
   "email": "alice@example.com",
-  "password": "senha123",
-  "role": "member"
+  "name": "Alice",
+  "role": "developer"
 }
 ```
-
-`role` deve ser um de: `owner`, `admin`, `member`.
 
 **Resposta (201 Created):**
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440010",
-  "name": "Alice",
+  "id": "550e8400-e29b-41d4-a716-446655440090",
+  "user_id": "550e8400-e29b-41d4-a716-446655440010",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
   "email": "alice@example.com",
-  "role": "member",
-  "created_at": "2026-03-17T10:00:00Z"
+  "name": "Alice",
+  "role": "developer",
+  "joined_at": "2026-03-17T10:00:00Z",
+  "temp_password": "x7kR2mNp"
 }
 ```
+
+`temp_password` só é retornado quando uma nova conta é criada. Quando o usuário já possui conta, o campo é omitido.
 
 **Resposta (403 Forbidden):**
 ```json
@@ -1118,71 +1216,129 @@ Cria um novo usuário na organization. Requer role `owner`. Apenas um `owner` é
 }
 ```
 
-Retornado ao tentar criar um segundo `owner` na organization.
+Retornado ao tentar convidar um segundo `owner`.
 
 **Resposta (409 Conflict):**
 ```json
 {
-  "error": "email already exists for this organization"
+  "error": "user is already a member"
 }
 ```
 
 ---
 
-### GET /v1/users
+### GET /v1/members/:user_id
 
-Lista todos os usuários da organization. Requer role `admin` ou superior.
+Retorna um membro pelo `user_id`. Requer role `admin` ou superior.
 
-**Resposta (200 OK):**
-```json
-[
-  {
-    "id": "550e8400-e29b-41d4-a716-446655440010",
-    "name": "Alice",
-    "email": "alice@example.com",
-    "role": "member",
-    "created_at": "2026-03-17T10:00:00Z"
-  }
-]
-```
-
----
-
-### PUT /v1/users/:user_id
-
-Atualiza nome e role de um usuário. Requer role `owner`.
-
-**Requisição:**
-```json
-{
-  "name": "Alice",
-  "role": "admin"
-}
-```
-
-**Resposta (200 OK):** mesmo formato do item da listagem acima.
+**Resposta (200 OK):** mesmo formato de um item da listagem de membros.
 
 **Resposta (404 Not Found):**
 ```json
 {
-  "error": "user not found"
+  "error": "member not found"
 }
 ```
 
 ---
 
-### DELETE /v1/users/:user_id
+### PUT /v1/members/:user_id/role
 
-Remove um usuário da organization (soft delete). Requer role `owner`.
+Atualiza o role de um membro. Requer role `owner`.
+
+**Requisição:**
+```json
+{
+  "role": "admin"
+}
+```
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/members/:user_id`.
+
+**Resposta (403 Forbidden):**
+```json
+{
+  "error": "forbidden"
+}
+```
+
+**Resposta (404 Not Found):**
+```json
+{
+  "error": "member not found"
+}
+```
+
+---
+
+### DELETE /v1/members/:user_id
+
+Remove um membro da organization. Requer role `owner`.
 
 **Resposta (204 No Content):** sem body.
 
 **Resposta (404 Not Found):**
 ```json
 {
-  "error": "user not found"
+  "error": "member not found"
 }
 ```
+
+---
+
+### GET /v1/members/:user_id/permissions
+
+Retorna as permissões efetivas de um membro, com anotação de origem (`role`, `grant` ou `revoke`). Requer role `admin` ou superior.
+
+Permissões efetivas = padrões do role ± overrides individuais.
+
+**Resposta (200 OK):**
+```json
+{
+  "role": "developer",
+  "permissions": [
+    { "permission": "customers:read",    "source": "role" },
+    { "permission": "customers:write",   "source": "role" },
+    { "permission": "payments:refund",   "source": "grant" }
+  ],
+  "revoked": [
+    { "permission": "credentials:manage", "source": "revoke" }
+  ]
+}
+```
+
+`source` pode ser:
+- `"role"` — concedida pelo role padrão
+- `"grant"` — concedida individualmente (override)
+- `"revoke"` — revogada individualmente (override que remove permissão do role)
+
+---
+
+### PUT /v1/members/:user_id/permissions
+
+Define overrides de permissão em lote para um membro. Requer role `owner`.
+
+Grants e revocations são aplicados atomicamente. Qualquer permissão não mencionada preserva seu estado atual.
+
+**Requisição:**
+```json
+{
+  "grants": ["payments:refund"],
+  "revocations": ["credentials:manage"]
+}
+```
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/members/:user_id/permissions`.
+
+---
+
+### DELETE /v1/members/:user_id/permissions/:permission
+
+Remove um override individual de permissão, revertendo o membro ao padrão do role. Requer role `owner`.
+
+Exemplo: `DELETE /v1/members/:user_id/permissions/credentials:manage`
+
+**Resposta (204 No Content):** sem body.
 
 ---
 
@@ -1548,15 +1704,24 @@ Retorna um log de entrega específico pelo ID. Requer role `admin` ou superior.
 Endpoints protegidos podem exigir um role mínimo. A hierarquia de roles é:
 
 ```
-owner (3) > admin (2) > member (1)
+owner (4) > admin (3) > developer (2) > support (1)
 ```
 
 | Endpoint | Role Mínimo |
 |----------|-------------|
-| `POST /v1/users` | owner |
-| `PUT /v1/users/:user_id` | owner |
-| `DELETE /v1/users/:user_id` | owner |
-| `GET /v1/users` | admin |
+| **Usuários** | |
+| `GET /v1/members/logs` | admin |
+| `GET /v1/members/logs/:log_id` | admin |
+| **Membros** | |
+| `POST /v1/members` | owner |
+| `PUT /v1/members/:user_id/role` | owner |
+| `DELETE /v1/members/:user_id` | owner |
+| `PUT /v1/members/:user_id/permissions` | owner |
+| `DELETE /v1/members/:user_id/permissions/:permission` | owner |
+| `GET /v1/members` | admin |
+| `GET /v1/members/:user_id` | admin |
+| `GET /v1/members/:user_id/permissions` | admin |
+| **Credenciais** | |
 | `POST /v1/credentials` | admin |
 | `GET /v1/credentials` | admin |
 | `GET /v1/credentials/:credential_id` | admin |
@@ -1564,6 +1729,7 @@ owner (3) > admin (2) > member (1)
 | `POST /v1/credentials/:credential_id/rotate` | owner |
 | `GET /v1/credentials/logs` | admin |
 | `GET /v1/credentials/logs/:log_id` | admin |
+| **Produtos e Planos** | |
 | `POST /v1/products` | Qualquer role |
 | `GET /v1/products` | Qualquer role |
 | `GET /v1/products/:product_id` | Qualquer role |
@@ -1574,23 +1740,26 @@ owner (3) > admin (2) > member (1)
 | `GET /v1/products/:product_id/plans/:plan_id` | Qualquer role |
 | `PUT /v1/products/:product_id/plans/:plan_id` | admin |
 | `DELETE /v1/products/:product_id/plans/:plan_id` | admin |
+| **Assinaturas** | |
 | `POST /v1/subscriptions` | Qualquer role |
 | `GET /v1/subscriptions` | Qualquer role |
 | `GET /v1/subscriptions/:subscription_id` | Qualquer role |
-| `POST /v1/subscriptions/:subscription_id/cancel` | member |
-| `POST /v1/subscriptions/:subscription_id/pause` | member |
-| `POST /v1/subscriptions/:subscription_id/resume` | member |
+| `POST /v1/subscriptions/:subscription_id/cancel` | support |
+| `POST /v1/subscriptions/:subscription_id/pause` | support |
+| `POST /v1/subscriptions/:subscription_id/resume` | support |
 | `PUT /v1/subscriptions/:subscription_id/items` | admin |
 | `GET /v1/subscriptions/:subscription_id/items` | Qualquer role |
 | `GET /v1/subscriptions/:subscription_id/history` | admin |
 | `POST /v1/subscriptions/:subscription_id/schedules` | admin |
 | `DELETE /v1/subscriptions/:subscription_id/schedules/pending` | admin |
+| **Pagamentos** | |
 | `POST /v1/payments` | Qualquer role |
 | `GET /v1/payments` | Qualquer role |
 | `GET /v1/payments/:payment_id` | Qualquer role |
 | `GET /v1/payments/:payment_id/history` | Qualquer role |
-| `POST /v1/payments/:payment_id/refund` | member |
-| `POST /v1/payments/:payment_id/cancel` | member |
+| `POST /v1/payments/:payment_id/refund` | support |
+| `POST /v1/payments/:payment_id/cancel` | support |
+| **Webhooks** | |
 | `POST /v1/webhooks` | admin |
 | `GET /v1/webhooks` | admin |
 | `GET /v1/webhooks/events` | admin |
@@ -1602,6 +1771,33 @@ owner (3) > admin (2) > member (1)
 | Demais rotas protegidas | Qualquer role (autenticação JWT válida) |
 
 Tokens gerados via API Key (`auth_type: "system"`) não possuem role e recebem `403 Forbidden` em endpoints que exigem role.
+
+Além dos roles, o sistema oferece **permissões granulares** gerenciadas via `/v1/members/:id/permissions`. Cada role tem um conjunto padrão que pode ser estendido ou restringido individualmente por usuário:
+
+| Permissão | Descrição |
+|-----------|-----------|
+| `users:read` | Listar e visualizar usuários |
+| `users:invite` | Convidar novos membros |
+| `users:manage` | Criar, atualizar e remover usuários |
+| `credentials:read` | Visualizar credenciais |
+| `credentials:manage` | Criar, rotacionar e remover credenciais |
+| `customers:read` | Visualizar clientes |
+| `customers:write` | Criar e atualizar clientes |
+| `customers:delete` | Remover clientes |
+| `products:read` | Visualizar produtos |
+| `products:write` | Criar e atualizar produtos e planos |
+| `plans:read` | Visualizar planos |
+| `plans:write` | Criar e atualizar planos |
+| `subscriptions:read` | Visualizar assinaturas |
+| `subscriptions:write` | Criar, cancelar e alterar status de assinaturas |
+| `subscriptions:items` | Substituir itens de assinatura |
+| `payments:read` | Visualizar pagamentos |
+| `payments:charge` | Executar cobranças |
+| `payments:refund` | Executar reembolsos |
+| `payments:cancel` | Cancelar pagamentos |
+| `webhooks:read` | Visualizar webhooks e logs |
+| `webhooks:manage` | Criar, atualizar e remover webhooks |
+| `logs:read` | Visualizar logs de credenciais e usuários |
 
 **Resposta (403 Forbidden):**
 ```json

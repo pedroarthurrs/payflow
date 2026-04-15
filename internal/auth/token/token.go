@@ -28,6 +28,11 @@ const (
 	// TypeRefresh is a long-lived token used only to obtain a new token pair.
 	TypeRefresh TokenType = "refresh"
 
+	// TypeOrgSelect is a short-lived token (5 min) issued when a user belongs to
+	// multiple organizations. The client must POST /v1/auth/select-organization
+	// with this token to obtain a full access/refresh pair for the chosen org.
+	TypeOrgSelect TokenType = "org_selection"
+
 	issuer = "i9pay"
 )
 
@@ -41,6 +46,8 @@ type Claims struct {
 
 	// UserID is the authenticated user's UUID. Empty for system tokens.
 	UserID string `json:"user_id,omitempty"`
+	// MemberID is the organization_members.id UUID for the active membership. Empty for system tokens.
+	MemberID string `json:"member_id,omitempty"`
 	// Role is the user's role within the organization. Empty for system tokens.
 	Role domain.Role `json:"role,omitempty"`
 	// AuthType indicates the authentication mode (user or system). Always present.
@@ -53,6 +60,7 @@ type Claims struct {
 type ClaimsInput struct {
 	OrganizationID string          // organization UUID
 	UserID         string          // empty for system tokens
+	MemberID       string          // organization_members.id UUID; empty for system tokens
 	Role           domain.Role     // empty for system tokens
 	AuthType       domain.AuthType // user or system
 }
@@ -169,6 +177,18 @@ func (s *Service) Verify(tokenString string, expectedType TokenType) (*Claims, e
 	return claims, nil
 }
 
+// NewOrgSelectToken issues a 5-minute org_selection token for a user who
+// authenticated successfully but belongs to multiple organizations.
+// The JWT sub field is set to userAccountID; the client must present this token
+// via POST /v1/auth/select-organization to obtain a full access/refresh pair.
+func (s *Service) NewOrgSelectToken(userAccountID string) (string, error) {
+	tok, _, err := s.sign(ClaimsInput{
+		OrganizationID: userAccountID,
+		AuthType:       domain.AuthTypeUser,
+	}, TypeOrgSelect, 5*time.Minute)
+	return tok, err
+}
+
 // sign creates and signs a JWT for the given ClaimsInput and TokenType.
 func (s *Service) sign(input ClaimsInput, tokenType TokenType, ttl time.Duration) (string, time.Time, error) {
 	now := time.Now()
@@ -178,6 +198,7 @@ func (s *Service) sign(input ClaimsInput, tokenType TokenType, ttl time.Duration
 		OrganizationID: input.OrganizationID,
 		TokenType:      tokenType,
 		UserID:         input.UserID,
+		MemberID:       input.MemberID,
 		Role:           input.Role,
 		AuthType:       input.AuthType,
 		RegisteredClaims: jwt.RegisteredClaims{

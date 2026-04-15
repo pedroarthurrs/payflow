@@ -26,7 +26,7 @@ func TestProperty_ClaimsOrganizationIDAndAuthType(t *testing.T) {
 		var role domain.Role
 		if authType == domain.AuthTypeUser {
 			userID = rapid.StringMatching(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`).Draw(t, "userID")
-			role = rapid.SampledFrom([]domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleMember}).Draw(t, "role")
+			role = rapid.SampledFrom([]domain.Role{domain.RoleOwner, domain.RoleAdmin, domain.RoleDeveloper, domain.RoleSupport}).Draw(t, "role")
 		}
 
 		input := token.ClaimsInput{

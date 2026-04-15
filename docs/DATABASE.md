@@ -7,6 +7,28 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
 ## Diagrama de Entidade-Relacionamento
 
 ```
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       "user"                                               │
+│  id (PK) · email (UNIQUE) · name · password_hash · created_at · updated_at · deleted_at   │
+└────────────────────────────────────────────┬───────────────────────────────────────────────┘
+                                             │ 1
+              ┌──────────────────────────────┼──────────────────────────────────┐
+              │ N                            │ N                                │ N
+┌─────────────▼───────────────────────┐  ┌───▼────────────────────────────┐  ┌──▼──────────────────────┐
+│       ORGANIZATION_MEMBERS          │  │      MEMBER_PERMISSIONS        │  │       MEMBER_LOGS       │
+│  id (PK)                            │  │  id (PK)                       │  │  id (PK)                │
+│  organization_id (FK)               │  │  organization_id (denorm.)     │  │  organization_id        │
+│  user_id (FK)                       │  │  member_id (FK)                │  │    (denorm.)            │
+│  role                               │  │  permission                    │  │  member_id (FK)         │
+│  invited_by (FK, nullable)          │  │  granted (bool)                │  │  action                 │
+│  joined_at                          │  │  created_at · updated_at       │  │  method · path          │
+│  created_at · updated_at            │  └────────────────────────────────┘  │  status_code · latency  │
+└─────────────────────────────────────┘                                      │  ip_address · user_agent│
+                                                                             │  metadata               │
+                                                                             │  created_at · updated_at†│
+                                                                             └─────────────────────────┘
+
+
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                      ORGANIZATIONS                                          │
 │  id (PK) · name · webhook_secret · status · created_at · updated_at · deleted_at            │
@@ -16,29 +38,29 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
               │                              │                               │
               │ N                            │ N                             │ N
 ┌─────────────▼──────────────┐  ┌────────────▼────────────┐  ┌───────────────▼────────────────┐
-│     ORGANIZATION_CONFIGS   │  │          USERS          │  │         CREDENTIALS            │
+│     ORGANIZATION_CONFIGS   │  │  ORGANIZATION_MEMBERS   │  │         CREDENTIALS            │
 │  id (PK)                   │  │  id (PK)                │  │  id (PK)                       │
 │  organization_id (FK)      │  │  organization_id (FK)   │  │  organization_id (FK)          │
-│  support_email             │  │  email                  │  │  name                          │
-│  logo_url                  │  │  name                   │  │  key_hash (UNIQUE)             │
-│  primary_color             │  │  password               │  │  key_prefix                    │
-│  created_at · updated_at   │  │  role                   │  │  environment                   │
-└────────────────────────────┘  │  created_at · updated_at│  │  last_used_at · expires_at     │
-                                │  deleted_at             │  │  created_at · deleted_at       │
-                                └─────────────────────────┘  └───────────────┬────────────────┘
-                                                                             │ 1
-                                                                             │ N
-                                                              ┌──────────────▼─────────────────┐
-                                                              │        CREDENTIAL_LOGS         │
-                                                              │  id (PK)                       │
-                                                              │  organization_id (FK)          │
-                                                              │  credential_id (FK, nullable)  │
-                                                              │  method · path                 │
-                                                              │  request_body · response_body  │
-                                                              │  status_code · latency_ms      │
-                                                              │  ip_address · user_agent       │
-                                                              │  created_at · updated_at       │
-                                                              └────────────────────────────────┘
+│  support_email             │  │  user_id (FK)           │  │  name                          │
+│  logo_url                  │  │  role                   │  │  key_hash (UNIQUE)             │
+│  primary_color             │  │  invited_by (FK,        │  │  key_prefix                    │
+│  created_at · updated_at   │  │    nullable)            │  │  environment                   │
+└────────────────────────────┘  │  joined_at              │  │  last_used_at · expires_at     │
+                                │  created_at · updated_at│  │  created_at · updated_at       │
+                                │  deleted_at             │  │  deleted_at                    │
+                                └─────────────────────────┘                 │ 1
+                                                                            │ N
+                                                             ┌──────────────▼─────────────────┐
+                                                             │        CREDENTIAL_LOGS         │
+                                                             │  id (PK)                       │
+                                                             │  organization_id (FK)          │
+                                                             │  credential_id (FK, nullable)  │
+                                                             │  method · path                 │
+                                                             │  request_body · response_body  │
+                                                             │  status_code · latency_ms      │
+                                                             │  ip_address · user_agent       │
+                                                             │  created_at · updated_at       │
+                                                             └────────────────────────────────┘
 
 
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -57,11 +79,13 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
        │  postal_code · street │  │  current_period_start   │  │  conditions                  │
        │  number · complement  │  │  current_period_end     │  │  is_active                   │
        │  neighborhood · city  │  │  cancel_at_period_end   │  │  created_at · updated_at     │
-       │  state · country      │  │  metadata               │  │  deleted_at                  │
-       │  is_main              │  │  created_at · updated_at│  └──────────────────────────────┘
-       │  created_at · updated │  └──────────┬──────────────┘
-       │  deleted_at           │             │ 1
-       └───────────────────────┘             │
+       │  state · country      │  │  billing_locked_until   │  │  deleted_at                  │
+       │  is_main              │  │  payment_method         │  └──────────────────────────────┘
+       │  created_at · updated │  │  metadata               │
+       │  deleted_at           │  │  created_at · updated_at│
+       └───────────────────────┘  └──────────┬──────────────┘
+                                             │ 1
+                                             │
               ┌──────────────────────────────├─────────┬────────────────────────────────┐
               │ N                                      │ N                              │ N
        ┌──────────────────────────────┐   ┌────────────▼──────────────┐  ┌──────────────▼──────────────┐
@@ -72,7 +96,7 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
        │  scheduled_at                │   │  plan_id (FK)             │  │  old_status · new_status    │
        │  target_status               │   │  quantity                 │  │  reason · metadata          │
        │  target_plan_id              │   │  created_at · updated_at  │  │  event_source_id            │
-       │  applied_at                  │   └───────────────────────────┘  │  created_at                 │
+       │  applied_at                  │   └───────────────────────────┘  │  created_at · updated_at†   │
        │  created_at · updated_at     │                                  └─────────────────────────────┘
        └──────────────────────────────┘
 
@@ -130,7 +154,8 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
                                                                │  old_status · new_status      │
                                                                │  event_source                 │
                                                                │  event_source_id              │
-                                                               │  reason · created_at          │
+                                                               │  reason                       │
+                                                               │  created_at · updated_at†     │
                                                                └───────────────────────────────┘
 
 
@@ -155,7 +180,7 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
        │  invoice_id (FK)      │  └─────────────────────────┘
        │  payment_id (FK)      │
        │  metadata             │
-       │  created_at · updated │
+       │  created_at · updated†│
        └───────────────────────┘
 
 
@@ -196,6 +221,8 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+> **†  Tabelas imutáveis** — `subscription_status_history`, `payment_status_history`, `member_logs` e `ledger_entries` são registros append-only. A coluna `updated_at` existe exclusivamente para rastreabilidade de alterações manuais diretas no banco (DBA / hotfix) e não deve ser atualizada pela aplicação.
+
 ## Grupos Funcionais
 
 ### Identidade e Acesso
@@ -203,7 +230,10 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
 |--------|-----------|
 | `organizations` | Tenant raiz. Todos os dados são isolados por `organization_id`. |
 | `organization_configs` | Configurações visuais e de suporte por organização (1:1). |
-| `users` | Usuários do painel com RBAC (`owner > admin > member`). Email único por organização. |
+| `"user"` | Identidade global de um usuário, independente de organização. Email único global. |
+| `organization_members` | Vínculo entre `"user"` e `organization`. Carrega o `role` (`owner`/`admin`/`developer`/`support`). |
+| `member_permissions` | Overrides de permissão granular por membro. FK direto em `organization_members`. `granted=true` concede; `granted=false` revoga. |
+| `member_logs` | Audit trail assíncrono de ações de membros autenticados via JWT. Sempre vinculado a um `organization_member` ativo. |
 | `credentials` | API Keys para autenticação de sistema. Armazena hash SHA-256 + prefixo de ambiente. |
 | `credential_logs` | Audit trail assíncrono de requisições autenticadas via API Key. |
 
@@ -222,7 +252,7 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
 ### Assinaturas
 | Tabela | Descrição |
 |--------|-----------|
-| `subscriptions` | Contratos ativos de assinatura com ciclo de vida completo. |
+| `subscriptions` | Contratos ativos de assinatura com ciclo de vida completo. Campo `billing_locked_until` previne double processing pelo motor de recorrência. |
 | `subscription_items` | Planos contratados dentro de uma assinatura (N:N entre subscription e plan). |
 | `subscription_status_history` | Histórico automático de mudanças de status (via trigger). |
 | `subscription_schedules` | Agendamento de alterações futuras (mudança de plano, cancelamento). |
@@ -284,7 +314,7 @@ O banco de dados do i9pay é estruturado em torno da entidade `organizations`, q
 Todas as tabelas carregam `organization_id`. Chaves estrangeiras compostas `(organization_id, entity_id)` garantem que referências cruzadas nunca vazem entre tenants.
 
 **Soft Delete**
-Tabelas com dados sensíveis usam `deleted_at` em vez de remoção física: `organizations`, `users`, `credentials`, `customers`, `addresses`, `products`, `plans`, `webhook_endpoints`, `commission_settings`.
+Tabelas com dados sensíveis usam `deleted_at` em vez de remoção física: `organizations`, `"user"`, `credentials`, `customers`, `addresses`, `products`, `plans`, `webhook_endpoints`, `commission_settings`.
 
 **Snapshots Imutáveis**
 `invoices` armazena `customer_snapshot` e `items_snapshot` em JSONB para garantir integridade histórica independente de alterações futuras nos dados originais.
@@ -293,4 +323,7 @@ Tabelas com dados sensíveis usam `deleted_at` em vez de remoção física: `org
 `payments` possui `idempotency_key` único. A tabela `idempotency_keys` provê cache de resposta para qualquer endpoint da API.
 
 **Auditoria Automática**
-`subscription_status_history` e `payment_status_history` registram todas as transições de estado. `credential_logs` registra todas as requisições autenticadas via API Key.
+`subscription_status_history` e `payment_status_history` registram todas as transições de estado. `credential_logs` registra todas as requisições autenticadas via API Key. `member_logs` registra todas as ações de membros autenticados via JWT (`auth_type=user`); por ser vinculado a `organization_members`, os logs são automaticamente isolados por organização.
+
+**Tabelas Imutáveis**
+`subscription_status_history`, `payment_status_history`, `member_logs` e `ledger_entries` são registros append-only — a aplicação nunca executa `UPDATE` nessas tabelas. A coluna `updated_at` está presente exclusivamente para rastreabilidade de alterações manuais diretas (DBA / hotfix de produção), disparada pelo trigger padrão `tr_*_updated_at`.

@@ -1,6 +1,3 @@
--- name: GetUserByEmail :one
-SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1;
-
 -- name: GetAPIKeyByHash :one
 SELECT * FROM credentials
 WHERE key_hash = $1

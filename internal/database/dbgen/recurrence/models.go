@@ -370,6 +370,31 @@ type LedgerEntry struct {
 	UpdatedAt      sql.NullTime          `json:"updated_at"`
 }
 
+type MemberLog struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	MemberID       uuid.UUID             `json:"member_id"`
+	Action         string                `json:"action"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+	Metadata       pqtype.NullRawMessage `json:"metadata"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+type MemberPermission struct {
+	ID             uuid.UUID    `json:"id"`
+	OrganizationID uuid.UUID    `json:"organization_id"`
+	MemberID       uuid.UUID    `json:"member_id"`
+	Permission     string       `json:"permission"`
+	Granted        bool         `json:"granted"`
+	CreatedAt      sql.NullTime `json:"created_at"`
+	UpdatedAt      sql.NullTime `json:"updated_at"`
+}
+
 type Organization struct {
 	ID            uuid.UUID      `json:"id"`
 	Name          string         `json:"name"`
@@ -388,6 +413,18 @@ type OrganizationConfig struct {
 	PrimaryColor   sql.NullString `json:"primary_color"`
 	CreatedAt      sql.NullTime   `json:"created_at"`
 	UpdatedAt      sql.NullTime   `json:"updated_at"`
+}
+
+type OrganizationMember struct {
+	ID             uuid.UUID     `json:"id"`
+	OrganizationID uuid.UUID     `json:"organization_id"`
+	UserID         uuid.UUID     `json:"user_id"`
+	Role           string        `json:"role"`
+	InvitedBy      uuid.NullUUID `json:"invited_by"`
+	JoinedAt       sql.NullTime  `json:"joined_at"`
+	CreatedAt      sql.NullTime  `json:"created_at"`
+	UpdatedAt      sql.NullTime  `json:"updated_at"`
+	DeletedAt      sql.NullTime  `json:"deleted_at"`
 }
 
 type Payment struct {
@@ -509,15 +546,13 @@ type SubscriptionStatusHistory struct {
 }
 
 type User struct {
-	ID             uuid.UUID    `json:"id"`
-	OrganizationID uuid.UUID    `json:"organization_id"`
-	Email          string       `json:"email"`
-	Name           string       `json:"name"`
-	Password       string       `json:"password"`
-	Role           string       `json:"role"`
-	CreatedAt      sql.NullTime `json:"created_at"`
-	UpdatedAt      sql.NullTime `json:"updated_at"`
-	DeletedAt      sql.NullTime `json:"deleted_at"`
+	ID        uuid.UUID    `json:"id"`
+	Email     string       `json:"email"`
+	Name      string       `json:"name"`
+	Password  string       `json:"password"`
+	CreatedAt sql.NullTime `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
+	DeletedAt sql.NullTime `json:"deleted_at"`
 }
 
 type Wallet struct {

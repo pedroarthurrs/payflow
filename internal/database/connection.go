@@ -13,13 +13,13 @@ import (
 	credentiallogdb "i9pay/internal/database/dbgen/credentiallog"
 	customerdb "i9pay/internal/database/dbgen/customer"
 	idempotencydb "i9pay/internal/database/dbgen/idempotency"
+	memberlogdb "i9pay/internal/database/dbgen/memberlog"
 	organizationdb "i9pay/internal/database/dbgen/organization"
 	paymentdb "i9pay/internal/database/dbgen/payment"
 	plandb "i9pay/internal/database/dbgen/plan"
 	productdb "i9pay/internal/database/dbgen/product"
 	recurrencedb "i9pay/internal/database/dbgen/recurrence"
 	subscriptiondb "i9pay/internal/database/dbgen/subscription"
-	userdb "i9pay/internal/database/dbgen/user"
 	webhookdb "i9pay/internal/database/dbgen/webhook"
 	webhooklogdb "i9pay/internal/database/dbgen/webhooklog"
 
@@ -31,12 +31,12 @@ type DB struct {
 	*sql.DB
 	CustomerQ      customerdb.Querier
 	AddressQ       addressdb.Querier
-	UserQ          userdb.Querier
 	ProductQ       productdb.Querier
 	AuthQ          authdb.Querier
 	OrganizationQ  organizationdb.Querier
 	CredentialQ    credentialdb.Querier
 	CredentialLogQ credentiallogdb.Querier
+	MemberLogQ     memberlogdb.Querier
 	WebhookQ       webhookdb.Querier
 	WebhookLogQ    webhooklogdb.Querier
 	IdempotencyQ   idempotencydb.Querier
@@ -76,12 +76,12 @@ func New(cfg *config.Config) (*DB, error) {
 		DB:             db,
 		CustomerQ:      customerdb.New(db),
 		AddressQ:       addressdb.New(db),
-		UserQ:          userdb.New(db),
 		ProductQ:       productdb.New(db),
 		AuthQ:          authdb.New(db),
 		OrganizationQ:  organizationdb.New(db),
 		CredentialQ:    credentialdb.New(db),
 		CredentialLogQ: credentiallogdb.New(db),
+		MemberLogQ:     memberlogdb.New(db),
 		WebhookQ:       webhookdb.New(db),
 		WebhookLogQ:    webhooklogdb.New(db),
 		IdempotencyQ:   idempotencydb.New(db),

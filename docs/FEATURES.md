@@ -13,7 +13,167 @@ Cada módulo descreve:
 
 ## Módulos
 
+- [Member-Scoped Logs & Permissions](#member-scoped-logs--permissions)
 - [User Permissions & Multi-Organization](#user-permissions--multi-organization)
+
+---
+
+## Member-Scoped Logs & Permissions
+
+### Contexto
+
+`member_logs` e `user_permissions` foram refatoradas para referenciar `organization_members` diretamente em vez de `"user"` + `organizations` separadamente. Isso garante que logs e sobrescritas de permissão existam somente no contexto de um vínculo de membership válido, separando explicitamente as ações de um usuário entre organizações distintas.
+
+**Problema anterior:**
+
+```
+user_permissions(organization_id, user_id) — duas FKs independentes
+member_logs(organization_id, user_id)     — sem garantia de membership
+```
+
+Um `user_id` podia ter logs ou permissões em uma `organization_id` para a qual não existia `organization_members`, tornando a relação inconsistente e sem restrição referencial explícita.
+
+**Modelo correto:**
+
+```
+user_permissions(member_id) → organization_members(id)
+member_logs(member_id)      → organization_members(id)
+```
+
+`organization_id` é mantido como coluna desnormalizada nas duas tabelas para otimizar queries filtradas por org sem JOIN adicional. Integridade de cascata é garantida pela FK em `member_id ON DELETE CASCADE`.
+
+---
+
+### Mudanças no Schema
+
+#### `user_permissions`
+
+| Antes | Depois |
+|-------|--------|
+| `organization_id UUID NOT NULL REFERENCES organizations(id)` | mantido como coluna desnormalizada (sem FK própria) |
+| `user_id UUID NOT NULL REFERENCES "user"(id)` | **removido** |
+| — | `member_id UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE` |
+| `UNIQUE (organization_id, user_id, permission)` | `UNIQUE (member_id, permission)` |
+
+#### `member_logs`
+
+| Antes | Depois |
+|-------|--------|
+| `organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL` | mantido como coluna desnormalizada (sem FK própria) |
+| `user_id UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE` | **removido** |
+| — | `member_id UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE` |
+
+Logs sem contexto de organização (ex: eventos de autenticação pré-seleção de org) **não são registrados** em `member_logs`. A tabela é exclusiva para ações de membros autenticados dentro de uma organização.
+
+---
+
+### Mudanças no Domínio
+
+#### `domain/user.go`
+
+`UserPermission`:
+```go
+// Antes
+type UserPermission struct {
+    ID             uuid.UUID
+    OrganizationID uuid.UUID
+    UserAccountID  uuid.UUID
+    Permission     Permission
+    Granted        bool
+    ...
+}
+
+// Depois
+type UserPermission struct {
+    ID             uuid.UUID
+    OrganizationID uuid.UUID  // desnormalizado para conveniência de query
+    MemberID       uuid.UUID
+    Permission     Permission
+    Granted        bool
+    ...
+}
+```
+
+`MemberLogRecord`:
+```go
+// Antes
+type MemberLogRecord struct {
+    ID             uuid.UUID
+    OrganizationID *uuid.UUID
+    UserAccountID  uuid.UUID
+    ...
+}
+
+// Depois
+type MemberLogRecord struct {
+    ID             uuid.UUID
+    OrganizationID uuid.UUID  // nunca nil — log sempre pertence a um membro com org
+    MemberID       uuid.UUID
+    ...
+}
+```
+
+`CreateMemberLogInput`:
+```go
+// Antes
+type CreateMemberLogInput struct {
+    OrganizationID *uuid.UUID
+    UserAccountID  uuid.UUID
+    ...
+}
+
+// Depois
+type CreateMemberLogInput struct {
+    OrganizationID uuid.UUID
+    MemberID       uuid.UUID
+    ...
+}
+```
+
+`PermissionRepository`:
+```go
+// Assinatura dos métodos refatorada — user_account_id substituído por member_id
+type PermissionRepository interface {
+    Upsert(ctx context.Context, orgID, memberID uuid.UUID, permission Permission, granted bool) error
+    Delete(ctx context.Context, orgID, memberID uuid.UUID, permission Permission) error
+    ListForMember(ctx context.Context, memberID uuid.UUID) ([]UserPermission, error)
+}
+```
+
+`MemberLogRepository`:
+```go
+type MemberLogRepository interface {
+    List(ctx context.Context, orgID uuid.UUID, input ListMemberLogsInput) ([]MemberLogRecord, error)
+    GetByID(ctx context.Context, orgID, logID uuid.UUID) (*MemberLogRecord, error)
+}
+```
+
+`MemberLogWriter`:
+```go
+// Sem mudança de interface — campos internos de CreateMemberLogInput mudam
+type MemberLogWriter interface {
+    Create(ctx context.Context, input CreateMemberLogInput) error
+}
+```
+
+---
+
+### Mudanças no Middleware `MemberLog`
+
+O middleware em `internal/api/middleware/member_log.go` precisa resolver o `member_id` a partir dos claims antes de criar o log. O `Claims` já carrega `UserID` e `OrganizationID`; o `MemberID` deve ser incluído nas claims ou resolvido via lookup no `MemberRepository`.
+
+**Opção recomendada:** incluir `member_id` diretamente nas claims do JWT na emissão do token (campo adicional `MemberID string`). Isso elimina lookup adicional no path crítico da request.
+
+---
+
+### Ordem de Implementação
+
+1. Atualizar `domain/user.go` — `UserPermission`, `MemberLogRecord`, `CreateMemberLogInput`, interfaces
+2. Regenerar queries SQLC (`make sqlc`)
+3. Atualizar `MemberLogRepo` e repositório de permissões
+4. Adicionar `MemberID` nas `Claims` do JWT e no `token.Service`
+5. Atualizar middleware `MemberLog` para usar `claims.MemberID`
+6. Atualizar `PermissionResolver` para usar `member_id`
 
 ---
 
