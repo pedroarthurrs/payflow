@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "feature-architect": {
+      "source": ".ai/skills",
+      "sourceType": "local",
+      "computedHash": "2ed46570f7c3f1b22148bf4a508944cac35083d8675c1defb5355add4c4af854"
+    },
+    "feature-checker": {
+      "source": ".ai/skills",
+      "sourceType": "local",
+      "computedHash": "b8a34280c7f29e7cc1d4d24574976402a1a99067a7179c0d5829757fba26beb9"
+    },
+    "feature-scaffold": {
+      "source": ".ai/skills",
+      "sourceType": "local",
+      "computedHash": "b45f7353d95f389be996527dac9ffdd50d2bc626eaa417f441bd92bbbc92e137"
+    }
+  }
+}
