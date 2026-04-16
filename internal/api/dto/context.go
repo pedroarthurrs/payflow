@@ -114,3 +114,13 @@ func ScheduleID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// WalletID parses the ":wallet_id" path parameter as a UUID.
+func WalletID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("wallet_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid wallet id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}

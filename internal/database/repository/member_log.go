@@ -86,7 +86,7 @@ func (r *MemberLogRepo) GetByID(ctx context.Context, orgID, logID uuid.UUID) (*d
 	return &rec, nil
 }
 
-func toDomainMemberLogFromGetRow(row memberlogdb.MemberLog) domain.MemberLogRecord {
+func toDomainMemberLogFromGetRow(row memberlogdb.GetMemberLogByIDRow) domain.MemberLogRecord {
 	rec := domain.MemberLogRecord{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
@@ -118,7 +118,7 @@ func toDomainMemberLogFromGetRow(row memberlogdb.MemberLog) domain.MemberLogReco
 	return rec
 }
 
-func toDomainMemberLogFromListRow(row memberlogdb.MemberLog) domain.MemberLogRecord {
+func toDomainMemberLogFromListRow(row memberlogdb.ListMemberLogsRow) domain.MemberLogRecord {
 	rec := domain.MemberLogRecord{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

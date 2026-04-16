@@ -248,6 +248,8 @@ func (r *PaymentFSMRepo) GetForUpdate(ctx context.Context, orgID, paymentID uuid
 	return &domain.PaymentForUpdate{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
+		CustomerID:     row.CustomerID,
+		AmountCents:    row.AmountCents,
 		Status:         domain.PaymentStatus(row.Status),
 	}, nil
 }
@@ -318,7 +320,7 @@ func (r *PaymentFSMRepo) ListHistory(ctx context.Context, orgID, paymentID uuid.
 	return records, nil
 }
 
-func toDomainTransitionHistory(row paymentdb.PaymentStatusHistory) domain.TransitionHistory {
+func toDomainTransitionHistory(row paymentdb.ListPaymentHistoryRow) domain.TransitionHistory {
 	h := domain.TransitionHistory{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,

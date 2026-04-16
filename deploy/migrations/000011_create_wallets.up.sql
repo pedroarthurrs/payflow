@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS wallets (
     customer_owner_id UUID REFERENCES customers(id),
 
     balance INTEGER NOT NULL DEFAULT 0,
+    locked_balance INTEGER NOT NULL DEFAULT 0,
     currency VARCHAR(3) DEFAULT 'BRL',
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
 
@@ -112,3 +113,27 @@ CREATE TRIGGER tr_payouts_updated_at
 CREATE TRIGGER tr_commission_settings_updated_at
     BEFORE UPDATE ON commission_settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Tabela de locks de saldo (disputas e payouts pendentes)
+CREATE TABLE IF NOT EXISTS wallet_locks (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
+    wallet_id       UUID NOT NULL REFERENCES wallets(id),
+    type            VARCHAR(20) NOT NULL CHECK (type IN ('dispute', 'payout')),
+    reference_id    UUID NOT NULL,
+    amount_cents    INTEGER NOT NULL CHECK (amount_cents > 0),
+    status          VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'released')),
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    released_at     TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_wallet_locks_wallet_id
+    ON wallet_locks (wallet_id) WHERE status = 'active';
+
+CREATE INDEX IF NOT EXISTS idx_wallet_locks_reference_id
+    ON wallet_locks (organization_id, reference_id, type) WHERE status = 'active';
+
+-- Unique constraint para upsert de commission_settings
+CREATE UNIQUE INDEX IF NOT EXISTS idx_commission_settings_org_customer
+    ON commission_settings (organization_id, target_customer_id)
+    WHERE deleted_at IS NULL;

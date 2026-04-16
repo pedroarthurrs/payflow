@@ -237,6 +237,7 @@ type Credential struct {
 	LastUsedAt     sql.NullTime    `json:"last_used_at"`
 	ExpiresAt      sql.NullTime    `json:"expires_at"`
 	CreatedAt      sql.NullTime    `json:"created_at"`
+	UpdatedAt      sql.NullTime    `json:"updated_at"`
 	DeletedAt      sql.NullTime    `json:"deleted_at"`
 }
 
@@ -383,6 +384,7 @@ type MemberLog struct {
 	UserAgent      sql.NullString        `json:"user_agent"`
 	Metadata       pqtype.NullRawMessage `json:"metadata"`
 	CreatedAt      sql.NullTime          `json:"created_at"`
+	UpdatedAt      sql.NullTime          `json:"updated_at"`
 }
 
 type MemberPermission struct {
@@ -455,6 +457,7 @@ type PaymentStatusHistory struct {
 	EventSourceID  uuid.NullUUID         `json:"event_source_id"`
 	Reason         sql.NullString        `json:"reason"`
 	CreatedAt      sql.NullTime          `json:"created_at"`
+	UpdatedAt      sql.NullTime          `json:"updated_at"`
 }
 
 type Payout struct {
@@ -543,6 +546,7 @@ type SubscriptionStatusHistory struct {
 	Metadata       pqtype.NullRawMessage      `json:"metadata"`
 	EventSourceID  uuid.NullUUID              `json:"event_source_id"`
 	CreatedAt      sql.NullTime               `json:"created_at"`
+	UpdatedAt      sql.NullTime               `json:"updated_at"`
 }
 
 type User struct {
@@ -565,6 +569,19 @@ type Wallet struct {
 	Status              sql.NullString `json:"status"`
 	CreatedAt           sql.NullTime   `json:"created_at"`
 	UpdatedAt           sql.NullTime   `json:"updated_at"`
+	LockedBalance       int32          `json:"locked_balance"`
+}
+
+type WalletLock struct {
+	ID             uuid.UUID    `json:"id"`
+	OrganizationID uuid.UUID    `json:"organization_id"`
+	WalletID       uuid.UUID    `json:"wallet_id"`
+	Type           string       `json:"type"`
+	ReferenceID    uuid.UUID    `json:"reference_id"`
+	AmountCents    int32        `json:"amount_cents"`
+	Status         string       `json:"status"`
+	CreatedAt      sql.NullTime `json:"created_at"`
+	ReleasedAt     sql.NullTime `json:"released_at"`
 }
 
 type WebhookEndpoint struct {

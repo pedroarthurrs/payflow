@@ -42,6 +42,15 @@ var (
 	ErrSubscriptionAlreadyLocked = errors.New("subscription billing is already locked")
 	ErrBillingAmountZero         = errors.New("subscription billing amount is zero")
 
+	// Wallet / ledger errors
+	ErrWalletNotFound      = errors.New("wallet not found")
+	ErrWalletSuspended     = errors.New("wallet is suspended")
+	ErrInsufficientBalance = errors.New("insufficient balance")
+	ErrCommissionNotFound  = errors.New("commission setting not found")
+	ErrPayoutNotFound      = errors.New("payout not found")
+	ErrInvalidAdjustment   = errors.New("invalid adjustment")
+	ErrWalletLockNotFound  = errors.New("wallet lock not found")
+
 	// Member / permission errors
 	ErrAlreadyMember        = errors.New("user is already a member of this organization")
 	ErrOwnerCannotLeave     = errors.New("owner cannot be removed from organization")

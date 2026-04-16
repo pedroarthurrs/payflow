@@ -31,6 +31,12 @@ var domainStatusMap = map[error]int{
 	domain.ErrTerminalState:           http.StatusConflict,            // 409
 	domain.ErrSameStateTransition:     http.StatusUnprocessableEntity, // 422
 	domain.ErrInvalidTransition:       http.StatusUnprocessableEntity, // 422
+	domain.ErrWalletNotFound:          http.StatusNotFound,            // 404
+	domain.ErrPayoutNotFound:          http.StatusNotFound,            // 404
+	domain.ErrCommissionNotFound:      http.StatusNotFound,            // 404
+	domain.ErrWalletSuspended:         http.StatusUnprocessableEntity, // 422
+	domain.ErrInsufficientBalance:     http.StatusUnprocessableEntity, // 422
+	domain.ErrInvalidAdjustment:       http.StatusUnprocessableEntity, // 422
 }
 
 // Errors reads errors attached via c.Error() after the handler chain runs and

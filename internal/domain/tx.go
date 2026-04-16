@@ -15,6 +15,7 @@ type TxHandle interface {
 	AddressRepo() AddressRepository
 	CredentialRepo() CredentialRepository
 	PaymentFSMRepo() PaymentFSMRepository
+	WalletRepo() WalletRepository
 	// Subscription
 	SubscriptionRepo() SubscriptionRepository
 	SubscriptionItemRepo() SubscriptionItemRepository

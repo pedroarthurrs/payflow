@@ -14,7 +14,7 @@ type Querier interface {
 	GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) (Payment, error)
 	GetPaymentForUpdate(ctx context.Context, arg GetPaymentForUpdateParams) (GetPaymentForUpdateRow, error)
 	InsertPaymentHistory(ctx context.Context, arg InsertPaymentHistoryParams) error
-	ListPaymentHistory(ctx context.Context, arg ListPaymentHistoryParams) ([]PaymentStatusHistory, error)
+	ListPaymentHistory(ctx context.Context, arg ListPaymentHistoryParams) ([]ListPaymentHistoryRow, error)
 	ListPayments(ctx context.Context, arg ListPaymentsParams) ([]Payment, error)
 	UpdatePaymentErrorLog(ctx context.Context, arg UpdatePaymentErrorLogParams) error
 	UpdatePaymentGatewayReference(ctx context.Context, arg UpdatePaymentGatewayReferenceParams) error

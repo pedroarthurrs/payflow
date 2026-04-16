@@ -164,3 +164,14 @@ sql:
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/wallet.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "walletdb"
+        out: "internal/database/dbgen/wallet"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true

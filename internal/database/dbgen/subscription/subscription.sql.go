@@ -338,7 +338,7 @@ func (q *Queries) GetSubscriptionForUpdate(ctx context.Context, arg GetSubscript
 
 const listSubscriptionHistory = `-- name: ListSubscriptionHistory :many
 
-SELECT id, organization_id, subscription_id, old_status, new_status, reason, metadata, event_source_id, created_at FROM subscription_status_history
+SELECT id, organization_id, subscription_id, old_status, new_status, reason, metadata, event_source_id, created_at, updated_at FROM subscription_status_history
 WHERE organization_id = $1 AND subscription_id = $2
 ORDER BY created_at ASC
 `
@@ -370,6 +370,7 @@ func (q *Queries) ListSubscriptionHistory(ctx context.Context, arg ListSubscript
 			&i.Metadata,
 			&i.EventSourceID,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

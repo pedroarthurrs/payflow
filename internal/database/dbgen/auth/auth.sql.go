@@ -12,7 +12,7 @@ import (
 )
 
 const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
-SELECT id, organization_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, deleted_at FROM credentials
+SELECT id, organization_id, name, key_hash, key_prefix, environment, last_used_at, expires_at, created_at, updated_at, deleted_at FROM credentials
 WHERE key_hash = $1
   AND deleted_at IS NULL
   AND (expires_at IS NULL OR expires_at > NOW())
@@ -31,6 +31,7 @@ func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (Credenti
 		&i.LastUsedAt,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.DeletedAt,
 	)
 	return i, err

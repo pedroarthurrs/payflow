@@ -98,6 +98,8 @@ type TransitionHistory struct {
 type PaymentForUpdate struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
+	CustomerID     uuid.UUID
+	AmountCents    int32
 	Status         PaymentStatus
 }
 

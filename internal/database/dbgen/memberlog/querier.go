@@ -12,8 +12,8 @@ import (
 type Querier interface {
 	CreateMemberLog(ctx context.Context, arg CreateMemberLogParams) error
 	DeleteMemberLogsOlderThan(ctx context.Context, createdAt sql.NullTime) (sql.Result, error)
-	GetMemberLogByID(ctx context.Context, arg GetMemberLogByIDParams) (MemberLog, error)
-	ListMemberLogs(ctx context.Context, arg ListMemberLogsParams) ([]MemberLog, error)
+	GetMemberLogByID(ctx context.Context, arg GetMemberLogByIDParams) (GetMemberLogByIDRow, error)
+	ListMemberLogs(ctx context.Context, arg ListMemberLogsParams) ([]ListMemberLogsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

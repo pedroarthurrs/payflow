@@ -138,7 +138,7 @@ func (q *Queries) GetPaymentByID(ctx context.Context, arg GetPaymentByIDParams) 
 }
 
 const getPaymentForUpdate = `-- name: GetPaymentForUpdate :one
-SELECT id, organization_id, status
+SELECT id, organization_id, customer_id, amount_cents, status
 FROM payments
 WHERE organization_id = $1 AND id = $2
 FOR UPDATE
@@ -152,13 +152,21 @@ type GetPaymentForUpdateParams struct {
 type GetPaymentForUpdateRow struct {
 	ID             uuid.UUID         `json:"id"`
 	OrganizationID uuid.UUID         `json:"organization_id"`
+	CustomerID     uuid.UUID         `json:"customer_id"`
+	AmountCents    int32             `json:"amount_cents"`
 	Status         PaymentStatusType `json:"status"`
 }
 
 func (q *Queries) GetPaymentForUpdate(ctx context.Context, arg GetPaymentForUpdateParams) (GetPaymentForUpdateRow, error) {
 	row := q.db.QueryRowContext(ctx, getPaymentForUpdate, arg.OrganizationID, arg.ID)
 	var i GetPaymentForUpdateRow
-	err := row.Scan(&i.ID, &i.OrganizationID, &i.Status)
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CustomerID,
+		&i.AmountCents,
+		&i.Status,
+	)
 	return i, err
 }
 
@@ -210,15 +218,27 @@ type ListPaymentHistoryParams struct {
 	PaymentID      uuid.UUID `json:"payment_id"`
 }
 
-func (q *Queries) ListPaymentHistory(ctx context.Context, arg ListPaymentHistoryParams) ([]PaymentStatusHistory, error) {
+type ListPaymentHistoryRow struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	PaymentID      uuid.UUID             `json:"payment_id"`
+	OldStatus      NullPaymentStatusType `json:"old_status"`
+	NewStatus      PaymentStatusType     `json:"new_status"`
+	EventSource    sql.NullString        `json:"event_source"`
+	EventSourceID  uuid.NullUUID         `json:"event_source_id"`
+	Reason         sql.NullString        `json:"reason"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+func (q *Queries) ListPaymentHistory(ctx context.Context, arg ListPaymentHistoryParams) ([]ListPaymentHistoryRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPaymentHistory, arg.OrganizationID, arg.PaymentID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []PaymentStatusHistory
+	var items []ListPaymentHistoryRow
 	for rows.Next() {
-		var i PaymentStatusHistory
+		var i ListPaymentHistoryRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,

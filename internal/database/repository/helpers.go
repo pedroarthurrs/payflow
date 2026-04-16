@@ -3,6 +3,8 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strconv"
 
 	addressdb "i9pay/internal/database/dbgen/address"
 
@@ -49,3 +51,15 @@ func toNullUUID(id *uuid.UUID) uuid.NullUUID {
 	}
 	return uuid.NullUUID{UUID: *id, Valid: true}
 }
+
+// formatDecimal converts a float64 to a string suitable for NUMERIC columns.
+func formatDecimal(v float64) string {
+	return fmt.Sprintf("%.2f", v)
+}
+
+// parseDecimal parses a NUMERIC string returned by SQLC into float64.
+func parseDecimal(s string) (float64, error) {
+	return strconv.ParseFloat(s, 64)
+}
+
+// toNullTime converts a *time.Time to sql.NullTime — defined in credential.go

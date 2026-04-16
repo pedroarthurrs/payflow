@@ -73,9 +73,24 @@ type GetMemberLogByIDParams struct {
 	ID             uuid.UUID `json:"id"`
 }
 
-func (q *Queries) GetMemberLogByID(ctx context.Context, arg GetMemberLogByIDParams) (MemberLog, error) {
+type GetMemberLogByIDRow struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	MemberID       uuid.UUID             `json:"member_id"`
+	Action         string                `json:"action"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+	Metadata       pqtype.NullRawMessage `json:"metadata"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+func (q *Queries) GetMemberLogByID(ctx context.Context, arg GetMemberLogByIDParams) (GetMemberLogByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getMemberLogByID, arg.OrganizationID, arg.ID)
-	var i MemberLog
+	var i GetMemberLogByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
@@ -124,7 +139,22 @@ type ListMemberLogsParams struct {
 	PageLimit      int32          `json:"page_limit"`
 }
 
-func (q *Queries) ListMemberLogs(ctx context.Context, arg ListMemberLogsParams) ([]MemberLog, error) {
+type ListMemberLogsRow struct {
+	ID             uuid.UUID             `json:"id"`
+	OrganizationID uuid.UUID             `json:"organization_id"`
+	MemberID       uuid.UUID             `json:"member_id"`
+	Action         string                `json:"action"`
+	Method         sql.NullString        `json:"method"`
+	Path           sql.NullString        `json:"path"`
+	StatusCode     sql.NullInt32         `json:"status_code"`
+	LatencyMs      sql.NullInt32         `json:"latency_ms"`
+	IpAddress      sql.NullString        `json:"ip_address"`
+	UserAgent      sql.NullString        `json:"user_agent"`
+	Metadata       pqtype.NullRawMessage `json:"metadata"`
+	CreatedAt      sql.NullTime          `json:"created_at"`
+}
+
+func (q *Queries) ListMemberLogs(ctx context.Context, arg ListMemberLogsParams) ([]ListMemberLogsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listMemberLogs,
 		arg.OrganizationID,
 		arg.CursorTs,
@@ -142,9 +172,9 @@ func (q *Queries) ListMemberLogs(ctx context.Context, arg ListMemberLogsParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	var items []MemberLog
+	var items []ListMemberLogsRow
 	for rows.Next() {
-		var i MemberLog
+		var i ListMemberLogsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,

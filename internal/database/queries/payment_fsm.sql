@@ -1,5 +1,5 @@
 -- name: GetPaymentForUpdate :one
-SELECT id, organization_id, status
+SELECT id, organization_id, customer_id, amount_cents, status
 FROM payments
 WHERE organization_id = $1 AND id = $2
 FOR UPDATE;

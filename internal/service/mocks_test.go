@@ -188,6 +188,7 @@ type mockTxHandle struct {
 	subs        domain.SubscriptionRepository
 	subItems    domain.SubscriptionItemRepository
 	subSchedule domain.SubscriptionScheduleRepository
+	wallets     domain.WalletRepository
 }
 
 var _ domain.TxHandle = (*mockTxHandle)(nil)
@@ -239,6 +240,13 @@ func (m *mockTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRep
 		return m.subSchedule
 	}
 	return &mockSubscriptionScheduleRepoStub{}
+}
+
+func (m *mockTxHandle) WalletRepo() domain.WalletRepository {
+	if m.wallets != nil {
+		return m.wallets
+	}
+	return &mockWalletRepo{}
 }
 
 // Stub implementations for TxHandle that delegate to the outer mock when needed.
@@ -479,3 +487,75 @@ func (m *mockPermissionRepo) ListForMember(ctx context.Context, memberID uuid.UU
 	}
 	return nil, nil
 }
+
+// ============================================================
+// Mock WalletRepository (minimal stub — all methods no-op)
+// ============================================================
+
+type mockWalletRepo struct{}
+
+func (m *mockWalletRepo) CreateWallet(ctx context.Context, organizationID uuid.UUID, input domain.CreateWalletInput) (*domain.Wallet, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) GetWalletByID(ctx context.Context, organizationID, walletID uuid.UUID) (*domain.Wallet, error) {
+	return nil, domain.ErrWalletNotFound
+}
+func (m *mockWalletRepo) GetWalletByOrganizationOwner(ctx context.Context, organizationID uuid.UUID) (*domain.Wallet, error) {
+	return nil, domain.ErrWalletNotFound
+}
+func (m *mockWalletRepo) GetWalletByCustomerOwner(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.Wallet, error) {
+	return nil, domain.ErrWalletNotFound
+}
+func (m *mockWalletRepo) GetWalletForUpdate(ctx context.Context, organizationID, walletID uuid.UUID) (*domain.Wallet, error) {
+	return nil, domain.ErrWalletNotFound
+}
+func (m *mockWalletRepo) UpdateWalletBalance(ctx context.Context, organizationID, walletID uuid.UUID, newBalance int32) (*domain.Wallet, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) UpdateWalletLockedBalance(ctx context.Context, organizationID, walletID uuid.UUID, newLockedBalance int32) (*domain.Wallet, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) InsertLedgerEntry(ctx context.Context, organizationID uuid.UUID, input domain.LedgerEntryInput) (*domain.LedgerEntry, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) ListLedgerEntries(ctx context.Context, organizationID, walletID uuid.UUID, params domain.LedgerListParams) ([]domain.LedgerEntry, error) {
+	return nil, nil
+}
+func (m *mockWalletRepo) CountLedgerEntries(ctx context.Context, organizationID, walletID uuid.UUID, params domain.LedgerListParams) (int64, error) {
+	return 0, nil
+}
+func (m *mockWalletRepo) CreatePayout(ctx context.Context, organizationID uuid.UUID, input domain.CreatePayoutInput) (*domain.Payout, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) GetPayoutByID(ctx context.Context, organizationID, payoutID uuid.UUID) (*domain.Payout, error) {
+	return nil, domain.ErrPayoutNotFound
+}
+func (m *mockWalletRepo) UpdatePayoutStatus(ctx context.Context, organizationID, payoutID uuid.UUID, status domain.PayoutStatus) (*domain.Payout, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) ListPayouts(ctx context.Context, organizationID, walletID uuid.UUID, params domain.ListParams) ([]domain.Payout, error) {
+	return nil, nil
+}
+func (m *mockWalletRepo) UpsertCommissionSetting(ctx context.Context, organizationID uuid.UUID, input domain.CommissionSetting) (*domain.CommissionSetting, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) GetCommissionSettingByCustomer(ctx context.Context, organizationID, customerID uuid.UUID) (*domain.CommissionSetting, error) {
+	return nil, domain.ErrCommissionNotFound
+}
+func (m *mockWalletRepo) ListCommissionSettings(ctx context.Context, organizationID uuid.UUID, params domain.ListParams) ([]domain.CommissionSetting, error) {
+	return nil, nil
+}
+func (m *mockWalletRepo) SoftDeleteCommissionSetting(ctx context.Context, organizationID, settingID uuid.UUID) error {
+	return nil
+}
+func (m *mockWalletRepo) CreateWalletLock(ctx context.Context, organizationID uuid.UUID, input domain.CreateWalletLockInput) (*domain.WalletLock, error) {
+	return nil, errors.New("not implemented")
+}
+func (m *mockWalletRepo) ReleaseWalletLock(ctx context.Context, organizationID, lockID uuid.UUID) error {
+	return nil
+}
+func (m *mockWalletRepo) GetWalletLockByReference(ctx context.Context, organizationID, referenceID uuid.UUID, lockType domain.WalletLockType) (*domain.WalletLock, error) {
+	return nil, domain.ErrWalletLockNotFound
+}
+
+var _ domain.WalletRepository = (*mockWalletRepo)(nil)

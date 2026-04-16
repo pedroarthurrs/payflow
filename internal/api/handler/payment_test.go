@@ -45,6 +45,7 @@ func (h *mockTxHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository 
 func (h *mockTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
 	return nil
 }
+func (h *mockTxHandle) WalletRepo() domain.WalletRepository { return nil }
 
 // ── mock payment querier ──────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ func (m *mockPaymentQuerier) GetPaymentForUpdate(_ context.Context, _ paymentdb.
 func (m *mockPaymentQuerier) InsertPaymentHistory(_ context.Context, _ paymentdb.InsertPaymentHistoryParams) error {
 	return nil
 }
-func (m *mockPaymentQuerier) ListPaymentHistory(_ context.Context, _ paymentdb.ListPaymentHistoryParams) ([]paymentdb.PaymentStatusHistory, error) {
+func (m *mockPaymentQuerier) ListPaymentHistory(_ context.Context, _ paymentdb.ListPaymentHistoryParams) ([]paymentdb.ListPaymentHistoryRow, error) {
 	return nil, nil
 }
 func (m *mockPaymentQuerier) ListPayments(ctx context.Context, arg paymentdb.ListPaymentsParams) ([]paymentdb.Payment, error) {
@@ -173,7 +174,7 @@ func setupPaymentRouter(repo domain.PaymentRepository, orgID string) *gin.Engine
 func setupPaymentRouterWithFSM(repo domain.PaymentRepository, fsmRepo domain.PaymentFSMRepository, orgID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	txMgr := &mockTxManager{fsmRepo: fsmRepo}
-	svc := service.NewPaymentService(repo, txMgr, fsmRepo)
+	svc := service.NewPaymentService(repo, txMgr, fsmRepo, nil)
 	gatewaySvc := service.NewGatewayService(svc, &noopGateway{})
 	h := NewPaymentHandler(svc, gatewaySvc)
 	r := gin.New()

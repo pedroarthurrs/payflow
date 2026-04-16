@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 
 	"i9pay/internal/domain"
 
@@ -15,15 +16,17 @@ type PaymentService struct {
 	fsm      *domain.StateMachine
 	txMgr    domain.TxManager
 	fsmRepo  domain.PaymentFSMRepository
+	ledger   *LedgerService
 }
 
 // NewPaymentService creates a PaymentService.
-func NewPaymentService(payments domain.PaymentRepository, txMgr domain.TxManager, fsmRepo domain.PaymentFSMRepository) *PaymentService {
+func NewPaymentService(payments domain.PaymentRepository, txMgr domain.TxManager, fsmRepo domain.PaymentFSMRepository, ledger *LedgerService) *PaymentService {
 	return &PaymentService{
 		payments: payments,
 		fsm:      domain.NewStateMachine(),
 		txMgr:    txMgr,
 		fsmRepo:  fsmRepo,
+		ledger:   ledger,
 	}
 }
 
@@ -74,7 +77,7 @@ func (s *PaymentService) Transition(
 			return err
 		}
 
-		return repo.InsertHistory(ctx, domain.TransitionHistory{
+		if err := repo.InsertHistory(ctx, domain.TransitionHistory{
 			OrganizationID: payment.OrganizationID,
 			PaymentID:      paymentID,
 			OldStatus:      &payment.Status,
@@ -82,7 +85,37 @@ func (s *PaymentService) Transition(
 			EventSource:    event.Source,
 			EventSourceID:  event.SourceID,
 			Reason:         event.Reason,
-		})
+		}); err != nil {
+			return err
+		}
+
+		// Ledger hooks — non-fatal: log and continue on error
+		if s.ledger != nil {
+			switch toStatus { //nolint:exhaustive // pending/authorized/failed/canceled have no ledger action
+			case domain.StatusSucceeded:
+				if err := s.ledger.CreditOnPaymentSuccess(ctx, tx, organizationID, payment); err != nil {
+					slog.Warn("ledger credit failed, payment still succeeded", "error", err, "payment_id", paymentID)
+				}
+				// If transitioning out of disputed, also release the lock
+				if payment.Status == domain.StatusDisputed {
+					if err := s.ledger.ReleaseLockIfDisputed(ctx, tx, organizationID, payment); err != nil {
+						slog.Warn("failed to release dispute lock on succeeded", "error", err, "payment_id", paymentID)
+					}
+				}
+			case domain.StatusDisputed:
+				if err := s.ledger.LockOnPaymentDisputed(ctx, tx, organizationID, payment); err != nil {
+					slog.Warn("ledger lock failed on disputed", "error", err, "payment_id", paymentID)
+				}
+			case domain.StatusRefunded, domain.StatusPartiallyRefunded:
+				if err := s.ledger.DebitOnPaymentRefund(ctx, tx, organizationID, payment); err != nil {
+					slog.Warn("ledger debit failed on refund", "error", err, "payment_id", paymentID)
+				}
+			default:
+				// pending, authorized, failed, canceled — no ledger action
+			}
+		}
+
+		return nil
 	})
 }
 
