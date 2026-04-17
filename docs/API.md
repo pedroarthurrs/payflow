@@ -1508,6 +1508,267 @@ Cancela um pagamento pendente. Requer role `member` ou superior.
 
 ---
 
+### GET /v1/wallets/me
+
+Retorna a carteira da organization autenticada. Cria automaticamente se ainda não existir.
+
+Requer permissão `wallets:read`.
+
+**Resposta (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440100",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+  "balance": 150000,
+  "locked_balance": 50000,
+  "available_balance": 100000,
+  "currency": "BRL",
+  "status": "active",
+  "created_at": "2026-04-13T10:00:00Z",
+  "updated_at": "2026-04-13T10:00:00Z"
+}
+```
+
+`available_balance = balance - locked_balance`. Valores em centavos.
+
+---
+
+### GET /v1/wallets/:wallet_id
+
+Retorna uma carteira pelo ID, escopada à organization autenticada.
+
+Requer permissão `wallets:read`.
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/wallets/me`.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "wallet not found" }
+```
+
+---
+
+### GET /v1/wallets/:wallet_id/entries
+
+Lista as entradas do ledger de uma carteira com paginação e filtros.
+
+Requer permissão `wallets:read`.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset de paginação (padrão: 0) |
+| `category` | string | Filtrar por categoria (`payment_split`, `payout`, `refund`, `commission`, `manual_adjustment`) |
+| `type` | string | Filtrar por tipo (`credit`, `debit`) |
+| `created_from` | RFC3339 | Início do intervalo de criação |
+| `created_to` | RFC3339 | Fim do intervalo de criação |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440101",
+      "wallet_id": "550e8400-e29b-41d4-a716-446655440100",
+      "type": "credit",
+      "amount_cents": 9900,
+      "category": "payment_split",
+      "balance_after": 150000,
+      "payment_id": "550e8400-e29b-41d4-a716-446655440050",
+      "created_at": "2026-04-13T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### POST /v1/wallets/:wallet_id/payouts
+
+Solicita um saque da carteira. O valor é reservado (`locked_balance`) imediatamente; o débito efetivo ocorre quando o status for atualizado para `paid`.
+
+Requer permissão `wallets:payout`.
+
+**Requisição:**
+```json
+{
+  "amount_cents": 50000,
+  "fee_cents": 500,
+  "bank_info": { "bank": "341", "branch": "0001", "account": "12345-6" }
+}
+```
+
+`fee_cents` é opcional (padrão: 0). `bank_info` é um objeto JSON livre.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440102",
+  "wallet_id": "550e8400-e29b-41d4-a716-446655440100",
+  "amount_cents": 50000,
+  "fee_cents": 500,
+  "status": "pending",
+  "bank_info": { "bank": "341", "branch": "0001", "account": "12345-6" },
+  "created_at": "2026-04-13T10:00:00Z",
+  "updated_at": "2026-04-13T10:00:00Z"
+}
+```
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "wallet not found" }
+```
+
+**Resposta (422 Unprocessable Entity):**
+```json
+{ "error": "insufficient balance" }
+```
+
+Também retorna 422 se a carteira estiver suspensa (`wallet is suspended`).
+
+---
+
+### GET /v1/wallets/:wallet_id/payouts
+
+Lista os saques de uma carteira com paginação.
+
+Requer permissão `wallets:read`.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset de paginação (padrão: 0) |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440102",
+      "wallet_id": "550e8400-e29b-41d4-a716-446655440100",
+      "amount_cents": 50000,
+      "fee_cents": 500,
+      "status": "pending",
+      "bank_info": { "bank": "341", "branch": "0001", "account": "12345-6" },
+      "created_at": "2026-04-13T10:00:00Z",
+      "updated_at": "2026-04-13T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### POST /v1/wallets/:wallet_id/adjust
+
+Aplica um ajuste manual de crédito ou débito na carteira.
+
+Requer permissão `wallets:adjust` (exclusiva do role `owner`).
+
+**Requisição:**
+```json
+{
+  "direction": "credit",
+  "amount_cents": 1000,
+  "reason": "Correção manual referente à fatura #X"
+}
+```
+
+`direction` deve ser `credit` ou `debit`. `reason` é obrigatório.
+
+**Resposta (200 OK):** mesmo formato do `GET /v1/wallets/me`.
+
+**Resposta (422 Unprocessable Entity):**
+```json
+{ "error": "insufficient balance" }
+```
+
+Também retorna 422 para `invalid adjustment`.
+
+---
+
+### GET /v1/commissions
+
+Lista as configurações de comissão da organization.
+
+Requer permissão `commissions:read`.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset de paginação (padrão: 0) |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440110",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "target_customer_id": "550e8400-e29b-41d4-a716-446655440001",
+      "type": "percentage",
+      "value": 10.0,
+      "is_active": true,
+      "created_at": "2026-04-13T10:00:00Z",
+      "updated_at": "2026-04-13T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### PUT /v1/commissions/:customer_id
+
+Cria ou atualiza a configuração de comissão para um cliente (upsert).
+
+Requer permissão `commissions:manage`.
+
+**Requisição:**
+```json
+{
+  "type": "percentage",
+  "value": 10.0,
+  "is_active": true
+}
+```
+
+`type` deve ser `percentage` (0–100%) ou `fixed` (valor em centavos). `is_active` é opcional (padrão: `true`).
+
+**Resposta (200 OK):** mesmo formato de um item da listagem acima.
+
+---
+
+### DELETE /v1/commissions/:customer_id
+
+Remove (soft delete) a configuração de comissão de um cliente.
+
+Requer permissão `commissions:manage`.
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "commission setting not found" }
+```
+
+---
+
 ### POST /v1/webhooks
 
 Cria um novo endpoint de webhook. Requer role `admin` ou superior.
@@ -1768,6 +2029,17 @@ owner (4) > admin (3) > developer (2) > support (1)
 | `DELETE /v1/webhooks/:webhook_id` | owner |
 | `GET /v1/webhooks/logs` | admin |
 | `GET /v1/webhooks/logs/:log_id` | admin |
+| **Carteiras e Ledger** | |
+| `GET /v1/wallets/me` | `wallets:read` |
+| `GET /v1/wallets/:wallet_id` | `wallets:read` |
+| `GET /v1/wallets/:wallet_id/entries` | `wallets:read` |
+| `GET /v1/wallets/:wallet_id/payouts` | `wallets:read` |
+| `POST /v1/wallets/:wallet_id/payouts` | `wallets:payout` |
+| `POST /v1/wallets/:wallet_id/adjust` | `wallets:adjust` (owner only) |
+| **Comissões** | |
+| `GET /v1/commissions` | `commissions:read` |
+| `PUT /v1/commissions/:customer_id` | `commissions:manage` |
+| `DELETE /v1/commissions/:customer_id` | `commissions:manage` |
 | Demais rotas protegidas | Qualquer role (autenticação JWT válida) |
 
 Tokens gerados via API Key (`auth_type: "system"`) não possuem role e recebem `403 Forbidden` em endpoints que exigem role.
@@ -1798,6 +2070,11 @@ Além dos roles, o sistema oferece **permissões granulares** gerenciadas via `/
 | `webhooks:read` | Visualizar webhooks e logs |
 | `webhooks:manage` | Criar, atualizar e remover webhooks |
 | `logs:read` | Visualizar logs de credenciais e usuários |
+| `wallets:read` | Visualizar carteiras, entradas do ledger e saques |
+| `wallets:payout` | Solicitar saques de carteira |
+| `wallets:adjust` | Aplicar ajustes manuais de saldo (owner only) |
+| `commissions:read` | Visualizar configurações de comissão |
+| `commissions:manage` | Criar, atualizar e remover configurações de comissão |
 
 **Resposta (403 Forbidden):**
 ```json

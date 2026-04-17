@@ -214,8 +214,9 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `subscription.go`: `SubscriptionRepository`, `SubscriptionItemRepository`, `SubscriptionScheduleRepository`, `SubscriptionHistoryRepository`, modelos `Subscription`, `SubscriptionItem`, `SubscriptionStatusHistory`, `SubscriptionSchedule`, inputs e params
 - `subscription_fsm.go`: `SubscriptionStateMachine` — FSM de assinaturas com grafo de transições; `Validate(from, to)`, `IsTerminal(status)`
 - `webhook.go`: `WebhookEndpointRepository`, `WebhookLogRepository`, `OrganizationSecretReader`, modelos `WebhookEndpoint` e `WebhookLog`, event types
-- `tx.go`: contratos transacionais (`TxManager`, `TxHandle`); `TxHandle` expõe `CustomerRepo()`, `AddressRepo()`, `CredentialRepo()`, `PaymentFSMRepo()`, `SubscriptionRepo()`, `SubscriptionItemRepo()`
-- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrAlreadyMember`, `ErrUserLogNotFound`, `ErrBillingAmountZero`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, etc.)
+- `tx.go`: contratos transacionais (`TxManager`, `TxHandle`); `TxHandle` expõe `CustomerRepo()`, `AddressRepo()`, `CredentialRepo()`, `PaymentFSMRepo()`, `SubscriptionRepo()`, `SubscriptionItemRepo()`, `WalletRepo()`
+- `wallet.go`: `WalletRepository`, modelos `Wallet`, `LedgerEntry`, `Payout`, `CommissionSetting`, `WalletLock`; tipos `WalletStatus`, `LedgerEntryType`, `LedgerCategory`, `PayoutStatus`, `CommissionType`, `WalletLockType`; inputs e params de listagem
+- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrAlreadyMember`, `ErrUserLogNotFound`, `ErrBillingAmountZero`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, `ErrWalletNotFound`, `ErrWalletSuspended`, `ErrInsufficientBalance`, `ErrCommissionNotFound`, `ErrPayoutNotFound`, `ErrInvalidAdjustment`, `ErrWalletLockNotFound`, etc.)
 
 **Roles disponíveis:**
 ```
@@ -248,6 +249,11 @@ owner (4) > admin (3) > developer (2) > support (1)
 | `webhooks:read` | ✓ | ✓ | ✓ | — |
 | `webhooks:manage` | ✓ | ✓ | ✓ | — |
 | `logs:read` | ✓ | ✓ | ✓ | — |
+| `wallets:read` | ✓ | ✓ | ✓ | — |
+| `wallets:payout` | ✓ | ✓ | — | — |
+| `wallets:adjust` | ✓ | — | — | — |
+| `commissions:read` | ✓ | ✓ | ✓ | — |
+| `commissions:manage` | ✓ | ✓ | — | — |
 
 **Tipos de autenticação:**
 - `user` — login por email + password (inclui role no token)
@@ -377,6 +383,72 @@ RecurrenceService.ProcessBillingCycle()
 | `active` | qualquer | → `past_due` |
 | `past_due` | < maxAttempts | permanece `past_due`, re-enfileirado |
 | `past_due` | = maxAttempts | → `unpaid` ou `canceled` |
+
+---
+
+### Sistema de Ledger e Carteiras
+
+O sistema financeiro é composto por três camadas independentes que se integram ao FSM de pagamentos:
+
+**1. Domain** (`domain/wallet.go`)
+- `Wallet`: container de saldo para org (via `organization_owner_id`) ou cliente (via `customer_owner_id`)
+- `LedgerEntry`: registro imutável de cada movimentação monetária (`credit`/`debit`)
+- `Payout`: solicitação de saque com FSM próprio (`pending → processing → paid/failed`)
+- `CommissionSetting`: regra de comissão por cliente (`percentage` ou `fixed`)
+- `WalletLock`: reserva temporária de saldo para disputas e saques pendentes
+- `WalletRepository`: interface com 20+ métodos cobrindo wallets, ledger, payouts, commissions e locks
+
+**2. LedgerService** (`service/ledger.go`)
+- Chamado dentro de transações existentes do FSM de pagamentos — nunca abre transação própria
+- `CreditOnPaymentSuccess`: credita a carteira da org + comissão do cliente (se configurada)
+- `DebitOnPaymentRefund`: debita a carteira da org; permite overdraft com log de aviso
+- `LockOnPaymentDisputed`: cria lock de disputa e incrementa `locked_balance`
+- `ReleaseLockIfDisputed`: libera lock de disputa (idempotente)
+- Erros do ledger são **não-fatais** para o FSM — logados, nunca fazem rollback da transição de pagamento
+
+**3. WalletService** (`service/wallet.go`)
+- `GetOrgWallet` / `GetCustomerWallet`: semântica GetOrCreate — cria automaticamente se não existir
+- `RequestPayout`: reserva saldo via `WalletLock` + `locked_balance` dentro de transação
+- `UpdatePayoutStatus`: libera lock e debita saldo efetivo quando status = `paid`
+- `Adjust`: ajuste manual com validação de saldo para débitos
+- `ListEntries` / `ListPayouts`: listagem paginada com filtros
+
+**Fluxo de crédito automático (pagamento bem-sucedido):**
+```
+PaymentFSMService.Transition(→ succeeded)
+    ↓ (mesma transação)
+LedgerService.CreditOnPaymentSuccess()
+    ├─ GetOrCreate org wallet
+    ├─ UpdateWalletBalance (credit)
+    ├─ InsertLedgerEntry (payment_split)
+    ├─ GetCommissionSettingByCustomer
+    └─ [se comissão ativa]
+        ├─ GetOrCreate customer wallet
+        ├─ UpdateWalletBalance (credit)
+        └─ InsertLedgerEntry (commission)
+```
+
+**Fluxo de saque:**
+```
+POST /v1/wallets/:id/payouts
+    ↓
+WalletService.RequestPayout()
+    ├─ GetWalletForUpdate (SELECT FOR UPDATE)
+    ├─ Verifica available_balance >= amount + fee
+    ├─ CreatePayout (status=pending)
+    ├─ CreateWalletLock (type=payout)
+    └─ UpdateWalletLockedBalance
+```
+
+**Categorias de ledger entry:**
+
+| Categoria | Direção | Disparado por |
+|-----------|---------|---------------|
+| `payment_split` | credit | Pagamento → `succeeded` |
+| `refund` | debit | Pagamento → `refunded`/`partially_refunded` |
+| `commission` | credit | Pagamento → `succeeded` + commission_setting ativa |
+| `payout` | debit | Payout → `paid` |
+| `manual_adjustment` | credit ou debit | `POST /wallets/:id/adjust` (owner only) |
 
 ---
 
@@ -532,6 +604,7 @@ Cada domínio possui seu próprio subpacote gerado:
 | `dbgen/webhooklog` | Logs de webhook |
 | `dbgen/plan` | Planos de preço |
 | `dbgen/subscription` | Assinaturas, itens, histórico, schedules |
+| `dbgen/wallet` | Carteiras, ledger, saques, comissões e locks |
 
 **Repositórios** (`database/repository/`)
 - Implementam os contratos da camada de domínio

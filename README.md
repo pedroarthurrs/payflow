@@ -4,7 +4,7 @@ API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-ten
 
 ## Visão Geral
 
-i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, faturas e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
+i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, pagamentos, carteiras e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
 
 Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Vue 3 | TypeScript | Docker
 
@@ -39,7 +39,6 @@ curl http://localhost:8080/v1/live
 - [SECURITY_OBSERVABILITY.md](docs/SECURITY_OBSERVABILITY.md) — rate limiting, logging e validação
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md) — guia de contribuição e adição de features
 - [COMMANDS.md](docs/COMMANDS.md) — referência de comandos disponíveis
-- [FEATURES.md](docs/FEATURES.md) — funcionalidades a implementar e requisitos
 
 ---
 
@@ -62,54 +61,75 @@ i9pay/
 │   ├── auth/token/           — JWT service
 │   ├── config/               — configurações e feature flags
 │   ├── crypto/               — utilitários criptográficos centralizados
+│   ├── gateway/              — adaptadores de gateway de pagamento
 │   ├── monitor/              — integração com Sentry
 │   ├── queue/                — interface de fila e implementação in-memory
 │   ├── service/              — lógica de negócio
 │   ├── domain/               — modelos, contratos e erros de domínio
-│   ├── worker/               — webhook worker com retry e backoff
+│   ├── worker/               — webhook, recorrência e cleanup workers
 │   └── database/
+│       ├── queries/          — SQL (input do SQLC, um arquivo por entidade)
 │       ├── repository/       — implementações de repositórios
 │       └── dbgen/            — código gerado pelo SQLC
 ├── Makefile                  — comandos de build e desenvolvimento
 ├── go.mod / go.sum           — dependências Go
 ├── sqlc.yml                  — configuração SQLC
 └── web/                      — frontend Vue 3 + TypeScript
-    ├── src/
-    │   ├── views/            — páginas (customers, users, dashboard, login)
-    │   ├── components/       — componentes reutilizáveis
-    │   ├── stores/           — Pinia stores (auth, status)
-    │   ├── services/         — cliente HTTP Axios
-    │   ├── composables/      — composables (useAuth, useCrud, useToast)
-    │   ├── types/            — TypeScript DTO types
-    │   └── router/           — Vue Router com guards de autenticação
-    └── package.json
+    └── src/
+        ├── views/            — páginas (customers, users, dashboard, login)
+        ├── components/       — componentes reutilizáveis
+        ├── stores/           — Pinia stores (auth, status)
+        ├── services/         — cliente HTTP Axios
+        ├── composables/      — composables (useAuth, useCrud, useToast)
+        ├── types/            — TypeScript DTO types
+        └── router/           — Vue Router com guards de autenticação
 ```
 
 ---
 
 ## Funcionalidades
 
-- Autenticação JWT com access e refresh tokens (email/password e API Key)
-- RBAC com hierarquia de roles (owner > admin > member)
-- Gerenciamento de usuários (CRUD com controle de roles)
-- Gerenciamento de clientes (CRUD com soft/hard delete para LGPD/GDPR)
-- Gerenciamento de endereços (CRUD vinculado a clientes)
-- Gerenciamento de produtos (CRUD com soft/hard delete)
+**Autenticação e Acesso**
+- JWT com access/refresh tokens (email/password e API Key)
+- RBAC com hierarquia de roles: `owner > admin > developer > support`
+- 27 permissões granulares por membro com overrides individuais e cache de 5min
+- Idempotência via `X-Idempotency-Key` (24h TTL, POST/PATCH)
+- Rate limiting em 3 tiers: IP, login e organization
+
+**Gestão de Usuários e Organizations**
+- Gerenciamento de membros (convite, roles, remoção; owner único por org)
+- Audit trail de membros (log de ações autenticadas via JWT)
 - Gerenciamento de credenciais (API Keys: criar, rotacionar, revogar)
 - Audit trail de credenciais (log de requisições autenticadas via API Key)
-- Gerenciamento de pagamentos com FSM de status e integração com gateway (Stripe)
-- Webhooks (endpoints CRUD, entrega assíncrona com retry, logs de entrega)
-- Arquitetura multi-organization com isolamento de dados
-- Health check com status de dependências (monitor em background)
-- Rate limiting com 3 tiers (IP, login, organization)
-- Feature flags plugáveis (env vars por padrão, extensível para AppConfig/etc.)
+
+**Clientes e Produtos**
+- Gerenciamento de clientes (CRUD, soft/hard delete, LGPD/GDPR)
+- Gerenciamento de endereços (CRUD vinculado a clientes)
+- Gerenciamento de produtos (CRUD, soft/hard delete)
+- Gerenciamento de planos (CRUD, versionamento automático em mudanças de preço)
+
+**Pagamentos e Assinaturas**
+- Gerenciamento de pagamentos com FSM de 8 estados e `SELECT FOR UPDATE`
+- Motor de cobrança recorrente (cron scheduler + worker + idempotência por período)
+- Gerenciamento de assinaturas (FSM, `cancel_at_period_end`, substituição de itens, schedules)
+
+**Ledger e Carteiras**
+- Carteiras por organization e por cliente com saldo e saldo reservado
+- Ledger imutável: toda movimentação de saldo gera um `ledger_entry`
+- Saques com reserva de saldo (`WalletLock`) e débito efetivo na liquidação
+- Ajustes manuais de saldo (owner only)
+- Configurações de comissão por cliente (percentual ou fixo, creditadas automaticamente no pagamento)
+
+**Infraestrutura**
+- Webhooks (endpoints CRUD, entrega assíncrona com HMAC-SHA256 e retry exponencial)
+- Health check com monitor em background (liveness/readiness separados)
+- Modo manutenção via feature flag
 - Monitoramento de erros com Sentry (opcional)
 - Logging estruturado com slog (JSON em produção, texto em desenvolvimento)
-- Validação de entrada com mensagens traduzidas
-- Criptografia centralizada em `internal/crypto` (bcrypt, SHA-256, HMAC-SHA256)
+- Cleanup agendado de logs e chaves de idempotência expiradas
 - Queries type-safe geradas pelo SQLC
 - Migrations versionadas com golang-migrate
-- Docker para desenvolvimento e produção
+- Docker para desenvolvimento (hot reload via Air) e produção
 
 ---
 
