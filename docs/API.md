@@ -1508,6 +1508,321 @@ Cancela um pagamento pendente. Requer role `member` ou superior.
 
 ---
 
+### POST /v1/invoices
+
+Cria uma nova nota fiscal para a organization autenticada. O valor total (`amount_cents`) é calculado automaticamente a partir dos itens.
+
+Requer permissão `invoices:write`.
+
+**Requisição:**
+```json
+{
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "invoice_type": "national",
+  "items": [
+    {
+      "description": "Plano Pro - Abril 2026",
+      "quantity": "1.0",
+      "unit_price_cents": 4900
+    }
+  ]
+}
+```
+
+`invoice_type` deve ser `national` ou `international`. `items` deve conter ao menos um item.
+
+**Resposta (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440200",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+  "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+  "invoice_type": "national",
+  "operation_type": 3,
+  "amount_cents": 4900,
+  "currency": "BRL",
+  "status": "pending",
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440201",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "invoice_id": "550e8400-e29b-41d4-a716-446655440200",
+      "description": "Plano Pro - Abril 2026",
+      "quantity": "1.0",
+      "unit_price_cents": 4900,
+      "total_price_cents": 4900,
+      "created_at": "2026-04-17T10:00:00Z",
+      "updated_at": "2026-04-17T10:00:00Z"
+    }
+  ],
+  "created_at": "2026-04-17T10:00:00Z",
+  "updated_at": "2026-04-17T10:00:00Z"
+}
+```
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "customer not found" }
+```
+
+**Resposta (422 Unprocessable Entity):**
+```json
+{ "error": "invoice must have at least one item" }
+```
+
+---
+
+### GET /v1/invoices
+
+Lista as notas fiscais da organization com paginação e filtros.
+
+Requer permissão `invoices:read`.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset de paginação (padrão: 0) |
+| `customer_id` | UUID | Filtrar por cliente |
+| `subscription_id` | UUID | Filtrar por assinatura |
+| `status` | string | Filtrar por status (`pending`, `sent`, `paid`, `error`, `canceled`) |
+| `invoice_type` | string | Filtrar por tipo (`national`, `international`) |
+| `from` | RFC3339 | Início do intervalo de criação |
+| `to` | RFC3339 | Fim do intervalo de criação |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440200",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "customer_id": "550e8400-e29b-41d4-a716-446655440001",
+      "invoice_type": "national",
+      "operation_type": 3,
+      "amount_cents": 4900,
+      "currency": "BRL",
+      "status": "pending",
+      "created_at": "2026-04-17T10:00:00Z",
+      "updated_at": "2026-04-17T10:00:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### GET /v1/invoices/:invoice_id
+
+Retorna uma nota fiscal pelo ID, incluindo itens e snapshots.
+
+Requer permissão `invoices:read`.
+
+**Resposta (200 OK):** mesmo formato da resposta do `POST /v1/invoices`, incluindo `customer_snapshot`, `items_snapshot` e `items`.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "invoice not found" }
+```
+
+---
+
+### POST /v1/invoices/:invoice_id/cancel
+
+Cancela uma nota fiscal. Apenas invoices em estado não-terminal (`pending`, `sent`, `error`) podem ser canceladas.
+
+Requer permissão `invoices:write`.
+
+**Resposta (200 OK):** invoice atualizada com `status: "canceled"`.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "invoice not found" }
+```
+
+**Resposta (422 Unprocessable Entity):**
+```json
+{ "error": "invoice is already canceled" }
+```
+
+---
+
+### POST /v1/invoices/:invoice_id/transition
+
+Transição manual de status da nota fiscal via FSM.
+
+Requer permissão `invoices:write`.
+
+**Requisição:**
+```json
+{
+  "status": "sent",
+  "message": "Enviada ao ERP com sucesso"
+}
+```
+
+`message` é opcional. Transições válidas:
+
+| De | Para |
+|----|------|
+| `pending` | `sent`, `canceled` |
+| `sent` | `paid`, `error`, `canceled` |
+| `error` | `sent`, `canceled` |
+
+Estados terminais (`paid`, `canceled`) não permitem transição.
+
+**Resposta (200 OK):** invoice atualizada.
+
+**Resposta (422 Unprocessable Entity):**
+```json
+{ "error": "invalid invoice transition: pending → paid" }
+```
+
+---
+
+### GET /v1/invoices/:invoice_id/logs
+
+Lista os logs de operações ERP de uma nota fiscal.
+
+Requer permissão `invoices:read`.
+
+**Parâmetros de query:**
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `limit` | int | Itens por página (1–100, padrão: 20) |
+| `offset` | int | Offset de paginação (padrão: 0) |
+
+**Resposta (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440210",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "invoice_id": "550e8400-e29b-41d4-a716-446655440200",
+      "event_type": "status_transition",
+      "invoice_status": "sent",
+      "attempt_number": 1,
+      "success": true,
+      "message": "Enviada ao ERP com sucesso",
+      "created_at": "2026-04-17T10:05:00Z",
+      "updated_at": "2026-04-17T10:05:00Z"
+    }
+  ],
+  "limit": 20,
+  "offset": 0,
+  "total": 1
+}
+```
+
+---
+
+### PUT /v1/invoice-settings/:type
+
+Cria ou atualiza a configuração de emissão fiscal para um tipo de invoice (`national` ou `international`).
+
+Requer permissão `invoices:manage`.
+
+**Requisição:**
+```json
+{
+  "erp_api_key": "key_abc123",
+  "erp_api_secret": "secret_xyz",
+  "erp_account_id": "acc_001",
+  "nfse_service_code": "1.05",
+  "nfse_item_list_service": "01.05",
+  "tax_rate": "5.00",
+  "invoice_series": "NF",
+  "iso_currency": "BRL",
+  "issue_on": "payment_confirmed",
+  "is_active": true
+}
+```
+
+Todos os campos são opcionais. `issue_on` padrão: `payment_confirmed`. `is_active` padrão: `true`.
+
+**Resposta (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440220",
+  "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+  "type": "national",
+  "erp_api_key": "key_abc123",
+  "erp_api_secret": "secret_xyz",
+  "erp_account_id": "acc_001",
+  "nfse_service_code": "1.05",
+  "nfse_item_list_service": "01.05",
+  "tax_rate": "5.00",
+  "invoice_series": "NF",
+  "iso_currency": "BRL",
+  "issue_on": "payment_confirmed",
+  "is_active": true,
+  "created_at": "2026-04-17T10:00:00Z",
+  "updated_at": "2026-04-17T10:00:00Z"
+}
+```
+
+---
+
+### GET /v1/invoice-settings
+
+Lista todas as configurações de emissão fiscal da organization.
+
+Requer permissão `invoices:read`.
+
+**Resposta (200 OK):**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440220",
+    "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+    "type": "national",
+    "erp_api_key": "key_abc123",
+    "issue_on": "payment_confirmed",
+    "is_active": true,
+    "created_at": "2026-04-17T10:00:00Z",
+    "updated_at": "2026-04-17T10:00:00Z"
+  }
+]
+```
+
+---
+
+### GET /v1/invoice-settings/:type
+
+Retorna a configuração de emissão fiscal para um tipo específico.
+
+Requer permissão `invoices:read`.
+
+**Resposta (200 OK):** mesmo formato de um item da listagem acima.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "invoice setting not found" }
+```
+
+---
+
+### DELETE /v1/invoice-settings/:type
+
+Remove a configuração de emissão fiscal de um tipo.
+
+Requer permissão `invoices:manage`.
+
+**Resposta (204 No Content):** sem body.
+
+**Resposta (404 Not Found):**
+```json
+{ "error": "invoice setting not found" }
+```
+
+---
+
 ### GET /v1/wallets/me
 
 Retorna a carteira da organization autenticada. Cria automaticamente se ainda não existir.
@@ -2020,6 +2335,18 @@ owner (4) > admin (3) > developer (2) > support (1)
 | `GET /v1/payments/:payment_id/history` | Qualquer role |
 | `POST /v1/payments/:payment_id/refund` | support |
 | `POST /v1/payments/:payment_id/cancel` | support |
+| **Invoices** | |
+| `POST /v1/invoices` | `invoices:write` |
+| `GET /v1/invoices` | `invoices:read` |
+| `GET /v1/invoices/:invoice_id` | `invoices:read` |
+| `POST /v1/invoices/:invoice_id/cancel` | `invoices:write` |
+| `POST /v1/invoices/:invoice_id/transition` | `invoices:write` |
+| `GET /v1/invoices/:invoice_id/logs` | `invoices:read` |
+| **Invoice Settings** | |
+| `PUT /v1/invoice-settings/:type` | `invoices:manage` |
+| `GET /v1/invoice-settings` | `invoices:read` |
+| `GET /v1/invoice-settings/:type` | `invoices:read` |
+| `DELETE /v1/invoice-settings/:type` | `invoices:manage` |
 | **Webhooks** | |
 | `POST /v1/webhooks` | admin |
 | `GET /v1/webhooks` | admin |
@@ -2075,6 +2402,9 @@ Além dos roles, o sistema oferece **permissões granulares** gerenciadas via `/
 | `wallets:adjust` | Aplicar ajustes manuais de saldo (owner only) |
 | `commissions:read` | Visualizar configurações de comissão |
 | `commissions:manage` | Criar, atualizar e remover configurações de comissão |
+| `invoices:read` | Visualizar notas fiscais, itens, logs e configurações |
+| `invoices:write` | Criar notas fiscais, cancelar e transicionar status |
+| `invoices:manage` | Criar, atualizar e remover configurações de emissão fiscal |
 
 **Resposta (403 Forbidden):**
 ```json

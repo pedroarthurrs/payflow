@@ -58,9 +58,10 @@ Resposta JSON
 
 **Handlers** (`api/handler/`)
 - Um arquivo por recurso, todos no mesmo pacote `handler`
-- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CredentialHandler`, `CustomerHandler`, `MemberHandler`, `UserHandler`, `WebhookHandler`, etc.
+- Nomes qualificados: `AddressHandler`, `AuthHandler`, `CredentialHandler`, `CustomerHandler`, `InvoiceHandler`, `MemberHandler`, `UserHandler`, `WebhookHandler`, etc.
 - `CredentialHandler` agrega tanto as rotas de credenciais quanto as de credential logs (handler unificado)
 - `MemberHandler` agrega rotas de membros e de permissões granulares (handler unificado)
+- `InvoiceHandler` agrega rotas de invoices e de invoice-settings (handler unificado)
 - Cada handler implementa `RegisterRoutes(rg *gin.RouterGroup)`
 - Responsáveis por receber requisições HTTP, validar payload e chamar services
 
@@ -179,6 +180,18 @@ Resposta JSON
 - `SetPermission()` — cria/atualiza override via `PermissionRepository.Upsert`
 - `RemovePermission()` — deleta override, revertendo ao padrão do role
 
+**InvoiceService** (`service/invoice.go`)
+- `Create()` — cria invoice + items atomicamente via `TxManager`; calcula `amount_cents` a partir dos itens
+- `GetByID()` — retorna invoice com items carregados
+- `List()` — listagem paginada com filtros (customer_id, subscription_id, status, invoice_type, date range)
+- `Transition()` — transição de status via FSM com logging automático e dispatch de webhook
+- `Cancel()` — atalho para transição ao estado `canceled`
+- `GenerateFromSubscription()` — gera invoice automaticamente a partir dos itens de uma subscription (skip não-fatal se setting ausente)
+- `ListLogs()` / `CountLogs()` — acesso ao audit trail de operações ERP
+- `UpsertSetting()` / `GetSettingByOrgAndType()` / `ListSettings()` / `DeleteSetting()` — CRUD de configurações fiscais
+- Integração com `WebhookDispatcher`: dispara eventos `invoice.created`, `invoice.paid`, `invoice.payment_failed`
+- Falhas de webhook são não-fatais — logadas, nunca bloqueiam a operação
+
 **RecurrenceService** (`service/recurrence.go`)
 - `ProcessBillingCycle(orgID, subID, attemptNum)` — ciclo completo de cobrança recorrente:
   1. Skip de estados terminais
@@ -199,7 +212,7 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `organization.go`: entidade Organization
 - `auth.go`: `AuthRepository`, `AuthUser`, `APIKey`, `AuthType`, `LoginRequest`
 - `user.go`: `UserAccountRepository`, `MemberRepository`, `PermissionRepository`; modelos `UserAccount`, `OrganizationMember`, `UserPermission`, `OrganizationRef`; `UserLogWriter`, `UserLogRepository`, `UserLogRecord`, `CreateUserLogInput`, `ListUserLogsInput`
-- `permission.go`: catálogo completo de `Permission` (22 permissões granulares no formato `{resource}:{action}`); `roleDefaultPermissions` mapeando os 4 roles; `DefaultPermissionsFor()`, `HasDefaultPermission()`
+- `permission.go`: catálogo completo de `Permission` (30 permissões granulares no formato `{resource}:{action}`); `roleDefaultPermissions` mapeando os 4 roles; `DefaultPermissionsFor()`, `HasDefaultPermission()`
 - `customer.go`: `CustomerRepository`, modelo Customer, inputs de criação e atualização
 - `address.go`: `AddressRepository`, modelo Address, inputs de criação e atualização
 - `product.go`: `ProductRepository`, modelo Product, ProductInput
@@ -216,7 +229,8 @@ Modelos de dados puros, contratos (interfaces) e erros tipados. Sem dependência
 - `webhook.go`: `WebhookEndpointRepository`, `WebhookLogRepository`, `OrganizationSecretReader`, modelos `WebhookEndpoint` e `WebhookLog`, event types
 - `tx.go`: contratos transacionais (`TxManager`, `TxHandle`); `TxHandle` expõe `CustomerRepo()`, `AddressRepo()`, `CredentialRepo()`, `PaymentFSMRepo()`, `SubscriptionRepo()`, `SubscriptionItemRepo()`, `WalletRepo()`
 - `wallet.go`: `WalletRepository`, modelos `Wallet`, `LedgerEntry`, `Payout`, `CommissionSetting`, `WalletLock`; tipos `WalletStatus`, `LedgerEntryType`, `LedgerCategory`, `PayoutStatus`, `CommissionType`, `WalletLockType`; inputs e params de listagem
-- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrAlreadyMember`, `ErrUserLogNotFound`, `ErrBillingAmountZero`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, `ErrWalletNotFound`, `ErrWalletSuspended`, `ErrInsufficientBalance`, `ErrCommissionNotFound`, `ErrPayoutNotFound`, `ErrInvalidAdjustment`, `ErrWalletLockNotFound`, etc.)
+- `invoice.go`: `InvoiceRepository`, `InvoiceItemRepository`, `InvoiceLogRepository`, `InvoiceSettingRepository`; modelos `Invoice`, `InvoiceItem`, `InvoiceLog`, `InvoiceSetting`; `InvoiceStateMachine` com FSM (pending → sent → paid/error/canceled); tipos `InvoiceStatus`, `InvoiceType`; inputs e params de listagem
+- `errors.go`: erros de domínio tipados (`ErrNotFound`, `ErrConflict`, `ErrForbidden`, `ErrAlreadyMember`, `ErrUserLogNotFound`, `ErrBillingAmountZero`, `ErrPlanNotFound`, `ErrPlanInUse`, `ErrSubscriptionNotFound`, `ErrInvalidSubscriptionTransition`, `ErrSubscriptionCanceled`, `ErrNoSubscriptionItems`, `ErrScheduleAlreadyPending`, `ErrScheduleNotFound`, `ErrWalletNotFound`, `ErrWalletSuspended`, `ErrInsufficientBalance`, `ErrCommissionNotFound`, `ErrPayoutNotFound`, `ErrInvalidAdjustment`, `ErrWalletLockNotFound`, `ErrInvoiceNotFound`, `ErrInvalidInvoiceTransition`, `ErrInvoiceAlreadyCanceled`, `ErrInvoiceItemsRequired`, `ErrInvoiceSettingNotFound`, etc.)
 
 **Roles disponíveis:**
 ```
@@ -254,6 +268,9 @@ owner (4) > admin (3) > developer (2) > support (1)
 | `wallets:adjust` | ✓ | — | — | — |
 | `commissions:read` | ✓ | ✓ | ✓ | — |
 | `commissions:manage` | ✓ | ✓ | — | — |
+| `invoices:read` | ✓ | ✓ | ✓ | — |
+| `invoices:write` | ✓ | ✓ | — | — |
+| `invoices:manage` | ✓ | ✓ | — | — |
 
 **Tipos de autenticação:**
 - `user` — login por email + password (inclui role no token)
@@ -605,6 +622,7 @@ Cada domínio possui seu próprio subpacote gerado:
 | `dbgen/plan` | Planos de preço |
 | `dbgen/subscription` | Assinaturas, itens, histórico, schedules |
 | `dbgen/wallet` | Carteiras, ledger, saques, comissões e locks |
+| `dbgen/invoice` | Notas fiscais, itens, logs e configurações fiscais |
 
 **Repositórios** (`database/repository/`)
 - Implementam os contratos da camada de domínio
@@ -612,7 +630,7 @@ Cada domínio possui seu próprio subpacote gerado:
 - `tx.go`: `TxManager` e `txHandle` para operações atômicas com `defer sqlTx.Rollback()`
 
 **SQL** (`database/queries/`)
-- Um arquivo `.sql` por domínio: `customer.sql`, `address.sql`, `product.sql`, `plan.sql`, `subscription.sql` (cobrindo assinaturas, itens, histórico e schedules), `credential.sql`, `member.sql`, `permission.sql`, `user_log.sql`, `recurrence.sql`, `payment.sql`, `payment_fsm.sql`, `webhook.sql`, `webhooklog.sql`, `idempotency.sql`, `cleanup.sql`
+- Um arquivo `.sql` por domínio: `customer.sql`, `address.sql`, `product.sql`, `plan.sql`, `subscription.sql` (cobrindo assinaturas, itens, histórico e schedules), `credential.sql`, `member.sql`, `permission.sql`, `user_log.sql`, `recurrence.sql`, `payment.sql`, `payment_fsm.sql`, `webhook.sql`, `webhooklog.sql`, `idempotency.sql`, `cleanup.sql`, `invoice.sql` (cobrindo invoices, itens, logs e settings)
 - Queries geram código Go via `make sqlc`
 
 ---
@@ -742,6 +760,7 @@ Operações atômicas implementadas:
 - `CustomerService.Update` com endereço
 - `CredentialService.Rotate` (revoga + cria)
 - `PaymentFSMService` (criação de pagamento + registro de histórico FSM)
+- `InvoiceService.Create` (invoice + items)
 
 ---
 

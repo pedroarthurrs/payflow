@@ -9,7 +9,7 @@ Capacidades transversais aplicadas via middleware:
 1. Rate Limiting — proteção contra abuso e força bruta com 3 tiers configuráveis
 2. Logging Estruturado — logs com `log/slog` (JSON em produção, texto em desenvolvimento)
 3. Tradução de Erros de Validação — mensagens legíveis para erros de entrada
-4. RBAC — controle de acesso por hierarquia de roles + 27 permissões granulares
+4. RBAC — controle de acesso por hierarquia de roles + 30 permissões granulares
 5. Credential Log — audit trail assíncrono para requisições via API Key
 6. User Log — audit trail assíncrono para requisições via JWT de usuário
 7. Idempotência — prevenção de operações duplicadas via `X-Idempotency-Key`
@@ -283,7 +283,7 @@ O middleware `RequireRole(minRole)` verifica:
 
 **Arquivo:** `internal/api/middleware/permission.go`
 
-Além dos roles, o sistema oferece 27 permissões granulares no formato `{resource}:{action}`. O middleware `RequirePermission(perm)` verifica via `PermissionService.HasPermission`:
+Além dos roles, o sistema oferece 30 permissões granulares no formato `{resource}:{action}`. O middleware `RequirePermission(perm)` verifica via `PermissionService.HasPermission`:
 
 1. Overrides individuais do usuário (`user_permissions`) têm prioridade
 2. Fallback para as permissões padrão do role
@@ -320,6 +320,9 @@ Além dos roles, o sistema oferece 27 permissões granulares no formato `{resour
 | `wallets:adjust` | ✓ | — | — | — |
 | `commissions:read` | ✓ | ✓ | ✓ | — |
 | `commissions:manage` | ✓ | ✓ | — | — |
+| `invoices:read` | ✓ | ✓ | ✓ | — |
+| `invoices:write` | ✓ | ✓ | — | — |
+| `invoices:manage` | ✓ | ✓ | — | — |
 
 Overrides individuais são gerenciados via `PUT /v1/members/:user_id/permissions` e `DELETE /v1/members/:user_id/permissions/:permission`.
 

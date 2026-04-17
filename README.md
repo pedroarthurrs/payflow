@@ -92,7 +92,7 @@ i9pay/
 **Autenticação e Acesso**
 - JWT com access/refresh tokens (email/password e API Key)
 - RBAC com hierarquia de roles: `owner > admin > developer > support`
-- 27 permissões granulares por membro com overrides individuais e cache de 5min
+- 30 permissões granulares por membro com overrides individuais e cache de 5min
 - Idempotência via `X-Idempotency-Key` (24h TTL, POST/PATCH)
 - Rate limiting em 3 tiers: IP, login e organization
 
@@ -119,6 +119,14 @@ i9pay/
 - Saques com reserva de saldo (`WalletLock`) e débito efetivo na liquidação
 - Ajustes manuais de saldo (owner only)
 - Configurações de comissão por cliente (percentual ou fixo, creditadas automaticamente no pagamento)
+
+**Faturamento**
+- Notas fiscais com FSM de 5 estados (`pending → sent → paid/error/canceled`)
+- Snapshots imutáveis de cliente e itens capturados via trigger no momento da emissão
+- Configurações de emissão fiscal por tipo (nacional/internacional) com integração ERP
+- Audit trail de operações ERP via `invoice_logs`
+- Geração automática de invoices a partir de assinaturas
+- Eventos de webhook: `invoice.created`, `invoice.paid`, `invoice.payment_failed`
 
 **Infraestrutura**
 - Webhooks (endpoints CRUD, entrega assíncrona com HMAC-SHA256 e retry exponencial)
