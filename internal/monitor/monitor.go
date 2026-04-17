@@ -13,6 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// sentryEnabled tracks whether Sentry was successfully initialized.
+var sentryEnabled bool
+
 // Init initializes the monitoring backend. Safe to call even when DSN is empty
 // (e.g. local development) — in that case it is a no-op.
 func Init(cfg *config.Config) {
@@ -26,7 +29,9 @@ func Init(cfg *config.Config) {
 		TracesSampleRate: 0.2,
 	}); err != nil {
 		fmt.Printf("monitor: initialization failed: %v\n", err)
+		return
 	}
+	sentryEnabled = true
 }
 
 // Flush waits for buffered events to be sent to Sentry. Should be called
@@ -38,7 +43,12 @@ func Flush() {
 // Middleware returns a Gin middleware that instruments each request for error
 // tracking. Panics are captured and re-raised so the recovery middleware can
 // still produce a proper HTTP response.
+// When Sentry is not initialized (e.g. no DSN in dev), a no-op is returned
+// to avoid nil pointer dereferences inside sentrygin.
 func Middleware() gin.HandlerFunc {
+	if !sentryEnabled {
+		return func(c *gin.Context) { c.Next() }
+	}
 	return sentrygin.New(sentrygin.Options{Repanic: true})
 }
 

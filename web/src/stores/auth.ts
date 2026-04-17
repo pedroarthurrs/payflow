@@ -1,10 +1,12 @@
-import { computed, ref } from 'vue'
-import { defineStore } from 'pinia'
 import http from '@/services/http'
-import type { LoginRequest, Role, TokenPair } from '@/types'
+import type { LoginRequest, OrgRef, Role, SelectOrganizationRequest, TokenPair } from '@/types'
+import { isMultiOrgLoginResponse } from '@/types'
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
 
 interface AuthUser {
   organizationId: string
+  memberId: string
   role: Role
   authType: string
 }
@@ -14,6 +16,7 @@ interface JwtPayload {
   role: Role
   auth_type: string
   user_id?: string
+  member_id?: string
   token_type?: string
 }
 
@@ -38,10 +41,15 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref<string | null>(null)
   const user = ref<AuthUser | null>(null)
 
+  /** Populated during multi-org login; cleared after selectOrganization(). */
+  const pendingSessionToken = ref<string | null>(null)
+  const pendingOrganizations = ref<OrgRef[]>([])
+
   const isAuthenticated = computed(() => !!accessToken.value)
   const userRole = computed(() => user.value?.role ?? null)
   const isOwner = computed(() => user.value?.role === 'owner')
   const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'owner')
+  const isMultiOrgPending = computed(() => !!pendingSessionToken.value)
 
   function setTokens(access: string, refresh: string) {
     accessToken.value = access
@@ -52,16 +60,38 @@ export const useAuthStore = defineStore('auth', () => {
     const claims = decodeJwtPayload(access)
     user.value = {
       organizationId: claims.sub,
+      memberId: claims.member_id ?? '',
       role: claims.role,
       authType: claims.auth_type,
     }
   }
 
   async function login(email: string, password: string) {
-    const { data } = await http.post<TokenPair>('/v1/auth/login', {
-      email,
-      password,
-    } satisfies LoginRequest)
+    const { data } = await http.post<TokenPair | { session_token: string; organizations: OrgRef[] }>(
+      '/v1/auth/login',
+      { email, password } satisfies LoginRequest,
+    )
+
+    if (isMultiOrgLoginResponse(data)) {
+      pendingSessionToken.value = data.session_token
+      pendingOrganizations.value = data.organizations
+      return
+    }
+
+    setTokens(data.access_token, data.refresh_token)
+  }
+
+  async function selectOrganization(organizationId: string) {
+    const sessionToken = pendingSessionToken.value
+    if (!sessionToken) throw new Error('No pending session token')
+
+    const { data } = await http.post<TokenPair>('/v1/auth/select-organization', {
+      session_token: sessionToken,
+      organization_id: organizationId,
+    } satisfies SelectOrganizationRequest)
+
+    pendingSessionToken.value = null
+    pendingOrganizations.value = []
 
     setTokens(data.access_token, data.refresh_token)
   }
@@ -70,6 +100,8 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = null
     refreshToken.value = null
     user.value = null
+    pendingSessionToken.value = null
+    pendingOrganizations.value = []
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     window.location.href = '/login'
@@ -98,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
         const claims = decodeJwtPayload(storedAccess)
         user.value = {
           organizationId: claims.sub,
+          memberId: claims.member_id ?? '',
           role: claims.role,
           authType: claims.auth_type,
         }
@@ -112,11 +145,15 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     refreshToken,
     user,
+    pendingSessionToken,
+    pendingOrganizations,
     isAuthenticated,
+    isMultiOrgPending,
     userRole,
     isOwner,
     isAdmin,
     login,
+    selectOrganization,
     logout,
     refresh,
     loadFromStorage,

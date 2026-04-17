@@ -29,28 +29,6 @@ ON CONFLICT (organization_id) DO UPDATE SET
     primary_color = EXCLUDED.primary_color,
     updated_at = NOW();
 
--- ===================== USERS =====================
--- Senha: password123
-
-INSERT INTO users (id, organization_id, email, name, password, role) VALUES
-    -- I9Pay Dev Organization
-    ('aa000001-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'dev@i9pay.local',       'Dev User',          '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'owner'),
-    ('aa000002-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'admin@i9pay.local',     'Admin User',        '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'admin'),
-    ('aa000003-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'dev2@i9pay.local',      'Developer User',    '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'developer'),
-    ('aa000008-0000-0000-0000-000000000008', '11111111-1111-1111-1111-111111111111', 'support@i9pay.local',   'Support User',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'support'),
-    -- Acme Corp
-    ('aa000004-0000-0000-0000-000000000004', '22222222-2222-2222-2222-222222222222', 'owner@acme.local',      'Acme Owner',        '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'owner'),
-    ('aa000005-0000-0000-0000-000000000005', '22222222-2222-2222-2222-222222222222', 'admin@acme.local',      'Acme Admin',        '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'admin'),
-    ('aa000006-0000-0000-0000-000000000006', '22222222-2222-2222-2222-222222222222', 'developer@acme.local',  'Acme Developer',    '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'developer'),
-    ('aa000007-0000-0000-0000-000000000007', '22222222-2222-2222-2222-222222222222', 'support@acme.local',    'Acme Support',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'support'),
-    ('aa000009-0000-0000-0000-000000000009', '22222222-2222-2222-2222-222222222222', 'support2@acme.local',   'Acme Support II',   '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e', 'support')
-ON CONFLICT (organization_id, email) DO UPDATE SET
-    name = EXCLUDED.name,
-    password = EXCLUDED.password,
-    role = EXCLUDED.role,
-    updated_at = NOW(),
-    deleted_at = NULL;
-
 -- ===================== CREDENTIALS (API Keys) =====================
 -- key_hash é SHA-256 fictício para dev. Prefixo indica ambiente.
 
@@ -212,21 +190,21 @@ ON CONFLICT (id) DO NOTHING;
 
 -- ===================== PAYMENTS =====================
 
-INSERT INTO payments (id, organization_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, idempotency_key) VALUES
+INSERT INTO payments (id, organization_id, customer_id, invoice_id, gateway_name, gateway_reference, payment_method, amount_cents, status, idempotency_key) VALUES
     -- I9Pay transactions
-    ('99aaa001-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '77aaa001-0000-0000-0000-000000000001', 'stripe',  'pi_dev_001', 'credit_card', 7990,  'succeeded',          'idem_dev_001'),
-    ('99aaa002-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '77aaa002-0000-0000-0000-000000000002', 'stripe',  'pi_dev_002', 'credit_card', 9980,  'succeeded',          'idem_dev_002'),
-    ('99aaa003-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', '77aaa003-0000-0000-0000-000000000003', 'stripe',  'pi_dev_003', 'pix',         2990,  'succeeded',          'idem_dev_003'),
-    ('99aaa004-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', '77aaa004-0000-0000-0000-000000000004', 'stripe',  'pi_dev_004', 'credit_card', 24990, 'succeeded',          'idem_dev_004'),
-    ('99aaa005-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', '77aaa005-0000-0000-0000-000000000005', 'stripe',  'pi_dev_005', 'boleto',      79900, 'pending',            'idem_dev_005'),
-    ('99aaa006-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', '77aaa001-0000-0000-0000-000000000001', 'stripe',  'pi_dev_006', 'credit_card', 7990,  'refunded',           'idem_dev_006'),
-    ('99aaa007-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', '77aaa003-0000-0000-0000-000000000003', 'stripe',  'pi_dev_007', 'credit_card', 2990,  'failed',             'idem_dev_007'),
+    ('99aaa001-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'bb000001-0000-0000-0000-000000000001', '77aaa001-0000-0000-0000-000000000001', 'stripe',  'pi_dev_001',  'credit_card', 7990,  'succeeded',          'idem_dev_001'),
+    ('99aaa002-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'bb000001-0000-0000-0000-000000000001', '77aaa002-0000-0000-0000-000000000002', 'stripe',  'pi_dev_002',  'credit_card', 9980,  'succeeded',          'idem_dev_002'),
+    ('99aaa003-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'bb000002-0000-0000-0000-000000000002', '77aaa003-0000-0000-0000-000000000003', 'stripe',  'pi_dev_003',  'pix',         2990,  'succeeded',          'idem_dev_003'),
+    ('99aaa004-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'bb000003-0000-0000-0000-000000000003', '77aaa004-0000-0000-0000-000000000004', 'stripe',  'pi_dev_004',  'credit_card', 24990, 'succeeded',          'idem_dev_004'),
+    ('99aaa005-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', 'bb000005-0000-0000-0000-000000000005', '77aaa005-0000-0000-0000-000000000005', 'stripe',  'pi_dev_005',  'boleto',      79900, 'pending',            'idem_dev_005'),
+    ('99aaa006-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', 'bb000001-0000-0000-0000-000000000001', '77aaa001-0000-0000-0000-000000000001', 'stripe',  'pi_dev_006',  'credit_card', 7990,  'refunded',           'idem_dev_006'),
+    ('99aaa007-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', 'bb000002-0000-0000-0000-000000000002', '77aaa003-0000-0000-0000-000000000003', 'stripe',  'pi_dev_007',  'credit_card', 2990,  'failed',             'idem_dev_007'),
     -- Acme transactions
-    ('99aaa008-0000-0000-0000-000000000008', '22222222-2222-2222-2222-222222222222', '77aaa007-0000-0000-0000-000000000007', 'pagarme', 'tr_acme_001', 'pix',        1990,  'succeeded',          'idem_acme_001'),
-    ('99aaa009-0000-0000-0000-000000000009', '22222222-2222-2222-2222-222222222222', '77aaa008-0000-0000-0000-000000000008', 'pagarme', 'tr_acme_002', 'credit_card',59970, 'succeeded',          'idem_acme_002'),
-    ('99aaa010-0000-0000-0000-000000000010', '22222222-2222-2222-2222-222222222222', '77aaa009-0000-0000-0000-000000000009', 'pagarme', 'tr_acme_003', 'boleto',     4990,  'pending',            'idem_acme_003'),
-    ('99aaa011-0000-0000-0000-000000000011', '22222222-2222-2222-2222-222222222222', '77aaa010-0000-0000-0000-000000000010', 'pagarme', 'tr_acme_004', 'pix',        4990,  'succeeded',          'idem_acme_004'),
-    ('99aaa012-0000-0000-0000-000000000012', '22222222-2222-2222-2222-222222222222', '77aaa008-0000-0000-0000-000000000008', 'pagarme', 'tr_acme_005', 'credit_card',59970, 'partially_refunded', 'idem_acme_005')
+    ('99aaa008-0000-0000-0000-000000000008', '22222222-2222-2222-2222-222222222222', 'bb000006-0000-0000-0000-000000000006', '77aaa007-0000-0000-0000-000000000007', 'pagarme', 'tr_acme_001', 'pix',         1990,  'succeeded',          'idem_acme_001'),
+    ('99aaa009-0000-0000-0000-000000000009', '22222222-2222-2222-2222-222222222222', 'bb000008-0000-0000-0000-000000000008', '77aaa008-0000-0000-0000-000000000008', 'pagarme', 'tr_acme_002', 'credit_card', 59970, 'succeeded',          'idem_acme_002'),
+    ('99aaa010-0000-0000-0000-000000000010', '22222222-2222-2222-2222-222222222222', 'bb000010-0000-0000-0000-000000000010', '77aaa009-0000-0000-0000-000000000009', 'pagarme', 'tr_acme_003', 'boleto',      4990,  'pending',            'idem_acme_003'),
+    ('99aaa011-0000-0000-0000-000000000011', '22222222-2222-2222-2222-222222222222', 'bb000007-0000-0000-0000-000000000007', '77aaa010-0000-0000-0000-000000000010', 'pagarme', 'tr_acme_004', 'pix',         4990,  'succeeded',          'idem_acme_004'),
+    ('99aaa012-0000-0000-0000-000000000012', '22222222-2222-2222-2222-222222222222', 'bb000008-0000-0000-0000-000000000008', '77aaa008-0000-0000-0000-000000000008', 'pagarme', 'tr_acme_005', 'credit_card', 59970, 'partially_refunded', 'idem_acme_005')
 ON CONFLICT (id) DO NOTHING;
 
 -- ===================== USER (novo modelo de identidade global) =====================
@@ -234,14 +212,14 @@ ON CONFLICT (id) DO NOTHING;
 -- Hash bcrypt (cost 10): $2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e
 
 INSERT INTO "user" (id, email, name, password) VALUES
-    ('ua000001-0000-0000-0000-000000000001', 'dev@i9pay.local',       'Dev User',        '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000002-0000-0000-0000-000000000002', 'admin@i9pay.local',     'Admin User',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000003-0000-0000-0000-000000000003', 'dev2@i9pay.local',      'Developer User',  '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000004-0000-0000-0000-000000000004', 'support@i9pay.local',   'Support User',    '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000005-0000-0000-0000-000000000005', 'owner@acme.local',      'Acme Owner',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000006-0000-0000-0000-000000000006', 'admin@acme.local',      'Acme Admin',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000007-0000-0000-0000-000000000007', 'developer@acme.local',  'Acme Developer',  '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
-    ('ua000008-0000-0000-0000-000000000008', 'support@acme.local',    'Acme Support',    '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e')
+    ('a0000001-0000-0000-0000-000000000001', 'dev@i9pay.local',       'Dev User',        '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000002-0000-0000-0000-000000000002', 'admin@i9pay.local',     'Admin User',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000003-0000-0000-0000-000000000003', 'dev2@i9pay.local',      'Developer User',  '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000004-0000-0000-0000-000000000004', 'support@i9pay.local',   'Support User',    '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000005-0000-0000-0000-000000000005', 'owner@acme.local',      'Acme Owner',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000006-0000-0000-0000-000000000006', 'admin@acme.local',      'Acme Admin',      '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000007-0000-0000-0000-000000000007', 'developer@acme.local',  'Acme Developer',  '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e'),
+    ('a0000008-0000-0000-0000-000000000008', 'support@acme.local',    'Acme Support',    '$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e')
 ON CONFLICT (email) DO UPDATE SET
     name = EXCLUDED.name,
     password = EXCLUDED.password,
@@ -253,17 +231,17 @@ ON CONFLICT (email) DO UPDATE SET
 
 INSERT INTO organization_members (id, organization_id, user_id, role) VALUES
     -- I9Pay Dev Organization
-    ('om000001-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'ua000001-0000-0000-0000-000000000001', 'owner'),
-    ('om000002-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'ua000002-0000-0000-0000-000000000002', 'admin'),
-    ('om000003-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'ua000003-0000-0000-0000-000000000003', 'developer'),
-    ('om000004-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'ua000004-0000-0000-0000-000000000004', 'support'),
+    ('c0000001-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'a0000001-0000-0000-0000-000000000001', 'owner'),
+    ('c0000002-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'a0000002-0000-0000-0000-000000000002', 'admin'),
+    ('c0000003-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'a0000003-0000-0000-0000-000000000003', 'developer'),
+    ('c0000004-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'a0000004-0000-0000-0000-000000000004', 'support'),
     -- Acme Corp
-    ('om000005-0000-0000-0000-000000000005', '22222222-2222-2222-2222-222222222222', 'ua000005-0000-0000-0000-000000000005', 'owner'),
-    ('om000006-0000-0000-0000-000000000006', '22222222-2222-2222-2222-222222222222', 'ua000006-0000-0000-0000-000000000006', 'admin'),
-    ('om000007-0000-0000-0000-000000000007', '22222222-2222-2222-2222-222222222222', 'ua000007-0000-0000-0000-000000000007', 'developer'),
-    ('om000008-0000-0000-0000-000000000008', '22222222-2222-2222-2222-222222222222', 'ua000008-0000-0000-0000-000000000008', 'support'),
+    ('c0000005-0000-0000-0000-000000000005', '22222222-2222-2222-2222-222222222222', 'a0000005-0000-0000-0000-000000000005', 'owner'),
+    ('c0000006-0000-0000-0000-000000000006', '22222222-2222-2222-2222-222222222222', 'a0000006-0000-0000-0000-000000000006', 'admin'),
+    ('c0000007-0000-0000-0000-000000000007', '22222222-2222-2222-2222-222222222222', 'a0000007-0000-0000-0000-000000000007', 'developer'),
+    ('c0000008-0000-0000-0000-000000000008', '22222222-2222-2222-2222-222222222222', 'a0000008-0000-0000-0000-000000000008', 'support'),
     -- dev@i9pay.local também está na Acme Corp (para testar login multi-org)
-    ('om000009-0000-0000-0000-000000000009', '22222222-2222-2222-2222-222222222222', 'ua000001-0000-0000-0000-000000000001', 'admin')
+    ('c0000009-0000-0000-0000-000000000009', '22222222-2222-2222-2222-222222222222', 'a0000001-0000-0000-0000-000000000001', 'admin')
 ON CONFLICT (organization_id, user_id) DO UPDATE SET
     role = EXCLUDED.role,
     updated_at = NOW(),

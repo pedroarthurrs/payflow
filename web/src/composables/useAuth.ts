@@ -1,7 +1,7 @@
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import type { Role } from '@/types'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 const ROLE_HIERARCHY: Record<Role, number> = {
   member: 0,
@@ -14,9 +14,22 @@ export function useAuth() {
   const router = useRouter()
 
   const isAuthenticated = computed(() => store.isAuthenticated)
+  const isMultiOrgPending = computed(() => store.isMultiOrgPending)
+  const pendingOrganizations = computed(() => store.pendingOrganizations)
 
   async function login(email: string, password: string): Promise<void> {
     await store.login(email, password)
+
+    if (store.isMultiOrgPending) {
+      router.push('/select-organization')
+      return
+    }
+
+    router.push('/dashboard')
+  }
+
+  async function selectOrganization(organizationId: string): Promise<void> {
+    await store.selectOrganization(organizationId)
     router.push('/dashboard')
   }
 
@@ -32,8 +45,11 @@ export function useAuth() {
 
   return {
     login,
+    selectOrganization,
     logout,
     hasRole,
     isAuthenticated,
+    isMultiOrgPending,
+    pendingOrganizations,
   }
 }

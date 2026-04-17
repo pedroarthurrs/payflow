@@ -1,7 +1,7 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import type { Role } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useStatusStore } from '@/stores/status'
+import type { Role } from '@/types'
+import { createRouter, createWebHistory } from 'vue-router'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -28,6 +28,11 @@ const router = createRouter({
     {
       path: '/login',
       component: () => import('@/views/LoginView.vue'),
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/select-organization',
+      component: () => import('@/views/SelectOrganizationView.vue'),
       meta: { guestOnly: true },
     },
     {

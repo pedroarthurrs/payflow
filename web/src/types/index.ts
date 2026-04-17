@@ -3,8 +3,9 @@
 export type Role = 'owner' | 'admin' | 'member'
 
 export interface LoginRequest {
-  email: string
-  password: string
+  email?: string
+  password?: string
+  api_key?: string
 }
 
 export interface TokenPair {
@@ -12,6 +13,31 @@ export interface TokenPair {
   access_token_expires_at: string
   refresh_token: string
   refresh_token_expires_at: string
+}
+
+/** Returned when the user belongs to multiple organizations. */
+export interface OrgRef {
+  organization_id: string
+  name: string
+  role: Role
+}
+
+/** Returned by POST /v1/auth/login when the user has multiple organizations. */
+export interface MultiOrgLoginResponse {
+  session_token: string
+  organizations: OrgRef[]
+}
+
+/** Discriminated union of possible login responses. */
+export type LoginResponse = TokenPair | MultiOrgLoginResponse
+
+export function isMultiOrgLoginResponse(r: LoginResponse): r is MultiOrgLoginResponse {
+  return 'session_token' in r
+}
+
+export interface SelectOrganizationRequest {
+  session_token: string
+  organization_id: string
 }
 
 export interface MeResponse {
@@ -87,7 +113,7 @@ export interface CreateAddressRequest {
   is_main?: boolean
 }
 
-export interface UpdateAddressRequest extends CreateAddressRequest {}
+export interface UpdateAddressRequest extends CreateAddressRequest { }
 
 // === Usuários ===
 
