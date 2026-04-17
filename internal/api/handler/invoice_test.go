@@ -309,6 +309,7 @@ func TestInvoiceCreate(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/invoices", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set(middleware.IdempotencyHeader, uuid.New().String())
 			r.ServeHTTP(w, req)
 
 			if w.Code != tc.wantStatus {

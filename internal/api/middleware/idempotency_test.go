@@ -241,3 +241,56 @@ func TestIdempotency_NoClaims_SkipsMiddleware(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusCreated, w.Code)
 	}
 }
+
+// --- RequireIdempotency tests ---
+
+func setupRequireIdempotencyRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(Errors())
+	r.POST("/financial", RequireIdempotency(), func(c *gin.Context) {
+		c.JSON(http.StatusCreated, gin.H{"ok": true})
+	})
+	r.GET("/financial", RequireIdempotency(), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	return r
+}
+
+func TestRequireIdempotency_MissingHeader_Returns400(t *testing.T) {
+	r := setupRequireIdempotencyRouter()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/financial", http.NoBody)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestRequireIdempotency_WithHeader_Passes(t *testing.T) {
+	r := setupRequireIdempotencyRouter()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/financial", http.NoBody)
+	req.Header.Set(IdempotencyHeader, uuid.New().String())
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", w.Code)
+	}
+}
+
+func TestRequireIdempotency_NonPOST_SkipsCheck(t *testing.T) {
+	r := setupRequireIdempotencyRouter()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/financial", http.NoBody)
+	// No header — should still pass because it's a GET
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}

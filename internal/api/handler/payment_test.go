@@ -250,6 +250,7 @@ func TestProperty_Preservation_CreateReturns201Pending(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/payments", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(middleware.IdempotencyHeader, uuid.New().String())
 		router.ServeHTTP(w, req)
 
 		if w.Code != http.StatusCreated {

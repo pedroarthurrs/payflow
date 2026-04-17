@@ -28,7 +28,7 @@ func NewSubscriptionHandler(svc *service.SubscriptionService) *SubscriptionHandl
 // RegisterRoutes registers all subscription routes.
 func (h *SubscriptionHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	subs := rg.Group("/subscriptions")
-	subs.POST("", h.Create)
+	subs.POST("", middleware.RequireIdempotency(), h.Create)
 	subs.GET("", h.List)
 	subs.GET("/:subscription_id", h.GetByID)
 	subs.POST("/:subscription_id/cancel", middleware.RequireRole("member"), h.Cancel)

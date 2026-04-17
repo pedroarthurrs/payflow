@@ -31,7 +31,7 @@ func NewInvoiceHandler(svc *service.InvoiceService, permSvc middleware.Permissio
 // RegisterRoutes registers all invoice and invoice-settings routes.
 func (h *InvoiceHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	invoices := rg.Group("/invoices")
-	invoices.POST("", middleware.RequirePermission(h.permSvc, domain.PermInvoicesWrite), h.Create)
+	invoices.POST("", middleware.RequirePermission(h.permSvc, domain.PermInvoicesWrite), middleware.RequireIdempotency(), h.Create)
 	invoices.GET("", middleware.RequirePermission(h.permSvc, domain.PermInvoicesRead), h.List)
 	invoices.GET("/:invoice_id", middleware.RequirePermission(h.permSvc, domain.PermInvoicesRead), h.GetByID)
 	invoices.POST("/:invoice_id/cancel", middleware.RequirePermission(h.permSvc, domain.PermInvoicesWrite), h.Cancel)

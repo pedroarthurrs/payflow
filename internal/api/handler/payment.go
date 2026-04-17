@@ -29,7 +29,7 @@ func NewPaymentHandler(paymentSvc *service.PaymentService, gatewaySvc *service.G
 // RegisterRoutes registers the payment handler routes.
 func (h *PaymentHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	payments := rg.Group("/payments")
-	payments.POST("", h.Create)
+	payments.POST("", middleware.RequireIdempotency(), h.Create)
 	payments.GET("", h.List)
 	payments.GET("/:payment_id", h.GetByID)
 	payments.GET("/:payment_id/history", h.ListHistory)

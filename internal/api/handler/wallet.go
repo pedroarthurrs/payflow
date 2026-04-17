@@ -33,9 +33,9 @@ func (h *WalletHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	wallets.GET("/me", middleware.RequirePermission(h.permSvc, domain.PermWalletsRead), h.GetOrgWallet)
 	wallets.GET("/:wallet_id", middleware.RequirePermission(h.permSvc, domain.PermWalletsRead), h.GetByID)
 	wallets.GET("/:wallet_id/entries", middleware.RequirePermission(h.permSvc, domain.PermWalletsRead), h.ListEntries)
-	wallets.POST("/:wallet_id/payouts", middleware.RequirePermission(h.permSvc, domain.PermWalletsPayout), h.RequestPayout)
+	wallets.POST("/:wallet_id/payouts", middleware.RequirePermission(h.permSvc, domain.PermWalletsPayout), middleware.RequireIdempotency(), h.RequestPayout)
 	wallets.GET("/:wallet_id/payouts", middleware.RequirePermission(h.permSvc, domain.PermWalletsRead), h.ListPayouts)
-	wallets.POST("/:wallet_id/adjust", middleware.RequirePermission(h.permSvc, domain.PermWalletsAdjust), h.Adjust)
+	wallets.POST("/:wallet_id/adjust", middleware.RequirePermission(h.permSvc, domain.PermWalletsAdjust), middleware.RequireIdempotency(), h.Adjust)
 }
 
 // --- DTOs ---

@@ -224,6 +224,7 @@ func TestWalletRequestPayout_201(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/wallets/"+uuid.New().String()+"/payouts", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(middleware.IdempotencyHeader, uuid.New().String())
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
@@ -245,6 +246,7 @@ func TestWalletRequestPayout_422_InsufficientBalance(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/wallets/"+uuid.New().String()+"/payouts", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(middleware.IdempotencyHeader, uuid.New().String())
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusUnprocessableEntity {
@@ -261,6 +263,7 @@ func TestWalletAdjust_200(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/wallets/"+uuid.New().String()+"/adjust", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(middleware.IdempotencyHeader, uuid.New().String())
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -283,6 +286,7 @@ func TestWalletAdjust_422_InvalidInput(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/wallets/"+uuid.New().String()+"/adjust", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(middleware.IdempotencyHeader, uuid.New().String())
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusUnprocessableEntity {

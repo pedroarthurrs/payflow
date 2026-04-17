@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	apierr "i9pay/internal/api/err"
 	"i9pay/internal/auth/token"
 	"i9pay/internal/domain"
 
@@ -31,6 +32,23 @@ type idempotencyResponseWriter struct {
 func (w *idempotencyResponseWriter) Write(b []byte) (int, error) {
 	w.buf.Write(b)
 	return w.ResponseWriter.Write(b)
+}
+
+// RequireIdempotency returns a Gin middleware that enforces the presence of the
+// X-Idempotency-Key header on POST requests. Use this on financial endpoints
+// where duplicate submissions must be explicitly prevented by the caller.
+//
+// Returns 400 Bad Request if the header is absent or empty.
+// Has no effect on non-POST methods (GET, PATCH, DELETE, etc.).
+func RequireIdempotency() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodPost && c.GetHeader(IdempotencyHeader) == "" {
+			_ = c.Error(apierr.BadRequest(IdempotencyHeader + " header is required for this operation"))
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 // Idempotency returns a Gin middleware that prevents duplicate write operations
