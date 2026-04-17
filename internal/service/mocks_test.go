@@ -185,7 +185,7 @@ type mockTxHandle struct {
 	customers    domain.CustomerRepository
 	addresses    domain.AddressRepository
 	credentials  domain.CredentialRepository
-	paymentFSM   domain.PaymentFSMRepository
+	paymentFSM   domain.PaymentFSMRepository // accepts both mockPaymentFSMRepo and mockPaymentFSMRepository
 	subFSM       domain.SubscriptionFSMRepository
 	subs         domain.SubscriptionRepository
 	subItems     domain.SubscriptionItemRepository
@@ -730,3 +730,192 @@ func (m *mockSubscriptionFSMRepoStub) ListHistory(ctx context.Context, orgID, su
 }
 
 var _ domain.SubscriptionFSMRepository = (*mockSubscriptionFSMRepoStub)(nil)
+
+// ============================================================
+// Mock PaymentRepository
+// ============================================================
+
+type mockPaymentRepository struct {
+	createFn                 func(ctx context.Context, orgID uuid.UUID, input domain.PaymentInput) (*domain.Payment, error)
+	getByIDFn                func(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.Payment, error)
+	listFn                   func(ctx context.Context, orgID uuid.UUID, params domain.PaymentListParams) ([]domain.Payment, error)
+	countFn                  func(ctx context.Context, orgID uuid.UUID, params domain.PaymentListParams) (int64, error)
+	updateGatewayReferenceFn func(ctx context.Context, orgID, paymentID uuid.UUID, gatewayName, gatewayReference string) error
+	updateErrorLogFn         func(ctx context.Context, orgID, paymentID uuid.UUID, errorLog json.RawMessage) error
+}
+
+var _ domain.PaymentRepository = (*mockPaymentRepository)(nil)
+
+func (m *mockPaymentRepository) Create(ctx context.Context, orgID uuid.UUID, input domain.PaymentInput) (*domain.Payment, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, orgID, input)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockPaymentRepository) GetByID(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.Payment, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, orgID, paymentID)
+	}
+	return nil, domain.ErrPaymentNotFound
+}
+
+func (m *mockPaymentRepository) List(ctx context.Context, orgID uuid.UUID, params domain.PaymentListParams) ([]domain.Payment, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, orgID, params)
+	}
+	return nil, nil
+}
+
+func (m *mockPaymentRepository) Count(ctx context.Context, orgID uuid.UUID, params domain.PaymentListParams) (int64, error) {
+	if m.countFn != nil {
+		return m.countFn(ctx, orgID, params)
+	}
+	return 0, nil
+}
+
+func (m *mockPaymentRepository) UpdateGatewayReference(ctx context.Context, orgID, paymentID uuid.UUID, gatewayName, gatewayReference string) error {
+	if m.updateGatewayReferenceFn != nil {
+		return m.updateGatewayReferenceFn(ctx, orgID, paymentID, gatewayName, gatewayReference)
+	}
+	return nil
+}
+
+func (m *mockPaymentRepository) UpdateErrorLog(ctx context.Context, orgID, paymentID uuid.UUID, errorLog json.RawMessage) error {
+	if m.updateErrorLogFn != nil {
+		return m.updateErrorLogFn(ctx, orgID, paymentID, errorLog)
+	}
+	return nil
+}
+
+// ============================================================
+// Mock PaymentFSMRepository (full, with call tracking)
+// ============================================================
+
+type mockPaymentFSMRepository struct {
+	getForUpdateFn  func(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.PaymentForUpdate, error)
+	updateStatusFn  func(ctx context.Context, orgID, paymentID uuid.UUID, newStatus domain.PaymentStatus) error
+	insertHistoryFn func(ctx context.Context, entry domain.TransitionHistory) error
+	listHistoryFn   func(ctx context.Context, orgID, paymentID uuid.UUID) ([]domain.TransitionHistory, error)
+	// call tracking
+	updateStatusCalled  bool
+	insertHistoryCalled bool
+	callOrder           []string
+}
+
+var _ domain.PaymentFSMRepository = (*mockPaymentFSMRepository)(nil)
+
+func (m *mockPaymentFSMRepository) GetForUpdate(ctx context.Context, orgID, paymentID uuid.UUID) (*domain.PaymentForUpdate, error) {
+	m.callOrder = append(m.callOrder, "GetForUpdate")
+	if m.getForUpdateFn != nil {
+		return m.getForUpdateFn(ctx, orgID, paymentID)
+	}
+	return nil, domain.ErrPaymentNotFound
+}
+
+func (m *mockPaymentFSMRepository) UpdateStatus(ctx context.Context, orgID, paymentID uuid.UUID, newStatus domain.PaymentStatus) error {
+	m.updateStatusCalled = true
+	m.callOrder = append(m.callOrder, "UpdateStatus")
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, orgID, paymentID, newStatus)
+	}
+	return nil
+}
+
+func (m *mockPaymentFSMRepository) InsertHistory(ctx context.Context, entry domain.TransitionHistory) error {
+	m.insertHistoryCalled = true
+	m.callOrder = append(m.callOrder, "InsertHistory")
+	if m.insertHistoryFn != nil {
+		return m.insertHistoryFn(ctx, entry)
+	}
+	return nil
+}
+
+func (m *mockPaymentFSMRepository) ListHistory(ctx context.Context, orgID, paymentID uuid.UUID) ([]domain.TransitionHistory, error) {
+	if m.listHistoryFn != nil {
+		return m.listHistoryFn(ctx, orgID, paymentID)
+	}
+	return nil, nil
+}
+
+// ============================================================
+// Mock GatewayProvider (domain.Gateway for payment/gateway tests)
+// ============================================================
+
+type mockGatewayProvider struct {
+	chargeFn func(ctx context.Context, req domain.GatewayRequest) (*domain.ChargeResult, error)
+	refundFn func(ctx context.Context, req domain.GatewayRequest) (*domain.RefundResult, error)
+	cancelFn func(ctx context.Context, req domain.GatewayRequest) (*domain.ChargeResult, error)
+}
+
+var _ domain.Gateway = (*mockGatewayProvider)(nil)
+
+func (m *mockGatewayProvider) Charge(ctx context.Context, req domain.GatewayRequest) (*domain.ChargeResult, error) {
+	if m.chargeFn != nil {
+		return m.chargeFn(ctx, req)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockGatewayProvider) Refund(ctx context.Context, req domain.GatewayRequest) (*domain.RefundResult, error) {
+	if m.refundFn != nil {
+		return m.refundFn(ctx, req)
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *mockGatewayProvider) Cancel(ctx context.Context, req domain.GatewayRequest) (*domain.ChargeResult, error) {
+	if m.cancelFn != nil {
+		return m.cancelFn(ctx, req)
+	}
+	return nil, errors.New("not implemented")
+}
+
+// ============================================================
+// Mock LedgerService (interface + mock)
+// ============================================================
+
+// mockLedgerService implements paymentLedger for testing PaymentService ledger hooks.
+type mockLedgerService struct {
+	creditOnPaymentSuccessFn func(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	lockOnPaymentDisputedFn  func(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	debitOnPaymentRefundFn   func(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	releaseLockIfDisputedFn  func(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	// call tracking
+	creditCalled      bool
+	lockCalled        bool
+	debitCalled       bool
+	releaseLockCalled bool
+}
+
+func (m *mockLedgerService) CreditOnPaymentSuccess(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error {
+	m.creditCalled = true
+	if m.creditOnPaymentSuccessFn != nil {
+		return m.creditOnPaymentSuccessFn(ctx, tx, orgID, p)
+	}
+	return nil
+}
+
+func (m *mockLedgerService) LockOnPaymentDisputed(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error {
+	m.lockCalled = true
+	if m.lockOnPaymentDisputedFn != nil {
+		return m.lockOnPaymentDisputedFn(ctx, tx, orgID, p)
+	}
+	return nil
+}
+
+func (m *mockLedgerService) DebitOnPaymentRefund(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error {
+	m.debitCalled = true
+	if m.debitOnPaymentRefundFn != nil {
+		return m.debitOnPaymentRefundFn(ctx, tx, orgID, p)
+	}
+	return nil
+}
+
+func (m *mockLedgerService) ReleaseLockIfDisputed(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error {
+	m.releaseLockCalled = true
+	if m.releaseLockIfDisputedFn != nil {
+		return m.releaseLockIfDisputedFn(ctx, tx, orgID, p)
+	}
+	return nil
+}

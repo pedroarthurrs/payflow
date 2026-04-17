@@ -23,3 +23,7 @@ web/dist/
 web/coverage/
 web/*.tsbuildinfo
 web/tsconfig.*.tsbuildinfo
+
+# Cobertura de testes
+coverage.out
+coverage.html

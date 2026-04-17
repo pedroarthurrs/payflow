@@ -7,7 +7,7 @@ DOCKER_COMPOSE_DEV = deploy/docker/dev/docker-compose.yml
 MIGRATIONS_PATH = deploy/migrations
 DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?sslmode=disable
 
-.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test lint vet fmt check setup-hooks help
+.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test coverage lint vet fmt check setup-hooks help
 
 # --- DOCKER COMMANDS ---
 
@@ -40,6 +40,13 @@ tidy:
 ## test: Roda os testes do projeto
 test:
 	go test -v ./...
+
+## coverage: Gera relatório de cobertura de testes (HTML + terminal)
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Relatório HTML gerado em coverage.html"
 
 ## lint: Roda o golangci-lint
 lint:

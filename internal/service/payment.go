@@ -9,6 +9,15 @@ import (
 	"github.com/google/uuid"
 )
 
+// paymentLedger is the subset of LedgerService methods used by PaymentService.
+// Using an interface allows test doubles to be injected without modifying callers.
+type paymentLedger interface {
+	CreditOnPaymentSuccess(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	LockOnPaymentDisputed(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	DebitOnPaymentRefund(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+	ReleaseLockIfDisputed(ctx context.Context, tx domain.TxHandle, orgID uuid.UUID, p *domain.PaymentForUpdate) error
+}
+
 // PaymentService handles payment business logic, including CRUD operations
 // and FSM-driven state transitions.
 type PaymentService struct {
@@ -16,17 +25,21 @@ type PaymentService struct {
 	fsm      *domain.StateMachine
 	txMgr    domain.TxManager
 	fsmRepo  domain.PaymentFSMRepository
-	ledger   *LedgerService
+	ledger   paymentLedger
 }
 
 // NewPaymentService creates a PaymentService.
 func NewPaymentService(payments domain.PaymentRepository, txMgr domain.TxManager, fsmRepo domain.PaymentFSMRepository, ledger *LedgerService) *PaymentService {
+	var l paymentLedger
+	if ledger != nil {
+		l = ledger
+	}
 	return &PaymentService{
 		payments: payments,
 		fsm:      domain.NewStateMachine(),
 		txMgr:    txMgr,
 		fsmRepo:  fsmRepo,
-		ledger:   ledger,
+		ledger:   l,
 	}
 }
 
