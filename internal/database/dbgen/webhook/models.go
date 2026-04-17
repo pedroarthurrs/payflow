@@ -545,6 +545,7 @@ type SubscriptionStatusHistory struct {
 	Reason         sql.NullString             `json:"reason"`
 	Metadata       pqtype.NullRawMessage      `json:"metadata"`
 	EventSourceID  uuid.NullUUID              `json:"event_source_id"`
+	EventSource    sql.NullString             `json:"event_source"`
 	CreatedAt      sql.NullTime               `json:"created_at"`
 	UpdatedAt      sql.NullTime               `json:"updated_at"`
 }

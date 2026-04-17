@@ -21,7 +21,7 @@ WHERE organization_id = $1 AND id = $2
 LIMIT 1;
 
 -- name: GetSubscriptionForUpdate :one
-SELECT id, organization_id, status
+SELECT id, organization_id, customer_id, status
 FROM subscriptions
 WHERE organization_id = $1 AND id = $2
 FOR UPDATE;
@@ -82,10 +82,21 @@ WHERE organization_id = $1 AND subscription_id = $2;
 -- Subscription Status History
 -- =============================================================================
 
+-- name: InsertSubscriptionHistory :exec
+INSERT INTO subscription_status_history (
+    organization_id, subscription_id,
+    old_status, new_status,
+    event_source, event_source_id, reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+
 -- name: ListSubscriptionHistory :many
-SELECT * FROM subscription_status_history
+SELECT id, organization_id, subscription_id, old_status, new_status, event_source, event_source_id, reason, created_at
+FROM subscription_status_history
 WHERE organization_id = $1 AND subscription_id = $2
-ORDER BY created_at ASC;
+  AND (sqlc.narg('cursor_time')::timestamptz IS NULL
+       OR (created_at, id) > (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY created_at ASC, id ASC
+LIMIT $3;
 
 -- =============================================================================
 -- Subscription Schedules

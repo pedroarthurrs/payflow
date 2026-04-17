@@ -95,11 +95,13 @@ type subscriptionResponse struct {
 }
 
 type subscriptionHistoryResponse struct {
-	ID        uuid.UUID `json:"id"`
-	OldStatus *string   `json:"old_status,omitempty"`
-	NewStatus string    `json:"new_status"`
-	Reason    string    `json:"reason,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID            uuid.UUID  `json:"id"`
+	OldStatus     *string    `json:"old_status,omitempty"`
+	NewStatus     string     `json:"new_status"`
+	EventSource   string     `json:"event_source,omitempty"`
+	EventSourceID *uuid.UUID `json:"event_source_id,omitempty"`
+	Reason        string     `json:"reason,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 type scheduleResponse struct {
@@ -455,6 +457,23 @@ func (h *SubscriptionHandler) ListItems(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// toHistoryResponse maps a domain.SubscriptionStatusHistory to its HTTP response DTO.
+func toHistoryResponse(h domain.SubscriptionStatusHistory) subscriptionHistoryResponse {
+	r := subscriptionHistoryResponse{
+		ID:            h.ID,
+		NewStatus:     string(h.NewStatus),
+		EventSource:   h.EventSource,
+		EventSourceID: h.EventSourceID,
+		Reason:        h.Reason,
+		CreatedAt:     h.CreatedAt,
+	}
+	if h.OldStatus != nil {
+		s := string(*h.OldStatus)
+		r.OldStatus = &s
+	}
+	return r
+}
+
 // ListHistory handles GET /v1/subscriptions/:subscription_id/history.
 func (h *SubscriptionHandler) ListHistory(c *gin.Context) {
 	orgID, ok := dto.OrganizationID(c)
@@ -466,7 +485,12 @@ func (h *SubscriptionHandler) ListHistory(c *gin.Context) {
 		return
 	}
 
-	history, err := h.svc.ListHistory(c.Request.Context(), orgID, subID)
+	pag, ok := dto.ParsePagination(c)
+	if !ok {
+		return
+	}
+
+	history, nextCursor, err := h.svc.ListHistory(c.Request.Context(), orgID, subID, pag.Limit, pag.Cursor)
 	if err != nil {
 		if errors.Is(err, domain.ErrSubscriptionNotFound) {
 			_ = c.Error(apierr.NotFound("subscription not found"))
@@ -477,20 +501,21 @@ func (h *SubscriptionHandler) ListHistory(c *gin.Context) {
 	}
 
 	resp := make([]subscriptionHistoryResponse, len(history))
-	for i, h := range history {
-		r := subscriptionHistoryResponse{
-			ID:        h.ID,
-			NewStatus: string(h.NewStatus),
-			Reason:    h.Reason,
-			CreatedAt: h.CreatedAt,
-		}
-		if h.OldStatus != nil {
-			s := string(*h.OldStatus)
-			r.OldStatus = &s
-		}
-		resp[i] = r
+	for i := range history {
+		resp[i] = toHistoryResponse(history[i])
 	}
-	c.JSON(http.StatusOK, resp)
+
+	var nextCursorStr *string
+	if nextCursor != nil {
+		s := service.EncodeCursor(nextCursor.CreatedAt, nextCursor.ID)
+		nextCursorStr = &s
+	}
+
+	c.JSON(http.StatusOK, dto.CursorPagedResponse[subscriptionHistoryResponse]{
+		Data:       resp,
+		NextCursor: nextCursorStr,
+		Limit:      int64(pag.Limit),
+	})
 }
 
 // CreateSchedule handles POST /v1/subscriptions/:subscription_id/schedules.

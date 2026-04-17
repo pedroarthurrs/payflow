@@ -45,9 +45,10 @@ func (h *mockTxHandle) SubscriptionItemRepo() domain.SubscriptionItemRepository 
 func (h *mockTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
 	return nil
 }
-func (h *mockTxHandle) WalletRepo() domain.WalletRepository           { return nil }
-func (h *mockTxHandle) InvoiceRepo() domain.InvoiceRepository         { return nil }
-func (h *mockTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository { return nil }
+func (h *mockTxHandle) SubscriptionFSMRepo() domain.SubscriptionFSMRepository { return nil }
+func (h *mockTxHandle) WalletRepo() domain.WalletRepository                   { return nil }
+func (h *mockTxHandle) InvoiceRepo() domain.InvoiceRepository                 { return nil }
+func (h *mockTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository         { return nil }
 
 // ── mock payment querier ──────────────────────────────────────────────────────
 

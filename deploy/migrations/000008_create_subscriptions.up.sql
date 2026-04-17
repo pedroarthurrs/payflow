@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS subscription_status_history (
     reason VARCHAR(100),                          -- Motivo operacional que originou a mudança.
     metadata JSONB,
     event_source_id UUID,                         -- Entidade associada que disparou a mudança (payment ou invoice).
+    event_source VARCHAR(50),                     -- Origem da transição: "api", "system", "webhook".
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
@@ -119,47 +120,7 @@ CREATE TRIGGER tr_subscription_status_history_updated_at
     BEFORE UPDATE ON subscription_status_history
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- ----------------------------------------------------
--- TRIGGER: LOG DO STATUS DE SUBS
--- ----------------------------------------------------
-
--- Como o trigger é automático, ele não sabe sozinho se o motivo foi um "Cartão Recusado" ou um "Cancelamento Voluntário".
--- Uma técnica avançada para resolver isso é usar uma variável de configuração temporária na sua transação SQL:
---
--- No seu Backend (Node/Go/Python), antes de dar o Update:
--- SET LOCAL app.change_reason = 'customer_request';
---
--- No Trigger, você captura isso:
--- reason := current_setting('app.change_reason', true);
-
-CREATE OR REPLACE FUNCTION fn_log_subscription_status_change()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF (OLD.status IS DISTINCT FROM NEW.status) THEN
-        INSERT INTO subscription_status_history (
-            organization_id,
-            subscription_id,
-            old_status,
-            new_status,
-            reason,
-            metadata
-        ) VALUES (
-            NEW.organization_id,
-            NEW.id,
-            OLD.status,
-            NEW.status,
-            'status_changed_by_system',
-            jsonb_build_object(
-                'triggered_at', NOW(),
-                'previous_period_end', OLD.current_period_end
-            )
-        );
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER tr_subscriptions_status_history
-    AFTER UPDATE ON subscriptions
-    FOR EACH ROW
-    EXECUTE FUNCTION fn_log_subscription_status_change();
+-- NOTE: subscription status history is now recorded by the Go backend (SubscriptionService.Transition),
+-- not by a database trigger. This provides rich context (event_source, event_source_id, reason)
+-- within the same transaction that updates the status.
+-- The trigger fn_log_subscription_status_change and tr_subscriptions_status_history have been removed.

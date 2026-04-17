@@ -109,9 +109,10 @@ func (h *handlerTxHandle) SubscriptionItemRepo() domain.SubscriptionItemReposito
 func (h *handlerTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
 	return nil
 }
-func (h *handlerTxHandle) WalletRepo() domain.WalletRepository           { return h.walletRepo }
-func (h *handlerTxHandle) InvoiceRepo() domain.InvoiceRepository         { return nil }
-func (h *handlerTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository { return nil }
+func (h *handlerTxHandle) SubscriptionFSMRepo() domain.SubscriptionFSMRepository { return nil }
+func (h *handlerTxHandle) WalletRepo() domain.WalletRepository                   { return h.walletRepo }
+func (h *handlerTxHandle) InvoiceRepo() domain.InvoiceRepository                 { return nil }
+func (h *handlerTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository         { return nil }
 
 func setupWalletRouterDirect(svcMock *mockWalletService, resolver middleware.PermissionResolver, orgID, userID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)

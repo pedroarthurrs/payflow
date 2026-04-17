@@ -94,6 +94,10 @@ func (h *txHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleReposit
 	return NewSubscriptionScheduleRepo(h.subscriptionQ)
 }
 
+func (h *txHandle) SubscriptionFSMRepo() domain.SubscriptionFSMRepository {
+	return NewSubscriptionFSMRepo(h.subscriptionQ)
+}
+
 func (h *txHandle) WalletRepo() domain.WalletRepository {
 	return NewWalletRepo(h.walletQ)
 }

@@ -186,9 +186,10 @@ func (h *invoiceTxHandle) SubscriptionItemRepo() domain.SubscriptionItemReposito
 func (h *invoiceTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRepository {
 	return nil
 }
-func (h *invoiceTxHandle) WalletRepo() domain.WalletRepository           { return nil }
-func (h *invoiceTxHandle) InvoiceRepo() domain.InvoiceRepository         { return h.invoiceRepo }
-func (h *invoiceTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository { return h.itemRepo }
+func (h *invoiceTxHandle) SubscriptionFSMRepo() domain.SubscriptionFSMRepository { return nil }
+func (h *invoiceTxHandle) WalletRepo() domain.WalletRepository                   { return nil }
+func (h *invoiceTxHandle) InvoiceRepo() domain.InvoiceRepository                 { return h.invoiceRepo }
+func (h *invoiceTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository         { return h.itemRepo }
 
 // ── mock webhook dispatcher ───────────────────────────────────────────────────
 

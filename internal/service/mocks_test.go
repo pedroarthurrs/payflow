@@ -186,6 +186,7 @@ type mockTxHandle struct {
 	addresses    domain.AddressRepository
 	credentials  domain.CredentialRepository
 	paymentFSM   domain.PaymentFSMRepository
+	subFSM       domain.SubscriptionFSMRepository
 	subs         domain.SubscriptionRepository
 	subItems     domain.SubscriptionItemRepository
 	subSchedule  domain.SubscriptionScheduleRepository
@@ -243,6 +244,13 @@ func (m *mockTxHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleRep
 		return m.subSchedule
 	}
 	return &mockSubscriptionScheduleRepoStub{}
+}
+
+func (m *mockTxHandle) SubscriptionFSMRepo() domain.SubscriptionFSMRepository {
+	if m.subFSM != nil {
+		return m.subFSM
+	}
+	return &mockSubscriptionFSMRepoStub{}
 }
 
 func (m *mockTxHandle) WalletRepo() domain.WalletRepository {
@@ -681,3 +689,44 @@ func (m *mockInvoiceItemRepoStub) ListByInvoice(ctx context.Context, organizatio
 func (m *mockInvoiceItemRepoStub) DeleteByInvoice(_ context.Context, _, _ uuid.UUID) error {
 	return nil
 }
+
+// ============================================================
+// Mock SubscriptionFSMRepository (stub for TxHandle compliance)
+// ============================================================
+
+type mockSubscriptionFSMRepoStub struct {
+	getForUpdateFn  func(ctx context.Context, orgID, subID uuid.UUID) (*domain.SubscriptionForUpdate, error)
+	updateStatusFn  func(ctx context.Context, orgID, subID uuid.UUID, newStatus domain.SubscriptionStatus) error
+	insertHistoryFn func(ctx context.Context, entry domain.SubscriptionStatusHistory) error
+	listHistoryFn   func(ctx context.Context, orgID, subID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error)
+}
+
+func (m *mockSubscriptionFSMRepoStub) GetForUpdate(ctx context.Context, orgID, subID uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+	if m.getForUpdateFn != nil {
+		return m.getForUpdateFn(ctx, orgID, subID)
+	}
+	return nil, domain.ErrSubscriptionNotFound
+}
+
+func (m *mockSubscriptionFSMRepoStub) UpdateStatus(ctx context.Context, orgID, subID uuid.UUID, newStatus domain.SubscriptionStatus) error {
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, orgID, subID, newStatus)
+	}
+	return nil
+}
+
+func (m *mockSubscriptionFSMRepoStub) InsertHistory(ctx context.Context, entry domain.SubscriptionStatusHistory) error {
+	if m.insertHistoryFn != nil {
+		return m.insertHistoryFn(ctx, entry)
+	}
+	return nil
+}
+
+func (m *mockSubscriptionFSMRepoStub) ListHistory(ctx context.Context, orgID, subID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error) {
+	if m.listHistoryFn != nil {
+		return m.listHistoryFn(ctx, orgID, subID, limit, cursor)
+	}
+	return nil, nil, nil
+}
+
+var _ domain.SubscriptionFSMRepository = (*mockSubscriptionFSMRepoStub)(nil)

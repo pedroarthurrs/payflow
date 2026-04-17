@@ -49,9 +49,21 @@ type SubscriptionScheduleRepository interface {
 	Cancel(ctx context.Context, organizationID, scheduleID uuid.UUID) error
 }
 
+// SubscriptionFSMRepository defines the transactional persistence operations for the subscription FSM.
+type SubscriptionFSMRepository interface {
+	// GetForUpdate fetches the subscription with SELECT FOR UPDATE inside a SQL tx.
+	GetForUpdate(ctx context.Context, organizationID, subscriptionID uuid.UUID) (*SubscriptionForUpdate, error)
+	// UpdateStatus updates the subscription status inside a SQL tx.
+	UpdateStatus(ctx context.Context, organizationID, subscriptionID uuid.UUID, newStatus SubscriptionStatus) error
+	// InsertHistory inserts a record into subscription_status_history inside a SQL tx.
+	InsertHistory(ctx context.Context, entry SubscriptionStatusHistory) error
+	// ListHistory returns the history for a subscription with cursor-based pagination.
+	ListHistory(ctx context.Context, organizationID, subscriptionID uuid.UUID, limit int, cursor *CursorToken) ([]SubscriptionStatusHistory, *CursorToken, error)
+}
+
 // SubscriptionHistoryRepository defines read access to subscription status history.
 type SubscriptionHistoryRepository interface {
-	List(ctx context.Context, organizationID, subscriptionID uuid.UUID) ([]SubscriptionStatusHistory, error)
+	List(ctx context.Context, organizationID, subscriptionID uuid.UUID, limit int, cursor *CursorToken) ([]SubscriptionStatusHistory, *CursorToken, error)
 }
 
 // Subscription represents a recurring billing agreement.
@@ -82,6 +94,14 @@ type SubscriptionItem struct {
 	UpdatedAt      time.Time
 }
 
+// SubscriptionForUpdate is the minimal snapshot returned by SELECT FOR UPDATE.
+type SubscriptionForUpdate struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	CustomerID     uuid.UUID
+	Status         SubscriptionStatus
+}
+
 // SubscriptionStatusHistory records every status transition.
 type SubscriptionStatusHistory struct {
 	ID             uuid.UUID
@@ -89,6 +109,8 @@ type SubscriptionStatusHistory struct {
 	SubscriptionID uuid.UUID
 	OldStatus      *SubscriptionStatus
 	NewStatus      SubscriptionStatus
+	EventSource    string
+	EventSourceID  *uuid.UUID
 	Reason         string
 	CreatedAt      time.Time
 }

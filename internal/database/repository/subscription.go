@@ -305,21 +305,38 @@ func NewSubscriptionHistoryRepo(q subscriptiondb.Querier) *SubscriptionHistoryRe
 	return &SubscriptionHistoryRepo{q: q}
 }
 
-// List returns all history entries for a subscription, ordered by created_at ASC.
-func (r *SubscriptionHistoryRepo) List(ctx context.Context, organizationID, subscriptionID uuid.UUID) ([]domain.SubscriptionStatusHistory, error) {
-	rows, err := r.q.ListSubscriptionHistory(ctx, subscriptiondb.ListSubscriptionHistoryParams{
+// List returns history entries for a subscription with cursor-based pagination.
+func (r *SubscriptionHistoryRepo) List(ctx context.Context, organizationID, subscriptionID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error) {
+	params := subscriptiondb.ListSubscriptionHistoryParams{
 		OrganizationID: organizationID,
 		SubscriptionID: subscriptionID,
-	})
+		Limit:          int32(limit + 1),
+	}
+	if cursor != nil {
+		params.CursorTime = sql.NullTime{Time: cursor.CreatedAt, Valid: true}
+		params.CursorID = uuid.NullUUID{UUID: cursor.ID, Valid: true}
+	}
+
+	rows, err := r.q.ListSubscriptionHistory(ctx, params)
 	if err != nil {
 		slog.Error("failed to list subscription history", "organization_id", organizationID, "subscription_id", subscriptionID, "error", err)
-		return nil, domain.ErrInternal
+		return nil, nil, domain.ErrInternal
 	}
+
+	var nextCursor *domain.CursorToken
+	if len(rows) > limit {
+		last := rows[limit-1]
+		if last.CreatedAt.Valid {
+			nextCursor = &domain.CursorToken{CreatedAt: last.CreatedAt.Time, ID: last.ID}
+		}
+		rows = rows[:limit]
+	}
+
 	result := make([]domain.SubscriptionStatusHistory, len(rows))
 	for i := range rows {
 		result[i] = toDomainHistory(rows[i])
 	}
-	return result, nil
+	return result, nextCursor, nil
 }
 
 // =============================================================================
@@ -375,7 +392,7 @@ func toDomainSubscriptionItem(row subscriptiondb.SubscriptionItem) domain.Subscr
 	return item
 }
 
-func toDomainHistory(row subscriptiondb.SubscriptionStatusHistory) domain.SubscriptionStatusHistory {
+func toDomainHistory(row subscriptiondb.ListSubscriptionHistoryRow) domain.SubscriptionStatusHistory {
 	h := domain.SubscriptionStatusHistory{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
@@ -385,6 +402,13 @@ func toDomainHistory(row subscriptiondb.SubscriptionStatusHistory) domain.Subscr
 	if row.OldStatus.Valid {
 		s := domain.SubscriptionStatus(row.OldStatus.SubscriptionStatusType)
 		h.OldStatus = &s
+	}
+	if row.EventSource.Valid {
+		h.EventSource = row.EventSource.String
+	}
+	if row.EventSourceID.Valid {
+		id := row.EventSourceID.UUID
+		h.EventSourceID = &id
 	}
 	if row.Reason.Valid {
 		h.Reason = row.Reason.String
@@ -435,3 +459,117 @@ var _ domain.SubscriptionRepository = (*SubscriptionRepo)(nil)
 var _ domain.SubscriptionItemRepository = (*SubscriptionItemRepo)(nil)
 var _ domain.SubscriptionScheduleRepository = (*SubscriptionScheduleRepo)(nil)
 var _ domain.SubscriptionHistoryRepository = (*SubscriptionHistoryRepo)(nil)
+
+// =============================================================================
+// SubscriptionFSMRepo
+// =============================================================================
+
+// SubscriptionFSMRepo implements domain.SubscriptionFSMRepository.
+type SubscriptionFSMRepo struct {
+	q subscriptiondb.Querier
+}
+
+// NewSubscriptionFSMRepo creates a SubscriptionFSMRepo.
+func NewSubscriptionFSMRepo(q subscriptiondb.Querier) *SubscriptionFSMRepo {
+	return &SubscriptionFSMRepo{q: q}
+}
+
+// GetForUpdate retrieves a subscription with SELECT FOR UPDATE, mapping sql.ErrNoRows to domain.ErrSubscriptionNotFound.
+func (r *SubscriptionFSMRepo) GetForUpdate(ctx context.Context, organizationID, subscriptionID uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+	row, err := r.q.GetSubscriptionForUpdate(ctx, subscriptiondb.GetSubscriptionForUpdateParams{
+		OrganizationID: organizationID,
+		ID:             subscriptionID,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrSubscriptionNotFound
+		}
+		slog.Error("failed to get subscription for update", "organization_id", organizationID, "subscription_id", subscriptionID, "error", err)
+		return nil, domain.ErrInternal
+	}
+	return &domain.SubscriptionForUpdate{
+		ID:             row.ID,
+		OrganizationID: row.OrganizationID,
+		CustomerID:     row.CustomerID,
+		Status:         domain.SubscriptionStatus(row.Status),
+	}, nil
+}
+
+// UpdateStatus updates the subscription status inside a transaction.
+func (r *SubscriptionFSMRepo) UpdateStatus(ctx context.Context, organizationID, subscriptionID uuid.UUID, newStatus domain.SubscriptionStatus) error {
+	_, err := r.q.UpdateSubscriptionStatus(ctx, subscriptiondb.UpdateSubscriptionStatusParams{
+		OrganizationID: organizationID,
+		ID:             subscriptionID,
+		Status:         subscriptiondb.SubscriptionStatusType(newStatus),
+	})
+	if err != nil {
+		slog.Error("failed to update subscription status (fsm)", "organization_id", organizationID, "subscription_id", subscriptionID, "error", err)
+		return domain.ErrInternal
+	}
+	return nil
+}
+
+// InsertHistory persists a subscription status history record.
+func (r *SubscriptionFSMRepo) InsertHistory(ctx context.Context, entry domain.SubscriptionStatusHistory) error {
+	params := subscriptiondb.InsertSubscriptionHistoryParams{
+		OrganizationID: entry.OrganizationID,
+		SubscriptionID: entry.SubscriptionID,
+		NewStatus:      subscriptiondb.SubscriptionStatusType(entry.NewStatus),
+	}
+	if entry.OldStatus != nil {
+		params.OldStatus = subscriptiondb.NullSubscriptionStatusType{
+			SubscriptionStatusType: subscriptiondb.SubscriptionStatusType(*entry.OldStatus),
+			Valid:                  true,
+		}
+	}
+	if entry.EventSource != "" {
+		params.EventSource = sql.NullString{String: entry.EventSource, Valid: true}
+	}
+	if entry.EventSourceID != nil {
+		params.EventSourceID = uuid.NullUUID{UUID: *entry.EventSourceID, Valid: true}
+	}
+	if entry.Reason != "" {
+		params.Reason = sql.NullString{String: entry.Reason, Valid: true}
+	}
+	if err := r.q.InsertSubscriptionHistory(ctx, params); err != nil {
+		slog.Error("failed to insert subscription history", "organization_id", entry.OrganizationID, "subscription_id", entry.SubscriptionID, "error", err)
+		return domain.ErrInternal
+	}
+	return nil
+}
+
+// ListHistory returns history for a subscription with cursor-based pagination.
+func (r *SubscriptionFSMRepo) ListHistory(ctx context.Context, organizationID, subscriptionID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error) {
+	params := subscriptiondb.ListSubscriptionHistoryParams{
+		OrganizationID: organizationID,
+		SubscriptionID: subscriptionID,
+		Limit:          int32(limit + 1),
+	}
+	if cursor != nil {
+		params.CursorTime = sql.NullTime{Time: cursor.CreatedAt, Valid: true}
+		params.CursorID = uuid.NullUUID{UUID: cursor.ID, Valid: true}
+	}
+
+	rows, err := r.q.ListSubscriptionHistory(ctx, params)
+	if err != nil {
+		slog.Error("failed to list subscription history (fsm)", "organization_id", organizationID, "subscription_id", subscriptionID, "error", err)
+		return nil, nil, domain.ErrInternal
+	}
+
+	var nextCursor *domain.CursorToken
+	if len(rows) > limit {
+		last := rows[limit-1]
+		if last.CreatedAt.Valid {
+			nextCursor = &domain.CursorToken{CreatedAt: last.CreatedAt.Time, ID: last.ID}
+		}
+		rows = rows[:limit]
+	}
+
+	result := make([]domain.SubscriptionStatusHistory, len(rows))
+	for i := range rows {
+		result[i] = toDomainHistory(rows[i])
+	}
+	return result, nextCursor, nil
+}
+
+var _ domain.SubscriptionFSMRepository = (*SubscriptionFSMRepo)(nil)

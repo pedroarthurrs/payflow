@@ -312,7 +312,7 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, arg GetSubscriptionBy
 }
 
 const getSubscriptionForUpdate = `-- name: GetSubscriptionForUpdate :one
-SELECT id, organization_id, status
+SELECT id, organization_id, customer_id, status
 FROM subscriptions
 WHERE organization_id = $1 AND id = $2
 FOR UPDATE
@@ -326,51 +326,112 @@ type GetSubscriptionForUpdateParams struct {
 type GetSubscriptionForUpdateRow struct {
 	ID             uuid.UUID              `json:"id"`
 	OrganizationID uuid.UUID              `json:"organization_id"`
+	CustomerID     uuid.UUID              `json:"customer_id"`
 	Status         SubscriptionStatusType `json:"status"`
 }
 
 func (q *Queries) GetSubscriptionForUpdate(ctx context.Context, arg GetSubscriptionForUpdateParams) (GetSubscriptionForUpdateRow, error) {
 	row := q.db.QueryRowContext(ctx, getSubscriptionForUpdate, arg.OrganizationID, arg.ID)
 	var i GetSubscriptionForUpdateRow
-	err := row.Scan(&i.ID, &i.OrganizationID, &i.Status)
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CustomerID,
+		&i.Status,
+	)
 	return i, err
 }
 
-const listSubscriptionHistory = `-- name: ListSubscriptionHistory :many
+const insertSubscriptionHistory = `-- name: InsertSubscriptionHistory :exec
 
-SELECT id, organization_id, subscription_id, old_status, new_status, reason, metadata, event_source_id, created_at, updated_at FROM subscription_status_history
-WHERE organization_id = $1 AND subscription_id = $2
-ORDER BY created_at ASC
+INSERT INTO subscription_status_history (
+    organization_id, subscription_id,
+    old_status, new_status,
+    event_source, event_source_id, reason
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
-type ListSubscriptionHistoryParams struct {
-	OrganizationID uuid.UUID `json:"organization_id"`
-	SubscriptionID uuid.UUID `json:"subscription_id"`
+type InsertSubscriptionHistoryParams struct {
+	OrganizationID uuid.UUID                  `json:"organization_id"`
+	SubscriptionID uuid.UUID                  `json:"subscription_id"`
+	OldStatus      NullSubscriptionStatusType `json:"old_status"`
+	NewStatus      SubscriptionStatusType     `json:"new_status"`
+	EventSource    sql.NullString             `json:"event_source"`
+	EventSourceID  uuid.NullUUID              `json:"event_source_id"`
+	Reason         sql.NullString             `json:"reason"`
 }
 
 // =============================================================================
 // Subscription Status History
 // =============================================================================
-func (q *Queries) ListSubscriptionHistory(ctx context.Context, arg ListSubscriptionHistoryParams) ([]SubscriptionStatusHistory, error) {
-	rows, err := q.db.QueryContext(ctx, listSubscriptionHistory, arg.OrganizationID, arg.SubscriptionID)
+func (q *Queries) InsertSubscriptionHistory(ctx context.Context, arg InsertSubscriptionHistoryParams) error {
+	_, err := q.db.ExecContext(ctx, insertSubscriptionHistory,
+		arg.OrganizationID,
+		arg.SubscriptionID,
+		arg.OldStatus,
+		arg.NewStatus,
+		arg.EventSource,
+		arg.EventSourceID,
+		arg.Reason,
+	)
+	return err
+}
+
+const listSubscriptionHistory = `-- name: ListSubscriptionHistory :many
+SELECT id, organization_id, subscription_id, old_status, new_status, event_source, event_source_id, reason, created_at
+FROM subscription_status_history
+WHERE organization_id = $1 AND subscription_id = $2
+  AND ($4::timestamptz IS NULL
+       OR (created_at, id) > ($4::timestamptz, $5::uuid))
+ORDER BY created_at ASC, id ASC
+LIMIT $3
+`
+
+type ListSubscriptionHistoryParams struct {
+	OrganizationID uuid.UUID     `json:"organization_id"`
+	SubscriptionID uuid.UUID     `json:"subscription_id"`
+	Limit          int32         `json:"limit"`
+	CursorTime     sql.NullTime  `json:"cursor_time"`
+	CursorID       uuid.NullUUID `json:"cursor_id"`
+}
+
+type ListSubscriptionHistoryRow struct {
+	ID             uuid.UUID                  `json:"id"`
+	OrganizationID uuid.UUID                  `json:"organization_id"`
+	SubscriptionID uuid.UUID                  `json:"subscription_id"`
+	OldStatus      NullSubscriptionStatusType `json:"old_status"`
+	NewStatus      SubscriptionStatusType     `json:"new_status"`
+	EventSource    sql.NullString             `json:"event_source"`
+	EventSourceID  uuid.NullUUID              `json:"event_source_id"`
+	Reason         sql.NullString             `json:"reason"`
+	CreatedAt      sql.NullTime               `json:"created_at"`
+}
+
+func (q *Queries) ListSubscriptionHistory(ctx context.Context, arg ListSubscriptionHistoryParams) ([]ListSubscriptionHistoryRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSubscriptionHistory,
+		arg.OrganizationID,
+		arg.SubscriptionID,
+		arg.Limit,
+		arg.CursorTime,
+		arg.CursorID,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SubscriptionStatusHistory
+	var items []ListSubscriptionHistoryRow
 	for rows.Next() {
-		var i SubscriptionStatusHistory
+		var i ListSubscriptionHistoryRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,
 			&i.SubscriptionID,
 			&i.OldStatus,
 			&i.NewStatus,
-			&i.Reason,
-			&i.Metadata,
+			&i.EventSource,
 			&i.EventSourceID,
+			&i.Reason,
 			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

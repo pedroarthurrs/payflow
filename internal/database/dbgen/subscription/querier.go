@@ -31,7 +31,8 @@ type Querier interface {
 	// =============================================================================
 	// Subscription Status History
 	// =============================================================================
-	ListSubscriptionHistory(ctx context.Context, arg ListSubscriptionHistoryParams) ([]SubscriptionStatusHistory, error)
+	InsertSubscriptionHistory(ctx context.Context, arg InsertSubscriptionHistoryParams) error
+	ListSubscriptionHistory(ctx context.Context, arg ListSubscriptionHistoryParams) ([]ListSubscriptionHistoryRow, error)
 	ListSubscriptionItems(ctx context.Context, arg ListSubscriptionItemsParams) ([]SubscriptionItem, error)
 	ListSubscriptions(ctx context.Context, arg ListSubscriptionsParams) ([]Subscription, error)
 	SetCancelAtPeriodEnd(ctx context.Context, arg SetCancelAtPeriodEndParams) (Subscription, error)

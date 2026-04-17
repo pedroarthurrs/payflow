@@ -22,20 +22,21 @@ func newSubscriptionSvc(
 	customers *mockCustomerRepo,
 	txMgr *mockTxManager,
 ) *SubscriptionService {
-	return NewSubscriptionService(subs, items, schedules, history, plans, customers, txMgr)
+	fsmRepo := &mockSubscriptionFSMRepoStub{}
+	return NewSubscriptionService(subs, items, schedules, history, plans, customers, txMgr, fsmRepo)
 }
 
 type mockSubscriptionHistoryRepo struct {
-	listFn func(ctx context.Context, orgID, subID uuid.UUID) ([]domain.SubscriptionStatusHistory, error)
+	listFn func(ctx context.Context, orgID, subID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error)
 }
 
 var _ domain.SubscriptionHistoryRepository = (*mockSubscriptionHistoryRepo)(nil)
 
-func (m *mockSubscriptionHistoryRepo) List(ctx context.Context, orgID, subID uuid.UUID) ([]domain.SubscriptionStatusHistory, error) {
+func (m *mockSubscriptionHistoryRepo) List(ctx context.Context, orgID, subID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error) {
 	if m.listFn != nil {
-		return m.listFn(ctx, orgID, subID)
+		return m.listFn(ctx, orgID, subID, limit, cursor)
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 // ── Create ──────────────────────────────────────────────────────────────────
@@ -220,16 +221,23 @@ func TestSubscriptionCreate_WithTrial(t *testing.T) {
 func TestSubscriptionCancel_Immediate(t *testing.T) {
 	orgID, subID := uuid.New(), uuid.New()
 
+	fsmRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			return &domain.SubscriptionForUpdate{ID: subID, OrganizationID: orgID, Status: domain.SubStatusActive}, nil
+		},
+	}
 	subs := &mockSubscriptionRepo{
 		getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, OrganizationID: orgID, Status: domain.SubStatusActive}, nil
+			return &domain.Subscription{ID: subID, OrganizationID: orgID, Status: domain.SubStatusCanceled}, nil
 		},
-		updateStatusFn: func(_ context.Context, _, _ uuid.UUID, status domain.SubscriptionStatus, _ string) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: status}, nil
+	}
+	txMgr := &mockTxManager{
+		withTxFn: func(_ context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{subFSM: fsmRepo})
 		},
 	}
 
-	svc := newSubscriptionSvc(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, &mockTxManager{})
+	svc := NewSubscriptionService(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, txMgr, fsmRepo)
 
 	sub, err := svc.Cancel(context.Background(), orgID, subID, "user requested", false)
 	if err != nil {
@@ -268,13 +276,18 @@ func TestSubscriptionCancel_AtPeriodEnd(t *testing.T) {
 func TestSubscriptionCancel_AlreadyCanceled(t *testing.T) {
 	orgID, subID := uuid.New(), uuid.New()
 
-	subs := &mockSubscriptionRepo{
-		getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: domain.SubStatusCanceled}, nil
+	fsmRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			return &domain.SubscriptionForUpdate{ID: subID, OrganizationID: orgID, Status: domain.SubStatusCanceled}, nil
+		},
+	}
+	txMgr := &mockTxManager{
+		withTxFn: func(_ context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{subFSM: fsmRepo})
 		},
 	}
 
-	svc := newSubscriptionSvc(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, &mockTxManager{})
+	svc := NewSubscriptionService(&mockSubscriptionRepo{}, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, txMgr, fsmRepo)
 
 	_, err := svc.Cancel(context.Background(), orgID, subID, "test", false)
 	if err == nil {
@@ -287,16 +300,23 @@ func TestSubscriptionCancel_AlreadyCanceled(t *testing.T) {
 func TestSubscriptionPause_Success(t *testing.T) {
 	orgID, subID := uuid.New(), uuid.New()
 
+	fsmRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			return &domain.SubscriptionForUpdate{ID: subID, OrganizationID: orgID, Status: domain.SubStatusActive}, nil
+		},
+	}
 	subs := &mockSubscriptionRepo{
 		getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: domain.SubStatusActive}, nil
+			return &domain.Subscription{ID: subID, OrganizationID: orgID, Status: domain.SubStatusPaused}, nil
 		},
-		updateStatusFn: func(_ context.Context, _, _ uuid.UUID, status domain.SubscriptionStatus, _ string) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: status}, nil
+	}
+	txMgr := &mockTxManager{
+		withTxFn: func(_ context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{subFSM: fsmRepo})
 		},
 	}
 
-	svc := newSubscriptionSvc(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, &mockTxManager{})
+	svc := NewSubscriptionService(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, txMgr, fsmRepo)
 
 	sub, err := svc.Pause(context.Background(), orgID, subID, "vacation")
 	if err != nil {
@@ -310,13 +330,18 @@ func TestSubscriptionPause_Success(t *testing.T) {
 func TestSubscriptionPause_CanceledSubscription(t *testing.T) {
 	orgID, subID := uuid.New(), uuid.New()
 
-	subs := &mockSubscriptionRepo{
-		getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: domain.SubStatusCanceled}, nil
+	fsmRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			return &domain.SubscriptionForUpdate{ID: subID, OrganizationID: orgID, Status: domain.SubStatusCanceled}, nil
+		},
+	}
+	txMgr := &mockTxManager{
+		withTxFn: func(_ context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{subFSM: fsmRepo})
 		},
 	}
 
-	svc := newSubscriptionSvc(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, &mockTxManager{})
+	svc := NewSubscriptionService(&mockSubscriptionRepo{}, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, txMgr, fsmRepo)
 
 	_, err := svc.Pause(context.Background(), orgID, subID, "test")
 	if err == nil {
@@ -327,16 +352,23 @@ func TestSubscriptionPause_CanceledSubscription(t *testing.T) {
 func TestSubscriptionResume_Success(t *testing.T) {
 	orgID, subID := uuid.New(), uuid.New()
 
+	fsmRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			return &domain.SubscriptionForUpdate{ID: subID, OrganizationID: orgID, Status: domain.SubStatusPaused}, nil
+		},
+	}
 	subs := &mockSubscriptionRepo{
 		getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: domain.SubStatusPaused}, nil
+			return &domain.Subscription{ID: subID, OrganizationID: orgID, Status: domain.SubStatusActive}, nil
 		},
-		updateStatusFn: func(_ context.Context, _, _ uuid.UUID, status domain.SubscriptionStatus, _ string) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: status}, nil
+	}
+	txMgr := &mockTxManager{
+		withTxFn: func(_ context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{subFSM: fsmRepo})
 		},
 	}
 
-	svc := newSubscriptionSvc(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, &mockTxManager{})
+	svc := NewSubscriptionService(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, txMgr, fsmRepo)
 
 	sub, err := svc.Resume(context.Background(), orgID, subID)
 	if err != nil {
@@ -350,13 +382,18 @@ func TestSubscriptionResume_Success(t *testing.T) {
 func TestSubscriptionResume_NotPaused(t *testing.T) {
 	orgID, subID := uuid.New(), uuid.New()
 
-	subs := &mockSubscriptionRepo{
-		getByIDFn: func(_ context.Context, _, _ uuid.UUID) (*domain.Subscription, error) {
-			return &domain.Subscription{ID: subID, Status: domain.SubStatusCanceled}, nil
+	fsmRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, _ uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			return &domain.SubscriptionForUpdate{ID: subID, OrganizationID: orgID, Status: domain.SubStatusCanceled}, nil
+		},
+	}
+	txMgr := &mockTxManager{
+		withTxFn: func(_ context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{subFSM: fsmRepo})
 		},
 	}
 
-	svc := newSubscriptionSvc(subs, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, &mockTxManager{})
+	svc := NewSubscriptionService(&mockSubscriptionRepo{}, &mockSubscriptionItemRepo{}, &mockScheduleRepo{}, &mockSubscriptionHistoryRepo{}, &mockPlanRepo{}, &mockCustomerRepo{}, txMgr, fsmRepo)
 
 	_, err := svc.Resume(context.Background(), orgID, subID)
 	if err == nil {

@@ -22,6 +22,7 @@ type RecurrenceService struct {
 	payments    domain.PaymentRepository
 	gatewaySvc  *GatewayService
 	invoiceSvc  *InvoiceService
+	subSvc      *SubscriptionService
 	subFSM      *domain.SubscriptionStateMachine
 	txMgr       domain.TxManager
 	maxAttempts int
@@ -39,6 +40,7 @@ func NewRecurrenceService(
 	invoiceSvc *InvoiceService,
 	txMgr domain.TxManager,
 	maxAttempts int,
+	subSvc *SubscriptionService,
 ) *RecurrenceService {
 	return &RecurrenceService{
 		subs:        subs,
@@ -49,6 +51,7 @@ func NewRecurrenceService(
 		payments:    payments,
 		gatewaySvc:  gatewaySvc,
 		invoiceSvc:  invoiceSvc,
+		subSvc:      subSvc,
 		subFSM:      domain.NewSubscriptionStateMachine(),
 		txMgr:       txMgr,
 		maxAttempts: maxAttempts,
@@ -75,7 +78,10 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 
 	// Step 3: Cancel if cancel_at_period_end and period has ended.
 	if sub.CancelAtPeriodEnd && !sub.CurrentPeriodEnd.After(now) {
-		if _, err := s.subs.UpdateStatus(ctx, orgID, subID, domain.SubStatusCanceled, "cancel_at_period_end"); err != nil {
+		if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusCanceled, domain.TransitionEvent{
+			Source: "system",
+			Reason: "cancel_at_period_end",
+		}); err != nil {
 			return fmt.Errorf("canceling subscription at period end: %w", err)
 		}
 		_ = s.recRepo.UnlockBilling(ctx, orgID, subID)
@@ -84,11 +90,17 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 
 	// Step 4: Transition trial → active when trial period has ended.
 	if sub.Status == domain.SubStatusTrialing && !sub.CurrentPeriodEnd.After(now) {
-		updated, err := s.subs.UpdateStatus(ctx, orgID, subID, domain.SubStatusActive, "trial_ended")
-		if err != nil {
+		if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusActive, domain.TransitionEvent{
+			Source: "system",
+			Reason: "trial_ended",
+		}); err != nil {
 			return fmt.Errorf("transitioning trial to active: %w", err)
 		}
-		sub = updated
+		// Reload sub after transition so billing uses updated status.
+		sub, err = s.subs.GetByID(ctx, orgID, subID)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Step 5: Load items and plans to compute billing amount.
@@ -160,7 +172,10 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 
 		// If subscription was past_due, restore to active.
 		if statusBeforeCharge == domain.SubStatusPastDue {
-			if _, err := s.subs.UpdateStatus(ctx, orgID, subID, domain.SubStatusActive, "payment_succeeded"); err != nil {
+			if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusActive, domain.TransitionEvent{
+				Source: "system",
+				Reason: "payment_succeeded",
+			}); err != nil {
 				slog.Error("failed to restore subscription to active", "subscription_id", subID, "error", err)
 			}
 		}
@@ -203,12 +218,18 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 func (s *RecurrenceService) handleChargeFailure(ctx context.Context, orgID, subID uuid.UUID, currentStatus domain.SubscriptionStatus, attemptNum int) {
 	switch currentStatus {
 	case domain.SubStatusActive:
-		if _, err := s.subs.UpdateStatus(ctx, orgID, subID, domain.SubStatusPastDue, "payment_failed"); err != nil {
+		if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusPastDue, domain.TransitionEvent{
+			Source: "system",
+			Reason: "payment_failed",
+		}); err != nil {
 			slog.Error("failed to set subscription to past_due", "subscription_id", subID, "error", err)
 		}
 	case domain.SubStatusPastDue:
 		if attemptNum >= s.maxAttempts {
-			if _, err := s.subs.UpdateStatus(ctx, orgID, subID, domain.SubStatusUnpaid, "max_retries_exceeded"); err != nil {
+			if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusUnpaid, domain.TransitionEvent{
+				Source: "system",
+				Reason: "max_retries_exceeded",
+			}); err != nil {
 				slog.Error("failed to set subscription to unpaid", "subscription_id", subID, "error", err)
 			}
 		}

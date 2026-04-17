@@ -316,7 +316,32 @@ func newRecurrenceHarness() *recurrenceTestHarness {
 	paymentSvc := NewPaymentService(payments, txMgr, fsmRepo, nil)
 	gatewaySvc := NewGatewayService(paymentSvc, gw)
 
-	svc := NewRecurrenceService(subs, items, schedules, plans, recRepo, payments, gatewaySvc, nil, txMgr, 4)
+	subFSMRepo := &mockSubscriptionFSMRepoStub{
+		getForUpdateFn: func(_ context.Context, _, subID uuid.UUID) (*domain.SubscriptionForUpdate, error) {
+			sub, err := subs.GetByID(context.Background(), uuid.Nil, subID)
+			if err != nil {
+				return nil, err
+			}
+			return &domain.SubscriptionForUpdate{
+				ID:             sub.ID,
+				OrganizationID: sub.OrganizationID,
+				CustomerID:     sub.CustomerID,
+				Status:         sub.Status,
+			}, nil
+		},
+		updateStatusFn: func(_ context.Context, orgID, subID uuid.UUID, newStatus domain.SubscriptionStatus) error {
+			_, err := subs.UpdateStatus(context.Background(), orgID, subID, newStatus, "")
+			return err
+		},
+	}
+	subTxMgr := &mockTxManager{
+		withTxFn: func(ctx context.Context, fn func(domain.TxHandle) error) error {
+			return fn(&mockTxHandle{paymentFSM: fsmRepo, subFSM: subFSMRepo})
+		},
+	}
+	subSvc := NewSubscriptionService(subs, items, schedules, &mockSubscriptionHistoryRepo{}, plans, &mockCustomerRepo{}, subTxMgr, subFSMRepo)
+
+	svc := NewRecurrenceService(subs, items, schedules, plans, recRepo, payments, gatewaySvc, nil, txMgr, 4, subSvc)
 
 	return &recurrenceTestHarness{
 		subs:      subs,

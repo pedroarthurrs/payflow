@@ -100,6 +100,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	paymentSvc := service.NewPaymentService(paymentRepo, txManager, paymentFSMRepo, ledgerSvc)
 	gatewaySvc := service.NewGatewayService(paymentSvc, adapters.Gateway)
 	planSvc := service.NewPlanService(planRepo)
+	subscriptionFSMRepo := repository.NewSubscriptionFSMRepo(adapters.DB.SubscriptionQ)
 	subscriptionSvc := service.NewSubscriptionService(
 		subscriptionRepo,
 		subscriptionItemRepo,
@@ -108,6 +109,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 		planRepo,
 		customerRepo,
 		txManager,
+		subscriptionFSMRepo,
 	)
 	memberSvc := service.NewMemberServiceFull(memberRepo, userAccountRepo, memberLogRepo)
 	permSvc := service.NewPermissionService(memberRepo, permissionRepo)
@@ -136,6 +138,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 		invoiceSvc,
 		txManager,
 		config.RecurrenceMaxAttempts,
+		subscriptionSvc,
 	)
 	recurrenceWorker := worker.NewRecurrenceWorker(adapters.RecurrenceQueue, recurrenceSvc, config.RecurrenceWorkerCount, config.RecurrenceMaxAttempts)
 	recurrenceScheduler := worker.NewRecurrenceScheduler(recurrenceRepo, adapters.RecurrenceQueue, config.RecurrenceBatchSize, config.RecurrenceScanCron)

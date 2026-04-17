@@ -12,6 +12,7 @@ import (
 // SubscriptionService handles subscription business logic.
 type SubscriptionService struct {
 	fsm       *domain.SubscriptionStateMachine
+	fsmRepo   domain.SubscriptionFSMRepository
 	subs      domain.SubscriptionRepository
 	items     domain.SubscriptionItemRepository
 	schedules domain.SubscriptionScheduleRepository
@@ -30,9 +31,11 @@ func NewSubscriptionService(
 	plans domain.PlanRepository,
 	customers domain.CustomerRepository,
 	txMgr domain.TxManager,
+	fsmRepo domain.SubscriptionFSMRepository,
 ) *SubscriptionService {
 	return &SubscriptionService{
 		fsm:       domain.NewSubscriptionStateMachine(),
+		fsmRepo:   fsmRepo,
 		subs:      subs,
 		items:     items,
 		schedules: schedules,
@@ -128,45 +131,73 @@ func (s *SubscriptionService) List(ctx context.Context, organizationID uuid.UUID
 	return subs, total, nil
 }
 
+// Transition atomically validates and applies a subscription status transition,
+// recording a history entry within the same SQL transaction.
+func (s *SubscriptionService) Transition(ctx context.Context, organizationID, subscriptionID uuid.UUID, toStatus domain.SubscriptionStatus, event domain.TransitionEvent) error {
+	return s.txMgr.WithTx(ctx, func(tx domain.TxHandle) error {
+		fsmRepo := tx.SubscriptionFSMRepo()
+
+		current, err := fsmRepo.GetForUpdate(ctx, organizationID, subscriptionID)
+		if err != nil {
+			return err
+		}
+
+		if err := s.fsm.Validate(current.Status, toStatus); err != nil {
+			return err
+		}
+
+		if err := fsmRepo.UpdateStatus(ctx, organizationID, subscriptionID, toStatus); err != nil {
+			return err
+		}
+
+		oldStatus := current.Status
+		return fsmRepo.InsertHistory(ctx, domain.SubscriptionStatusHistory{
+			OrganizationID: organizationID,
+			SubscriptionID: subscriptionID,
+			OldStatus:      &oldStatus,
+			NewStatus:      toStatus,
+			EventSource:    event.Source,
+			EventSourceID:  event.SourceID,
+			Reason:         event.Reason,
+		})
+	})
+}
+
 // Cancel cancels a subscription immediately or at period end.
 func (s *SubscriptionService) Cancel(ctx context.Context, organizationID, subscriptionID uuid.UUID, reason string, cancelAtPeriodEnd bool) (*domain.Subscription, error) {
-	sub, err := s.subs.GetByID(ctx, organizationID, subscriptionID)
-	if err != nil {
-		return nil, err
-	}
-
 	if cancelAtPeriodEnd {
 		return s.subs.SetCancelAtPeriodEnd(ctx, organizationID, subscriptionID, true)
 	}
 
-	if err := s.fsm.Validate(sub.Status, domain.SubStatusCanceled); err != nil {
+	if err := s.Transition(ctx, organizationID, subscriptionID, domain.SubStatusCanceled, domain.TransitionEvent{
+		Source: "api",
+		Reason: reason,
+	}); err != nil {
 		return nil, err
 	}
-	return s.subs.UpdateStatus(ctx, organizationID, subscriptionID, domain.SubStatusCanceled, reason)
+	return s.subs.GetByID(ctx, organizationID, subscriptionID)
 }
 
 // Pause pauses an active subscription.
 func (s *SubscriptionService) Pause(ctx context.Context, organizationID, subscriptionID uuid.UUID, reason string) (*domain.Subscription, error) {
-	sub, err := s.subs.GetByID(ctx, organizationID, subscriptionID)
-	if err != nil {
+	if err := s.Transition(ctx, organizationID, subscriptionID, domain.SubStatusPaused, domain.TransitionEvent{
+		Source: "api",
+		Reason: reason,
+	}); err != nil {
 		return nil, err
 	}
-	if err := s.fsm.Validate(sub.Status, domain.SubStatusPaused); err != nil {
-		return nil, err
-	}
-	return s.subs.UpdateStatus(ctx, organizationID, subscriptionID, domain.SubStatusPaused, reason)
+	return s.subs.GetByID(ctx, organizationID, subscriptionID)
 }
 
 // Resume resumes a paused subscription.
 func (s *SubscriptionService) Resume(ctx context.Context, organizationID, subscriptionID uuid.UUID) (*domain.Subscription, error) {
-	sub, err := s.subs.GetByID(ctx, organizationID, subscriptionID)
-	if err != nil {
+	if err := s.Transition(ctx, organizationID, subscriptionID, domain.SubStatusActive, domain.TransitionEvent{
+		Source: "api",
+		Reason: "resumed",
+	}); err != nil {
 		return nil, err
 	}
-	if err := s.fsm.Validate(sub.Status, domain.SubStatusActive); err != nil {
-		return nil, err
-	}
-	return s.subs.UpdateStatus(ctx, organizationID, subscriptionID, domain.SubStatusActive, "resumed")
+	return s.subs.GetByID(ctx, organizationID, subscriptionID)
 }
 
 // ReplaceItems replaces all items of a subscription atomically.
@@ -210,12 +241,12 @@ func (s *SubscriptionService) ListItems(ctx context.Context, organizationID, sub
 	return s.items.ListBySubscription(ctx, organizationID, subscriptionID)
 }
 
-// ListHistory returns the status change history for a subscription.
-func (s *SubscriptionService) ListHistory(ctx context.Context, organizationID, subscriptionID uuid.UUID) ([]domain.SubscriptionStatusHistory, error) {
+// ListHistory returns the status change history for a subscription with cursor pagination.
+func (s *SubscriptionService) ListHistory(ctx context.Context, organizationID, subscriptionID uuid.UUID, limit int, cursor *domain.CursorToken) ([]domain.SubscriptionStatusHistory, *domain.CursorToken, error) {
 	if _, err := s.subs.GetByID(ctx, organizationID, subscriptionID); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return s.history.List(ctx, organizationID, subscriptionID)
+	return s.history.List(ctx, organizationID, subscriptionID, limit, cursor)
 }
 
 // CreateSchedule creates a future status or plan change schedule.
