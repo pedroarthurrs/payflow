@@ -51,6 +51,13 @@ var (
 	ErrInvalidAdjustment   = errors.New("invalid adjustment")
 	ErrWalletLockNotFound  = errors.New("wallet lock not found")
 
+	// Invoice errors
+	ErrInvoiceNotFound          = errors.New("invoice not found")
+	ErrInvoiceSettingNotFound   = errors.New("invoice setting not found")
+	ErrInvalidInvoiceTransition = errors.New("invalid invoice status transition")
+	ErrInvoiceAlreadyCanceled   = errors.New("invoice is already canceled")
+	ErrInvoiceItemsRequired     = errors.New("invoice must have at least one item")
+
 	// Member / permission errors
 	ErrAlreadyMember        = errors.New("user is already a member of this organization")
 	ErrOwnerCannotLeave     = errors.New("owner cannot be removed from organization")

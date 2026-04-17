@@ -21,6 +21,7 @@ type RecurrenceService struct {
 	recRepo     domain.RecurrenceRepository
 	payments    domain.PaymentRepository
 	gatewaySvc  *GatewayService
+	invoiceSvc  *InvoiceService
 	subFSM      *domain.SubscriptionStateMachine
 	txMgr       domain.TxManager
 	maxAttempts int
@@ -35,6 +36,7 @@ func NewRecurrenceService(
 	recRepo domain.RecurrenceRepository,
 	payments domain.PaymentRepository,
 	gatewaySvc *GatewayService,
+	invoiceSvc *InvoiceService,
 	txMgr domain.TxManager,
 	maxAttempts int,
 ) *RecurrenceService {
@@ -46,6 +48,7 @@ func NewRecurrenceService(
 		recRepo:     recRepo,
 		payments:    payments,
 		gatewaySvc:  gatewaySvc,
+		invoiceSvc:  invoiceSvc,
 		subFSM:      domain.NewSubscriptionStateMachine(),
 		txMgr:       txMgr,
 		maxAttempts: maxAttempts,
@@ -147,6 +150,13 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 			"subscription_id", subID,
 			"payment_id", charged.ID,
 			"amount_cents", totalAmountCents)
+
+		// Generate invoice from subscription (non-fatal).
+		if s.invoiceSvc != nil {
+			if _, err := s.invoiceSvc.GenerateFromSubscription(ctx, orgID, subID, &charged.ID); err != nil {
+				slog.Warn("failed to generate invoice from subscription", "subscription_id", subID, "error", err)
+			}
+		}
 
 		// If subscription was past_due, restore to active.
 		if statusBeforeCharge == domain.SubStatusPastDue {

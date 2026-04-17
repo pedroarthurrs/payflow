@@ -85,7 +85,7 @@ func (q *Queries) CreatePayout(ctx context.Context, arg CreatePayoutParams) (Pay
 const createWallet = `-- name: CreateWallet :one
 INSERT INTO wallets (organization_id, organization_owner_id, customer_owner_id, currency)
 VALUES ($1, $2, $3, $4)
-RETURNING id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance
+RETURNING id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at
 `
 
 type CreateWalletParams struct {
@@ -109,11 +109,11 @@ func (q *Queries) CreateWallet(ctx context.Context, arg CreateWalletParams) (Wal
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }
@@ -211,7 +211,7 @@ func (q *Queries) GetPayoutByID(ctx context.Context, arg GetPayoutByIDParams) (P
 }
 
 const getWalletByCustomerOwner = `-- name: GetWalletByCustomerOwner :one
-SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance FROM wallets
+SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at FROM wallets
 WHERE organization_id = $1 AND customer_owner_id = $2
 `
 
@@ -229,17 +229,17 @@ func (q *Queries) GetWalletByCustomerOwner(ctx context.Context, arg GetWalletByC
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }
 
 const getWalletByID = `-- name: GetWalletByID :one
-SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance FROM wallets
+SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at FROM wallets
 WHERE organization_id = $1 AND id = $2
 `
 
@@ -257,17 +257,17 @@ func (q *Queries) GetWalletByID(ctx context.Context, arg GetWalletByIDParams) (W
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }
 
 const getWalletByOrganizationOwner = `-- name: GetWalletByOrganizationOwner :one
-SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance FROM wallets
+SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at FROM wallets
 WHERE organization_id = $1 AND organization_owner_id = $1
 `
 
@@ -280,17 +280,17 @@ func (q *Queries) GetWalletByOrganizationOwner(ctx context.Context, organization
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }
 
 const getWalletForUpdate = `-- name: GetWalletForUpdate :one
-SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance FROM wallets
+SELECT id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at FROM wallets
 WHERE organization_id = $1 AND id = $2
 FOR UPDATE
 `
@@ -309,11 +309,11 @@ func (q *Queries) GetWalletForUpdate(ctx context.Context, arg GetWalletForUpdate
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }
@@ -632,7 +632,7 @@ const updateWalletBalance = `-- name: UpdateWalletBalance :one
 UPDATE wallets
 SET balance = $3, updated_at = NOW()
 WHERE organization_id = $1 AND id = $2
-RETURNING id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance
+RETURNING id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at
 `
 
 type UpdateWalletBalanceParams struct {
@@ -650,11 +650,11 @@ func (q *Queries) UpdateWalletBalance(ctx context.Context, arg UpdateWalletBalan
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }
@@ -663,7 +663,7 @@ const updateWalletLockedBalance = `-- name: UpdateWalletLockedBalance :one
 UPDATE wallets
 SET locked_balance = $3, updated_at = NOW()
 WHERE organization_id = $1 AND id = $2
-RETURNING id, organization_id, organization_owner_id, customer_owner_id, balance, currency, status, created_at, updated_at, locked_balance
+RETURNING id, organization_id, organization_owner_id, customer_owner_id, balance, locked_balance, currency, status, created_at, updated_at
 `
 
 type UpdateWalletLockedBalanceParams struct {
@@ -681,11 +681,11 @@ func (q *Queries) UpdateWalletLockedBalance(ctx context.Context, arg UpdateWalle
 		&i.OrganizationOwnerID,
 		&i.CustomerOwnerID,
 		&i.Balance,
+		&i.LockedBalance,
 		&i.Currency,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.LockedBalance,
 	)
 	return i, err
 }

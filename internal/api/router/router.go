@@ -95,7 +95,6 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	credentialSvc := service.NewCredentialService(credentialRepo, credentialLogRepo, txManager, cfg.APIKeyPepper)
 	webhookSvc := service.NewWebhookService(webhookRepo, webhookLogRepo)
 	webhookScheduler := worker.NewWebhookScheduler(webhookRepo, orgSecretReader, adapters.Queue)
-	_ = webhookScheduler // TODO: inject into handler that triggers webhook events
 	ledgerSvc := service.NewLedgerService(walletRepo)
 	walletSvc := service.NewWalletService(walletRepo, txManager)
 	paymentSvc := service.NewPaymentService(paymentRepo, txManager, paymentFSMRepo, ledgerSvc)
@@ -113,6 +112,17 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	memberSvc := service.NewMemberServiceFull(memberRepo, userAccountRepo, memberLogRepo)
 	permSvc := service.NewPermissionService(memberRepo, permissionRepo)
 
+	// Invoice
+	invoiceRepo := repository.NewInvoiceRepo(adapters.DB.InvoiceQ)
+	invoiceItemRepo := repository.NewInvoiceItemRepo(adapters.DB.InvoiceQ)
+	invoiceLogRepo := repository.NewInvoiceLogRepo(adapters.DB.InvoiceQ)
+	invoiceSettingRepo := repository.NewInvoiceSettingRepo(adapters.DB.InvoiceQ)
+	invoiceSvc := service.NewInvoiceService(
+		invoiceRepo, invoiceItemRepo, invoiceLogRepo, invoiceSettingRepo,
+		customerRepo, subscriptionRepo, subscriptionItemRepo, planRepo,
+		txManager, webhookScheduler,
+	)
+
 	// Recurrence engine
 	recurrenceRepo := repository.NewRecurrenceRepo(adapters.DB.DB, adapters.DB.RecurrenceQ)
 	recurrenceSvc := service.NewRecurrenceService(
@@ -123,6 +133,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 		recurrenceRepo,
 		paymentRepo,
 		gatewaySvc,
+		invoiceSvc,
 		txManager,
 		config.RecurrenceMaxAttempts,
 	)
@@ -150,6 +161,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	memberHandler := handler.NewMemberHandler(memberSvc, permSvc)
 	walletHandler := handler.NewWalletHandler(walletSvc, permSvc)
 	commissionHandler := handler.NewCommissionHandler(walletRepo, permSvc)
+	invoiceHandler := handler.NewInvoiceHandler(invoiceSvc, permSvc)
 
 	// Rota raiz (fora do grupo de versão)
 	rootHandler.RegisterRoutes(&r.RouterGroup)
@@ -182,6 +194,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	memberHandler.RegisterRoutes(protected)
 	walletHandler.RegisterRoutes(protected)
 	commissionHandler.RegisterRoutes(protected)
+	invoiceHandler.RegisterRoutes(protected)
 
 	// SPA: serve o frontend embutido para todas as rotas não mapeadas pela API.
 	r.NoRoute(SPAHandler())

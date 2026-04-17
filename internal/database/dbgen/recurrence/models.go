@@ -565,11 +565,11 @@ type Wallet struct {
 	OrganizationOwnerID uuid.NullUUID  `json:"organization_owner_id"`
 	CustomerOwnerID     uuid.NullUUID  `json:"customer_owner_id"`
 	Balance             int32          `json:"balance"`
+	LockedBalance       int32          `json:"locked_balance"`
 	Currency            sql.NullString `json:"currency"`
 	Status              sql.NullString `json:"status"`
 	CreatedAt           sql.NullTime   `json:"created_at"`
 	UpdatedAt           sql.NullTime   `json:"updated_at"`
-	LockedBalance       int32          `json:"locked_balance"`
 }
 
 type WalletLock struct {

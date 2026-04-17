@@ -8,6 +8,7 @@ import (
 	addressdb "i9pay/internal/database/dbgen/address"
 	credentialdb "i9pay/internal/database/dbgen/credential"
 	customerdb "i9pay/internal/database/dbgen/customer"
+	invoicedb "i9pay/internal/database/dbgen/invoice"
 	paymentdb "i9pay/internal/database/dbgen/payment"
 	subscriptiondb "i9pay/internal/database/dbgen/subscription"
 	walletdb "i9pay/internal/database/dbgen/wallet"
@@ -40,6 +41,7 @@ func (m *TxManager) WithTx(ctx context.Context, fn func(tx domain.TxHandle) erro
 		paymentQ:      paymentdb.New(sqlTx),
 		subscriptionQ: subscriptiondb.New(sqlTx),
 		walletQ:       walletdb.New(sqlTx),
+		invoiceQ:      invoicedb.New(sqlTx),
 	}
 
 	if err := fn(handle); err != nil {
@@ -61,6 +63,7 @@ type txHandle struct {
 	paymentQ      *paymentdb.Queries
 	subscriptionQ *subscriptiondb.Queries
 	walletQ       *walletdb.Queries
+	invoiceQ      *invoicedb.Queries
 }
 
 func (h *txHandle) CustomerRepo() domain.CustomerRepository {
@@ -93,6 +96,14 @@ func (h *txHandle) SubscriptionScheduleRepo() domain.SubscriptionScheduleReposit
 
 func (h *txHandle) WalletRepo() domain.WalletRepository {
 	return NewWalletRepo(h.walletQ)
+}
+
+func (h *txHandle) InvoiceRepo() domain.InvoiceRepository {
+	return NewInvoiceRepo(h.invoiceQ)
+}
+
+func (h *txHandle) InvoiceItemRepo() domain.InvoiceItemRepository {
+	return NewInvoiceItemRepo(h.invoiceQ)
 }
 
 var _ domain.TxManager = (*TxManager)(nil)

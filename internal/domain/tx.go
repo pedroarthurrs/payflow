@@ -20,4 +20,7 @@ type TxHandle interface {
 	SubscriptionRepo() SubscriptionRepository
 	SubscriptionItemRepo() SubscriptionItemRepository
 	SubscriptionScheduleRepo() SubscriptionScheduleRepository
+	// Invoice
+	InvoiceRepo() InvoiceRepository
+	InvoiceItemRepo() InvoiceItemRepository
 }

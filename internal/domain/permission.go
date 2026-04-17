@@ -34,6 +34,10 @@ const (
 	PermWalletsAdjust     Permission = "wallets:adjust"
 	PermCommissionsRead   Permission = "commissions:read"
 	PermCommissionsManage Permission = "commissions:manage"
+
+	PermInvoicesRead   Permission = "invoices:read"
+	PermInvoicesWrite  Permission = "invoices:write"
+	PermInvoicesManage Permission = "invoices:manage"
 )
 
 // roleDefaultPermissions maps each role to its default permission set.
@@ -50,6 +54,7 @@ var roleDefaultPermissions = map[Role][]Permission{
 		PermLogsRead,
 		PermWalletsRead, PermWalletsPayout, PermWalletsAdjust,
 		PermCommissionsRead, PermCommissionsManage,
+		PermInvoicesRead, PermInvoicesWrite, PermInvoicesManage,
 	},
 	RoleAdmin: {
 		PermUsersRead, PermUsersInvite,
@@ -63,6 +68,7 @@ var roleDefaultPermissions = map[Role][]Permission{
 		PermLogsRead,
 		PermWalletsRead, PermWalletsPayout,
 		PermCommissionsRead, PermCommissionsManage,
+		PermInvoicesRead, PermInvoicesWrite, PermInvoicesManage,
 	},
 	RoleDeveloper: {
 		PermCredentialsRead, PermCredentialsManage,
@@ -75,6 +81,7 @@ var roleDefaultPermissions = map[Role][]Permission{
 		PermLogsRead,
 		PermWalletsRead,
 		PermCommissionsRead,
+		PermInvoicesRead,
 	},
 	RoleSupport: {
 		PermCustomersRead, PermCustomersWrite,

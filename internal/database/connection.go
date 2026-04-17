@@ -13,6 +13,7 @@ import (
 	credentiallogdb "i9pay/internal/database/dbgen/credentiallog"
 	customerdb "i9pay/internal/database/dbgen/customer"
 	idempotencydb "i9pay/internal/database/dbgen/idempotency"
+	invoicedb "i9pay/internal/database/dbgen/invoice"
 	memberlogdb "i9pay/internal/database/dbgen/memberlog"
 	organizationdb "i9pay/internal/database/dbgen/organization"
 	paymentdb "i9pay/internal/database/dbgen/payment"
@@ -46,6 +47,7 @@ type DB struct {
 	SubscriptionQ  subscriptiondb.Querier
 	RecurrenceQ    recurrencedb.Querier
 	WalletQ        walletdb.Querier
+	InvoiceQ       invoicedb.Querier
 }
 
 // New opens and verifies a database connection using the provided application config.
@@ -92,6 +94,7 @@ func New(cfg *config.Config) (*DB, error) {
 		SubscriptionQ:  subscriptiondb.New(db),
 		RecurrenceQ:    recurrencedb.New(db),
 		WalletQ:        walletdb.New(db),
+		InvoiceQ:       invoicedb.New(db),
 	}, nil
 }
 

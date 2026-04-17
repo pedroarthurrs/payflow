@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -181,14 +182,16 @@ func (m *mockTxManager) WithTx(ctx context.Context, fn func(tx domain.TxHandle) 
 // ============================================================
 
 type mockTxHandle struct {
-	customers   domain.CustomerRepository
-	addresses   domain.AddressRepository
-	credentials domain.CredentialRepository
-	paymentFSM  domain.PaymentFSMRepository
-	subs        domain.SubscriptionRepository
-	subItems    domain.SubscriptionItemRepository
-	subSchedule domain.SubscriptionScheduleRepository
-	wallets     domain.WalletRepository
+	customers    domain.CustomerRepository
+	addresses    domain.AddressRepository
+	credentials  domain.CredentialRepository
+	paymentFSM   domain.PaymentFSMRepository
+	subs         domain.SubscriptionRepository
+	subItems     domain.SubscriptionItemRepository
+	subSchedule  domain.SubscriptionScheduleRepository
+	wallets      domain.WalletRepository
+	invoices     domain.InvoiceRepository
+	invoiceItems domain.InvoiceItemRepository
 }
 
 var _ domain.TxHandle = (*mockTxHandle)(nil)
@@ -247,6 +250,20 @@ func (m *mockTxHandle) WalletRepo() domain.WalletRepository {
 		return m.wallets
 	}
 	return &mockWalletRepo{}
+}
+
+func (m *mockTxHandle) InvoiceRepo() domain.InvoiceRepository {
+	if m.invoices != nil {
+		return m.invoices
+	}
+	return &mockInvoiceRepoStub{}
+}
+
+func (m *mockTxHandle) InvoiceItemRepo() domain.InvoiceItemRepository {
+	if m.invoiceItems != nil {
+		return m.invoiceItems
+	}
+	return &mockInvoiceItemRepoStub{}
 }
 
 // Stub implementations for TxHandle that delegate to the outer mock when needed.
@@ -559,3 +576,108 @@ func (m *mockWalletRepo) GetWalletLockByReference(ctx context.Context, organizat
 }
 
 var _ domain.WalletRepository = (*mockWalletRepo)(nil)
+
+// ============================================================
+// Mock InvoiceRepository (stub for TxHandle compliance)
+// ============================================================
+
+type mockInvoiceRepoStub struct {
+	createFn       func(ctx context.Context, organizationID uuid.UUID, input domain.CreateInvoiceInput) (*domain.Invoice, error)
+	getByIDFn      func(ctx context.Context, organizationID, invoiceID uuid.UUID) (*domain.Invoice, error)
+	listFn         func(ctx context.Context, organizationID uuid.UUID, params domain.InvoiceListParams) ([]domain.Invoice, error)
+	countFn        func(ctx context.Context, organizationID uuid.UUID, params domain.InvoiceListParams) (int64, error)
+	updateStatusFn func(ctx context.Context, organizationID, invoiceID uuid.UUID, newStatus domain.InvoiceStatus) (*domain.Invoice, error)
+}
+
+var _ domain.InvoiceRepository = (*mockInvoiceRepoStub)(nil)
+
+func (m *mockInvoiceRepoStub) Create(ctx context.Context, organizationID uuid.UUID, input domain.CreateInvoiceInput) (*domain.Invoice, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, organizationID, input)
+	}
+	return &domain.Invoice{
+		ID:             uuid.New(),
+		OrganizationID: organizationID,
+		CustomerID:     input.CustomerID,
+		SubscriptionID: input.SubscriptionID,
+		InvoiceType:    input.InvoiceType,
+		OperationType:  input.OperationType,
+		AmountCents:    input.AmountCents,
+		Currency:       input.Currency,
+		Status:         domain.InvStatusPending,
+	}, nil
+}
+
+func (m *mockInvoiceRepoStub) GetByID(ctx context.Context, organizationID, invoiceID uuid.UUID) (*domain.Invoice, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, organizationID, invoiceID)
+	}
+	return nil, domain.ErrInvoiceNotFound
+}
+
+func (m *mockInvoiceRepoStub) List(ctx context.Context, organizationID uuid.UUID, params domain.InvoiceListParams) ([]domain.Invoice, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, organizationID, params)
+	}
+	return nil, nil
+}
+
+func (m *mockInvoiceRepoStub) Count(ctx context.Context, organizationID uuid.UUID, params domain.InvoiceListParams) (int64, error) {
+	if m.countFn != nil {
+		return m.countFn(ctx, organizationID, params)
+	}
+	return 0, nil
+}
+
+func (m *mockInvoiceRepoStub) UpdateStatus(ctx context.Context, organizationID, invoiceID uuid.UUID, newStatus domain.InvoiceStatus) (*domain.Invoice, error) {
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, organizationID, invoiceID, newStatus)
+	}
+	return &domain.Invoice{ID: invoiceID, OrganizationID: organizationID, Status: newStatus}, nil
+}
+
+func (m *mockInvoiceRepoStub) UpdateERPReference(_ context.Context, _, _ uuid.UUID, _ string) error {
+	return nil
+}
+
+func (m *mockInvoiceRepoStub) UpdateLastSyncLog(_ context.Context, _, _ uuid.UUID, _ json.RawMessage) error {
+	return nil
+}
+
+// ============================================================
+// Mock InvoiceItemRepository (stub for TxHandle compliance)
+// ============================================================
+
+type mockInvoiceItemRepoStub struct {
+	createFn        func(ctx context.Context, organizationID, invoiceID uuid.UUID, input domain.CreateInvoiceItemInput) (*domain.InvoiceItem, error)
+	listByInvoiceFn func(ctx context.Context, organizationID, invoiceID uuid.UUID) ([]domain.InvoiceItem, error)
+}
+
+var _ domain.InvoiceItemRepository = (*mockInvoiceItemRepoStub)(nil)
+
+func (m *mockInvoiceItemRepoStub) Create(ctx context.Context, organizationID, invoiceID uuid.UUID, input domain.CreateInvoiceItemInput) (*domain.InvoiceItem, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, organizationID, invoiceID, input)
+	}
+	return &domain.InvoiceItem{
+		ID:              uuid.New(),
+		OrganizationID:  organizationID,
+		InvoiceID:       invoiceID,
+		Description:     input.Description,
+		Quantity:        input.Quantity,
+		UnitPriceCents:  input.UnitPriceCents,
+		TotalPriceCents: input.TotalPriceCents,
+		Metadata:        input.Metadata,
+	}, nil
+}
+
+func (m *mockInvoiceItemRepoStub) ListByInvoice(ctx context.Context, organizationID, invoiceID uuid.UUID) ([]domain.InvoiceItem, error) {
+	if m.listByInvoiceFn != nil {
+		return m.listByInvoiceFn(ctx, organizationID, invoiceID)
+	}
+	return nil, nil
+}
+
+func (m *mockInvoiceItemRepoStub) DeleteByInvoice(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}

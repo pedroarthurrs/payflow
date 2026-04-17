@@ -124,3 +124,13 @@ func WalletID(c *gin.Context) (uuid.UUID, bool) {
 	}
 	return id, true
 }
+
+// InvoiceID parses the ":invoice_id" path parameter as a UUID.
+func InvoiceID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("invoice_id"))
+	if err != nil {
+		_ = c.Error(apierr.BadRequest("invalid invoice id"))
+		return uuid.UUID{}, false
+	}
+	return id, true
+}

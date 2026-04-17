@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     currency VARCHAR(3) DEFAULT 'BRL',
 
     -- Estado transacional frente ao processamento externo.
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'paid', 'error', 'cancelled')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'paid', 'error', 'canceled')),
     erp_reference VARCHAR(100), -- Identificador gerado pelo ERP após a emissão.
 
     -- Snapshots imutáveis gerados no ato da emissão (via Triggers).
