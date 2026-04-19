@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import DataTable from '@/components/DataTable.vue'
 import FormField from '@/components/FormField.vue'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,8 @@ import type { Customer, ApiError, CreateCustomerRequest } from '@/types'
 import { useCrud } from '@/composables/useCrud'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { useToast } from '@/composables/useToast'
+import { formatDocument, formatPhone } from '@/lib/utils'
 
-const route = useRoute()
 const router = useRouter()
 const { list, create, loading } = useCrud<Customer>('/v1/customers')
 const customers = ref<Customer[]>([])
@@ -46,7 +46,8 @@ const documentTypeOptions = [
 const columns: Column[] = [
   { key: 'name', label: 'Nome' },
   { key: 'email', label: 'Email' },
-  { key: 'document', label: 'Documento' },
+  { key: 'phone', label: 'Telefone', format: (value: string) => formatPhone(value) || '—' },
+  { key: 'document', label: 'Documento', format: (value: string, row: Customer) => formatDocument(value, row.document_type) },
   { key: 'status', label: 'Status' },
   {
     key: 'created_at',
@@ -75,8 +76,8 @@ function handleRowClick(row: Customer) {
   router.push(`/customers/${row.id}`)
 }
 
-function navigateToNew() {
-  router.push('/customers/new')
+function openCreateModal() {
+  showCreateModal.value = true
 }
 
 function resetCreateForm() {
@@ -91,7 +92,8 @@ function resetCreateForm() {
 }
 
 function closeCreateModal() {
-  router.push('/customers')
+  showCreateModal.value = false
+  resetCreateForm()
 }
 
 function parseMetadata(): Record<string, unknown> | undefined {
@@ -124,7 +126,7 @@ async function handleCreateCustomer() {
     }
     const created = await create(payload as unknown as Partial<Customer>)
     toast.success('Cliente criado com sucesso')
-    resetCreateForm()
+    closeCreateModal()
     router.push(`/customers/${created.id}`)
   } catch (e: any) {
     const apiErr = e as ApiError
@@ -142,24 +144,13 @@ async function handleCreateCustomer() {
 }
 
 onMounted(fetchCustomers)
-
-watch(
-  () => route.path,
-  (path) => {
-    showCreateModal.value = path === '/customers/new'
-    if (!showCreateModal.value) {
-      resetCreateForm()
-    }
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-semibold text-foreground">Clientes</h1>
-      <Button @click="navigateToNew">Novo Cliente</Button>
+      <Button @click="openCreateModal">Novo Cliente</Button>
     </div>
 
     <div v-if="fetchError" class="text-center p-8 bg-card border border-destructive rounded-lg">
@@ -175,7 +166,7 @@ watch(
       @row-click="handleRowClick"
     />
 
-    <Dialog :open="showCreateModal" @update:open="(open) => !open && closeCreateModal()">
+    <Dialog v-model:open="showCreateModal" @update:open="(open) => !open && closeCreateModal()">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo Cliente</DialogTitle>

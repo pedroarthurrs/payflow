@@ -62,7 +62,7 @@ export interface Customer {
   email: string
   phone?: string
   document: string
-  document_type: 'CPF' | 'CNPJ'
+  document_type: string
   status: string
   metadata?: Record<string, unknown>
   created_at: string
@@ -74,7 +74,7 @@ export interface CreateCustomerRequest {
   email: string
   phone?: string
   document: string
-  document_type: 'CPF' | 'CNPJ'
+  document_type: string
   metadata?: Record<string, unknown>
   address?: CreateAddressRequest
 }
@@ -83,7 +83,7 @@ export interface UpdateCustomerRequest {
   name: string
   email: string
   document: string
-  document_type: 'CPF' | 'CNPJ'
+  document_type: string
   phone?: string
   metadata?: Record<string, unknown>
 }

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useCrud } from '@/composables/useCrud'
 import { useToast } from '@/composables/useToast'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { formatDocument, formatPhone, formatMetadata } from '@/lib/utils'
 import type { Customer, Address, ApiError } from '@/types'
 
 const route = useRoute()
@@ -147,11 +148,6 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
 
-function formatMetadata(metadata?: Record<string, unknown>) {
-  if (!metadata) return '—'
-  return JSON.stringify(metadata, null, 2)
-}
-
 onMounted(() => {
   fetchCustomer()
   fetchAddresses()
@@ -195,11 +191,11 @@ onMounted(() => {
           </div>
           <div>
             <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Telefone</dt>
-            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.phone || '—' }}</dd>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.phone ? formatPhone(customer.phone) : '—' }}</dd>
           </div>
           <div>
             <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Documento</dt>
-            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.document }}</dd>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ formatDocument(customer.document, customer.document_type) }}</dd>
           </div>
           <div>
             <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Tipo de Documento</dt>
@@ -219,7 +215,15 @@ onMounted(() => {
           </div>
           <div class="col-span-2">
             <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Metadata</dt>
-            <dd class="whitespace-pre-wrap font-mono text-[0.8125rem] bg-muted p-3 rounded-md border border-border m-0">{{ formatMetadata(customer.metadata) }}</dd>
+            <dd class="m-0">
+              <span v-if="!customer.metadata || Object.keys(customer.metadata).length === 0" class="text-muted-foreground">—</span>
+              <dl v-else class="grid grid-cols-1 gap-1 bg-muted p-3 rounded-md border border-border">
+                <div v-for="entry in formatMetadata(customer.metadata)" :key="entry.key" class="flex gap-2 text-[0.8125rem]">
+                  <dt class="font-semibold text-muted-foreground whitespace-nowrap">{{ entry.key }}:</dt>
+                  <dd class="text-foreground m-0 break-all">{{ entry.value }}</dd>
+                </div>
+              </dl>
+            </dd>
           </div>
         </dl>
       </div>

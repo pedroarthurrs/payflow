@@ -14,7 +14,7 @@ import {
 export interface Column {
   key: string
   label: string
-  format?: (value: any) => string
+  format?: (value: any, row?: any) => string
 }
 
 const props = withDefaults(defineProps<{
@@ -36,7 +36,7 @@ const emit = defineEmits<{
 function getCellValue(row: any, column: Column): string {
   const value = row[column.key]
   if (column.format) {
-    return column.format(value)
+    return column.format(value, row)
   }
   return value == null ? '' : String(value)
 }
