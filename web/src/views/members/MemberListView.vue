@@ -175,15 +175,15 @@ watch(
 </script>
 
 <template>
-  <div class="member-list">
-    <div class="member-list__header">
-      <h1 class="member-list__title">Members</h1>
-      <Button v-if="isOwner" class="member-list__new-btn" @click="navigateToNew">Novo Member</Button>
+  <div class="p-6">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-semibold text-foreground">Members</h1>
+      <Button v-if="isOwner" @click="navigateToNew">Novo Member</Button>
     </div>
 
-    <div v-if="fetchError" class="member-list__error">
-      <p class="member-list__error-message">{{ fetchError }}</p>
-      <button class="member-list__retry-btn" @click="fetchMembers">Tentar novamente</button>
+    <div v-if="fetchError" class="text-center p-8 bg-card border border-destructive rounded-lg">
+      <p class="text-destructive mb-4">{{ fetchError }}</p>
+      <Button @click="fetchMembers">Tentar novamente</Button>
     </div>
 
     <DataTable
@@ -213,8 +213,8 @@ watch(
           <DialogDescription>Preencha os campos para criar um novo member.</DialogDescription>
         </DialogHeader>
 
-        <div v-if="formError" class="member-list__error member-list__modal-error">
-          <p class="member-list__error-message">{{ formError }}</p>
+        <div v-if="formError" class="text-center py-3 px-4 bg-card border border-destructive rounded-lg mb-3">
+          <p class="text-destructive">{{ formError }}</p>
         </div>
 
         <FormField
@@ -263,60 +263,3 @@ watch(
     </Dialog>
   </div>
 </template>
-
-<style scoped>
-.member-list {
-  padding: 1.5rem;
-}
-
-.member-list__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.member-list__title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.member-list__new-btn {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.member-list__error {
-  text-align: center;
-  padding: 2rem;
-  background: var(--card);
-  border: 1px solid var(--destructive);
-  border-radius: 0.5rem;
-}
-
-.member-list__error-message {
-  color: var(--destructive);
-  margin: 0;
-}
-
-.member-list__modal-error {
-  border-color: var(--destructive);
-  background-color: hsl(var(--destructive) / 0.1);
-}
-
-.member-list__retry-btn {
-  padding: 0.5rem 1rem;
-  margin-top: 1rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-
-.member-list__retry-btn:hover {
-  opacity: 0.9;
-}
-</style>

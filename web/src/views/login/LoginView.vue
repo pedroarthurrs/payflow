@@ -84,7 +84,7 @@ async function handleSubmit() {
           :show-password-toggle="true"
           placeholder="Sua senha"
         />
-        <p v-if="errorMessage" class="login-error mb-3 text-center text-sm text-destructive">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="mb-3 text-center text-sm text-destructive">{{ errorMessage }}</p>
         <Button
           type="submit"
           class="w-full"

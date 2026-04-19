@@ -156,15 +156,15 @@ watch(
 </script>
 
 <template>
-  <div class="customer-list">
-    <div class="customer-list__header">
-      <h1 class="customer-list__title">Clientes</h1>
-      <Button class="customer-list__new-btn" @click="navigateToNew">Novo Cliente</Button>
+  <div class="p-6">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-semibold text-foreground">Clientes</h1>
+      <Button @click="navigateToNew">Novo Cliente</Button>
     </div>
 
-    <div v-if="fetchError" class="customer-list__error">
-      <p class="customer-list__error-message">{{ fetchError }}</p>
-      <button class="customer-list__retry-btn" @click="fetchCustomers">Tentar novamente</button>
+    <div v-if="fetchError" class="text-center p-8 bg-card border border-destructive rounded-lg">
+      <p class="text-destructive mb-4">{{ fetchError }}</p>
+      <Button @click="fetchCustomers">Tentar novamente</Button>
     </div>
 
     <DataTable
@@ -182,8 +182,8 @@ watch(
           <DialogDescription>Preencha os campos para criar um novo cliente.</DialogDescription>
         </DialogHeader>
 
-        <div v-if="formError" class="customer-list__error customer-list__modal-error">
-          <p class="customer-list__error-message">{{ formError }}</p>
+        <div v-if="formError" class="text-center py-3 px-4 bg-card border border-destructive rounded-lg mb-3">
+          <p class="text-destructive">{{ formError }}</p>
         </div>
 
         <FormField
@@ -247,59 +247,3 @@ watch(
     </Dialog>
   </div>
 </template>
-
-<style scoped>
-.customer-list {
-  padding: 1.5rem;
-}
-
-.customer-list__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.customer-list__title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.customer-list__new-btn {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.customer-list__error {
-  text-align: center;
-  padding: 2rem;
-  background: var(--card);
-  border: 1px solid var(--destructive);
-  border-radius: 0.5rem;
-}
-
-.customer-list__modal-error {
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.customer-list__error-message {
-  color: var(--destructive);
-  margin-bottom: 1rem;
-}
-
-.customer-list__retry-btn {
-  padding: 0.5rem 1rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-
-.customer-list__retry-btn:hover {
-  filter: brightness(1.08);
-}
-</style>

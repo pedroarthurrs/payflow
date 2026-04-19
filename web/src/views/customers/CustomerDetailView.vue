@@ -5,6 +5,7 @@ import DataTable from '@/components/DataTable.vue'
 import type { Column } from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { Button } from '@/components/ui/button'
 import { useCrud } from '@/composables/useCrud'
 import { useToast } from '@/composables/useToast'
 import { useErrorHandler } from '@/composables/useErrorHandler'
@@ -158,82 +159,81 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="customer-detail">
+  <div class="p-6">
     <!-- Loading -->
-    <div v-if="customerCrud.loading.value && !customer" class="customer-detail__loading">
+    <div v-if="customerCrud.loading.value && !customer" class="flex justify-center py-12">
       <LoadingSpinner size="lg" />
     </div>
 
-    <!-- Fetch Error -->
-    <div v-else-if="notFound" class="customer-detail__not-found">
-      <p class="customer-detail__not-found-message">Cliente não encontrado</p>
-      <router-link to="/customers" class="customer-detail__back-link">Voltar para listagem</router-link>
+    <!-- Not Found -->
+    <div v-else-if="notFound" class="text-center p-8 bg-card border border-destructive rounded-lg">
+      <p class="text-destructive mb-4">Cliente não encontrado</p>
+      <router-link to="/customers" class="text-primary text-sm font-medium hover:underline">Voltar para listagem</router-link>
     </div>
 
-    <div v-else-if="fetchError" class="customer-detail__error">
-      <p class="customer-detail__error-message">{{ fetchError }}</p>
-      <button class="customer-detail__retry-btn" @click="fetchCustomer">Tentar novamente</button>
+    <!-- Fetch Error -->
+    <div v-else-if="fetchError" class="text-center p-8 bg-card border border-destructive rounded-lg">
+      <p class="text-destructive mb-4">{{ fetchError }}</p>
+      <Button @click="fetchCustomer">Tentar novamente</Button>
     </div>
 
     <!-- Customer Data -->
     <template v-else-if="customer">
-      <div class="customer-detail__header">
-        <h1 class="customer-detail__title">{{ customer.name }}</h1>
-        <div class="customer-detail__actions">
-          <button class="customer-detail__edit-btn" @click="navigateToEdit">Editar</button>
-          <button class="customer-detail__delete-btn" @click="openDeleteCustomerDialog">Excluir</button>
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-semibold text-foreground">{{ customer.name }}</h1>
+        <div class="flex gap-3">
+          <Button @click="navigateToEdit">Editar</Button>
+          <Button variant="destructive" @click="openDeleteCustomerDialog">Excluir</Button>
         </div>
       </div>
 
-      <div class="customer-detail__info">
-        <dl class="customer-detail__fields">
-          <div class="customer-detail__field">
-            <dt>Email</dt>
-            <dd>{{ customer.email }}</dd>
+      <div class="bg-card border border-border rounded-lg p-6 mb-8">
+        <dl class="grid grid-cols-2 gap-4">
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Email</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.email }}</dd>
           </div>
-          <div class="customer-detail__field">
-            <dt>Telefone</dt>
-            <dd>{{ customer.phone || '—' }}</dd>
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Telefone</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.phone || '—' }}</dd>
           </div>
-          <div class="customer-detail__field">
-            <dt>Documento</dt>
-            <dd>{{ customer.document }}</dd>
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Documento</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.document }}</dd>
           </div>
-          <div class="customer-detail__field">
-            <dt>Tipo de Documento</dt>
-            <dd>{{ customer.document_type }}</dd>
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Tipo de Documento</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.document_type }}</dd>
           </div>
-          <div class="customer-detail__field">
-            <dt>Status</dt>
-            <dd>{{ customer.status }}</dd>
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Status</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ customer.status }}</dd>
           </div>
-          <div class="customer-detail__field">
-            <dt>Criado em</dt>
-            <dd>{{ formatDate(customer.created_at) }}</dd>
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Criado em</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ formatDate(customer.created_at) }}</dd>
           </div>
-          <div class="customer-detail__field">
-            <dt>Atualizado em</dt>
-            <dd>{{ formatDate(customer.updated_at) }}</dd>
+          <div>
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Atualizado em</dt>
+            <dd class="text-[0.9375rem] text-foreground m-0">{{ formatDate(customer.updated_at) }}</dd>
           </div>
-          <div class="customer-detail__field customer-detail__field--full">
-            <dt>Metadata</dt>
-            <dd class="customer-detail__metadata">{{ formatMetadata(customer.metadata) }}</dd>
+          <div class="col-span-2">
+            <dt class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Metadata</dt>
+            <dd class="whitespace-pre-wrap font-mono text-[0.8125rem] bg-muted p-3 rounded-md border border-border m-0">{{ formatMetadata(customer.metadata) }}</dd>
           </div>
         </dl>
       </div>
 
       <!-- Addresses Section -->
-      <div class="customer-detail__addresses">
-        <div class="customer-detail__addresses-header">
-          <h2 class="customer-detail__addresses-title">Endereços</h2>
-          <button class="customer-detail__new-address-btn" @click="navigateToNewAddress">
-            Novo Endereço
-          </button>
+      <div class="mt-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-foreground">Endereços</h2>
+          <Button @click="navigateToNewAddress">Novo Endereço</Button>
         </div>
 
-        <div v-if="addressFetchError" class="customer-detail__address-error">
-          <p class="customer-detail__address-error-message">{{ addressFetchError }}</p>
-          <button class="customer-detail__address-retry-btn" @click="fetchAddresses">Tentar novamente</button>
+        <div v-if="addressFetchError" class="text-center p-8 bg-card border border-destructive rounded-lg">
+          <p class="text-destructive mb-4">{{ addressFetchError }}</p>
+          <Button @click="fetchAddresses">Tentar novamente</Button>
         </div>
 
         <DataTable
@@ -257,8 +257,8 @@ onMounted(() => {
       @confirm="confirmDeleteCustomer"
       @cancel="showDeleteCustomer = false"
     >
-      <label class="customer-detail__hard-delete">
-        <input v-model="hardDelete" type="checkbox" />
+      <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer mt-2">
+        <input v-model="hardDelete" type="checkbox" class="size-4 cursor-pointer" />
         Exclusão permanente (hard delete)
       </label>
     </ConfirmDialog>
@@ -275,221 +275,3 @@ onMounted(() => {
     />
   </div>
 </template>
-
-<style scoped>
-.customer-detail {
-  padding: 1.5rem;
-}
-
-.customer-detail__loading {
-  display: flex;
-  justify-content: center;
-  padding: 3rem;
-}
-
-.customer-detail__error {
-  text-align: center;
-  padding: 2rem;
-  background: var(--card);
-  border: 1px solid var(--destructive);
-  border-radius: 0.5rem;
-}
-
-.customer-detail__error-message {
-  color: var(--destructive);
-  margin-bottom: 1rem;
-}
-
-.customer-detail__not-found {
-  text-align: center;
-  padding: 2rem;
-  background: var(--card);
-  border: 1px solid var(--destructive);
-  border-radius: 0.5rem;
-}
-
-.customer-detail__not-found-message {
-  color: var(--destructive);
-  margin-bottom: 1rem;
-  font-size: 1rem;
-}
-
-.customer-detail__back-link {
-  color: var(--primary);
-  text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.customer-detail__back-link:hover {
-  text-decoration: underline;
-}
-
-.customer-detail__retry-btn,
-.customer-detail__address-retry-btn {
-  padding: 0.5rem 1rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-
-.customer-detail__retry-btn:hover,
-.customer-detail__address-retry-btn:hover {
-  filter: brightness(1.08);
-}
-
-.customer-detail__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.customer-detail__title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.customer-detail__actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.customer-detail__edit-btn {
-  padding: 0.5rem 1rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.customer-detail__edit-btn:hover {
-  filter: brightness(1.08);
-}
-
-.customer-detail__delete-btn {
-  padding: 0.5rem 1rem;
-  background: var(--destructive);
-  color: var(--destructive-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.customer-detail__delete-btn:hover {
-  filter: brightness(1.08);
-}
-
-.customer-detail__info {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.customer-detail__fields {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-}
-
-.customer-detail__field dt {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.25rem;
-}
-
-.customer-detail__field dd {
-  font-size: 0.9375rem;
-  color: var(--foreground);
-  margin: 0;
-}
-
-.customer-detail__field--full {
-  grid-column: 1 / -1;
-}
-
-.customer-detail__metadata {
-  white-space: pre-wrap;
-  font-family: monospace;
-  font-size: 0.8125rem;
-  background: var(--muted);
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-}
-
-.customer-detail__addresses {
-  margin-top: 2rem;
-}
-
-.customer-detail__addresses-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.customer-detail__addresses-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.customer-detail__new-address-btn {
-  padding: 0.5rem 1rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.customer-detail__new-address-btn:hover {
-  filter: brightness(1.08);
-}
-
-.customer-detail__address-error {
-  text-align: center;
-  padding: 2rem;
-  background: var(--card);
-  border: 1px solid var(--destructive);
-  border-radius: 0.5rem;
-}
-
-.customer-detail__address-error-message {
-  color: var(--destructive);
-  margin-bottom: 1rem;
-}
-
-.customer-detail__hard-delete {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--foreground);
-  cursor: pointer;
-  margin-top: 0.5rem;
-}
-
-.customer-detail__hard-delete input[type="checkbox"] {
-  width: 1rem;
-  height: 1rem;
-  cursor: pointer;
-}
-</style>

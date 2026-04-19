@@ -27,17 +27,17 @@ const router = createRouter({
     },
     {
       path: '/login',
-      component: () => import('@/views/LoginView.vue'),
+      component: () => import('@/views/login/LoginView.vue'),
       meta: { guestOnly: true },
     },
     {
       path: '/select-organization',
-      component: () => import('@/views/SelectOrganizationView.vue'),
+      component: () => import('@/views/login/SelectOrganizationView.vue'),
       meta: { guestOnly: true },
     },
     {
       path: '/dashboard',
-      component: () => import('@/views/DashboardView.vue'),
+      component: () => import('@/views/dashboard/DashboardView.vue'),
       meta: { requiresAuth: true, keepAlive: true },
     },
     {

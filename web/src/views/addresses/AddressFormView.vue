@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FormField from '@/components/FormField.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { Button } from '@/components/ui/button'
 import { useCrud } from '@/composables/useCrud'
 import { useToast } from '@/composables/useToast'
 import { useErrorHandler } from '@/composables/useErrorHandler'
@@ -131,23 +132,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="address-form">
-    <h1 class="address-form__title">{{ pageTitle }}</h1>
+  <div class="mx-auto max-w-[600px] p-6">
+    <h1 class="text-2xl font-bold text-foreground mb-6">{{ pageTitle }}</h1>
 
-    <div v-if="notFound" class="address-form__not-found">
-      <p class="address-form__not-found-message">Endereço não encontrado</p>
-      <router-link :to="`/customers/${customerId}`" class="address-form__back-link">Voltar para detalhes do cliente</router-link>
+    <div v-if="notFound" class="text-center p-8 bg-card border border-destructive rounded-lg">
+      <p class="text-destructive mb-4">Endereço não encontrado</p>
+      <router-link :to="`/customers/${customerId}`" class="text-primary text-sm font-medium hover:underline">Voltar para detalhes do cliente</router-link>
     </div>
 
-    <div v-else-if="fetchError" class="address-form__fetch-error">
-      <p class="address-form__fetch-error-message">{{ fetchError }}</p>
-      <button class="address-form__retry-btn" @click="loadAddress">Tentar novamente</button>
+    <div v-else-if="fetchError" class="text-center p-8">
+      <p class="text-destructive mb-4">{{ fetchError }}</p>
+      <Button @click="loadAddress">Tentar novamente</Button>
     </div>
 
     <LoadingSpinner v-else-if="loading && isEditMode && !street" size="lg" />
 
-    <form v-else class="address-form__form" @submit.prevent="handleSubmit">
-      <div v-if="formError" class="address-form__error">
+    <form v-else class="flex flex-col" @submit.prevent="handleSubmit">
+      <div v-if="formError" class="bg-card border border-destructive text-destructive px-4 py-3 rounded-md mb-4 text-sm">
         {{ formError }}
       </div>
 
@@ -237,142 +238,12 @@ onMounted(() => {
         :error="fieldErrors.is_main"
       />
 
-      <div class="address-form__actions">
-        <button
-          type="button"
-          class="address-form__cancel-btn"
-          @click="router.push(`/customers/${customerId}`)"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          class="address-form__submit-btn"
-          :disabled="loading"
-        >
+      <div class="flex justify-end gap-3 mt-2">
+        <Button type="button" variant="outline" @click="router.push(`/customers/${customerId}`)">Cancelar</Button>
+        <Button type="submit" :disabled="loading">
           {{ loading ? 'Salvando...' : (isEditMode ? 'Salvar' : 'Criar') }}
-        </button>
+        </Button>
       </div>
     </form>
   </div>
 </template>
-
-<style scoped>
-.address-form {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-
-.address-form__title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--foreground);
-  margin-bottom: 1.5rem;
-}
-
-.address-form__form {
-  display: flex;
-  flex-direction: column;
-}
-
-.address-form__error {
-  background-color: var(--card);
-  border: 1px solid var(--destructive);
-  color: var(--destructive);
-  padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-}
-
-.address-form__fetch-error {
-  text-align: center;
-  padding: 2rem;
-}
-
-.address-form__not-found {
-  text-align: center;
-  padding: 2rem;
-  background: var(--card);
-  border: 1px solid var(--destructive);
-  border-radius: 0.5rem;
-}
-
-.address-form__not-found-message {
-  color: var(--destructive);
-  margin-bottom: 1rem;
-  font-size: 1rem;
-}
-
-.address-form__back-link {
-  color: var(--primary);
-  text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.address-form__back-link:hover {
-  text-decoration: underline;
-}
-
-.address-form__fetch-error-message {
-  color: var(--destructive);
-  margin-bottom: 1rem;
-}
-
-.address-form__retry-btn {
-  padding: 0.5rem 1rem;
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-
-.address-form__retry-btn:hover {
-  filter: brightness(1.08);
-}
-
-.address-form__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.address-form__cancel-btn {
-  padding: 0.5rem 1rem;
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
-  border: 1px solid var(--border);
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-}
-
-.address-form__cancel-btn:hover {
-  filter: brightness(1.08);
-}
-
-.address-form__submit-btn {
-  padding: 0.5rem 1.5rem;
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.address-form__submit-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.address-form__submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>
