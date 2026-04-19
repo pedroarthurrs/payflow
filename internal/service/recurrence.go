@@ -134,8 +134,10 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 		return domain.ErrBillingAmountZero
 	}
 
-	// Step 7: Idempotency key based on subscription + period start.
-	idempotencyKey := fmt.Sprintf("sub_%s_%s", subID, sub.CurrentPeriodStart.Format("2006-01-02"))
+	// Step 7: Idempotency key based on subscription + period start + attempt number.
+	// Including attemptNum ensures each retry creates a distinct payment record while
+	// still preventing double-processing of the same attempt (e.g. duplicate queue messages).
+	idempotencyKey := fmt.Sprintf("sub_%s_%s_attempt_%d", subID, sub.CurrentPeriodStart.Format("2006-01-02"), attemptNum)
 
 	// Step 8: Create payment record.
 	payment, err := s.payments.Create(ctx, orgID, domain.PaymentInput{
