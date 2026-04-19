@@ -118,21 +118,21 @@ function handleLogout() {
 
         <router-link
           v-if="hasRole('admin')"
-          to="/users"
+          to="/members"
           :class="cn(
             'group relative flex items-center gap-3 rounded-none px-3 py-2.5 text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-            isActive('/users') && 'bg-sidebar-accent text-sidebar-accent-foreground',
+            isActive('/members') && 'bg-sidebar-accent text-sidebar-accent-foreground',
             sidebarCollapsed && 'md:justify-center md:px-2'
           )"
           @click="closeSidebar"
         >
           <UserCog class="size-5" />
-          <span :class="cn(sidebarCollapsed && 'md:hidden')">Usuários</span>
+          <span :class="cn(sidebarCollapsed && 'md:hidden')">Members</span>
           <span
             v-if="sidebarCollapsed"
             class="pointer-events-none absolute left-full top-1/2 z-50 ml-4 hidden -translate-y-1/2 whitespace-nowrap rounded-none border border-border bg-popover px-2.5 py-1.5 text-sm text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 md:block"
           >
-            Usuários
+            Members
           </span>
         </router-link>
 

@@ -23,11 +23,11 @@ import { useErrorHandler } from '@/composables/useErrorHandler'
 const route = useRoute()
 const router = useRouter()
 const { hasRole } = useAuth()
-const { list, create, remove, loading } = useCrud<User>('/v1/users')
 const toast = useToast()
 const { handleError } = useErrorHandler()
+const { list, create, remove, loading } = useCrud<User>('/v1/members')
 
-const users = ref<User[]>([])
+const members = ref<User[]>([])
 const fetchError = ref<string | null>(null)
 
 const isOwner = hasRole('owner')
@@ -52,8 +52,8 @@ const columns: Column[] = [
   { key: 'email', label: 'Email' },
   { key: 'role', label: 'Role' },
   {
-    key: 'created_at',
-    label: 'Data de Criação',
+    key: 'joined_at',
+    label: 'Data de Ingresso',
     format: (value: string) => {
       if (!value) return ''
       return new Date(value).toLocaleDateString('pt-BR')
@@ -63,23 +63,23 @@ const columns: Column[] = [
 
 // Confirm dialog state
 const showConfirmDialog = ref(false)
-const userToDelete = ref<User | null>(null)
+const memberToDelete = ref<User | null>(null)
 
-async function fetchUsers() {
+async function fetchMembers() {
   fetchError.value = null
   try {
-    users.value = await list()
+    members.value = await list()
   } catch (e: any) {
     const apiErr = e as ApiError
-    const handled = handleError(apiErr, fetchUsers)
+    const handled = handleError(apiErr, fetchMembers)
     if (!handled) {
-      fetchError.value = apiErr?.message || 'Erro ao carregar usuários'
+      fetchError.value = apiErr?.message || 'Erro ao carregar members'
     }
   }
 }
 
 function navigateToNew() {
-  router.push('/users/new')
+  router.push('/members/new')
 }
 
 function resetCreateForm() {
@@ -92,10 +92,10 @@ function resetCreateForm() {
 }
 
 function closeCreateModal() {
-  router.push('/users')
+  router.push('/members')
 }
 
-async function handleCreateUser() {
+async function handleCreateMember() {
   fieldErrors.value = {}
   formError.value = ''
   creating.value = true
@@ -106,11 +106,11 @@ async function handleCreateUser() {
       password: password.value,
       role: role.value,
     }
-    await create(payload as unknown as Partial<User>)
-    toast.success('Usuário criado com sucesso')
+    await create(payload)
+    toast.success('Member criado com sucesso')
     resetCreateForm()
-    await fetchUsers()
-    router.push('/users')
+    await fetchMembers()
+    router.push('/members')
   } catch (e: any) {
     const apiErr = e as ApiError
     if (apiErr.status === 400 && apiErr.validationErrors) {
@@ -120,7 +120,7 @@ async function handleCreateUser() {
     } else {
       const handled = handleError(apiErr)
       if (!handled) {
-        formError.value = apiErr?.message || 'Erro ao criar usuário'
+        formError.value = apiErr?.message || 'Erro ao criar member'
       }
     }
   } finally {
@@ -128,44 +128,44 @@ async function handleCreateUser() {
   }
 }
 
-function handleEdit(user: User) {
-  router.push(`/users/${user.id}/edit`)
+function handleEdit(member: User) {
+  router.push(`/members/${member.id}/edit`)
 }
 
-function handleDelete(user: User) {
-  userToDelete.value = user
+function handleDelete(member: User) {
+  memberToDelete.value = member
   showConfirmDialog.value = true
 }
 
 async function confirmDelete() {
-  if (!userToDelete.value) return
+  if (!memberToDelete.value) return
   try {
-    await remove(userToDelete.value.id)
-    toast.success('Usuário excluído com sucesso')
-    await fetchUsers()
+    await remove(memberToDelete.value.id)
+    toast.success('Member excluído com sucesso')
+    await fetchMembers()
   } catch (e: any) {
     const apiErr = e as ApiError
     const handled = handleError(apiErr)
     if (!handled) {
-      toast.error(apiErr?.message || 'Erro ao excluir usuário')
+      toast.error(apiErr?.message || 'Erro ao excluir member')
     }
   } finally {
     showConfirmDialog.value = false
-    userToDelete.value = null
+    memberToDelete.value = null
   }
 }
 
 function cancelDelete() {
   showConfirmDialog.value = false
-  userToDelete.value = null
+  memberToDelete.value = null
 }
 
-onMounted(fetchUsers)
+onMounted(fetchMembers)
 
 watch(
   () => route.path,
   (path) => {
-    showCreateModal.value = path === '/users/new'
+    showCreateModal.value = path === '/members/new'
     if (!showCreateModal.value) {
       resetCreateForm()
     }
@@ -175,21 +175,21 @@ watch(
 </script>
 
 <template>
-  <div class="user-list">
-    <div class="user-list__header">
-      <h1 class="user-list__title">Usuários</h1>
-      <Button v-if="isOwner" class="user-list__new-btn" @click="navigateToNew">Novo Usuário</Button>
+  <div class="member-list">
+    <div class="member-list__header">
+      <h1 class="member-list__title">Members</h1>
+      <Button v-if="isOwner" class="member-list__new-btn" @click="navigateToNew">Novo Member</Button>
     </div>
 
-    <div v-if="fetchError" class="user-list__error">
-      <p class="user-list__error-message">{{ fetchError }}</p>
-      <button class="user-list__retry-btn" @click="fetchUsers">Tentar novamente</button>
+    <div v-if="fetchError" class="member-list__error">
+      <p class="member-list__error-message">{{ fetchError }}</p>
+      <button class="member-list__retry-btn" @click="fetchMembers">Tentar novamente</button>
     </div>
 
     <DataTable
       v-else
       :columns="columns"
-      :data="users"
+      :data="members"
       :loading="loading"
       :show-actions="isOwner"
       @edit="handleEdit"
@@ -198,8 +198,8 @@ watch(
 
     <ConfirmDialog
       :visible="showConfirmDialog"
-      title="Excluir Usuário"
-      :message="`Tem certeza que deseja excluir o usuário '${userToDelete?.name ?? ''}'?`"
+      title="Excluir Member"
+      :message="`Tem certeza que deseja excluir o member '${memberToDelete?.name ?? ''}'?`"
       confirm-label="Excluir"
       variant="danger"
       @confirm="confirmDelete"
@@ -209,12 +209,12 @@ watch(
     <Dialog v-if="isOwner" :open="showCreateModal" @update:open="(open) => !open && closeCreateModal()">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Novo Usuário</DialogTitle>
-          <DialogDescription>Preencha os campos para criar um novo usuário.</DialogDescription>
+          <DialogTitle>Novo Member</DialogTitle>
+          <DialogDescription>Preencha os campos para criar um novo member.</DialogDescription>
         </DialogHeader>
 
-        <div v-if="formError" class="user-list__error user-list__modal-error">
-          <p class="user-list__error-message">{{ formError }}</p>
+        <div v-if="formError" class="member-list__error member-list__modal-error">
+          <p class="member-list__error-message">{{ formError }}</p>
         </div>
 
         <FormField
@@ -223,7 +223,7 @@ watch(
           @update:modelValue="name = $event as string"
           :error="fieldErrors.name"
           :required="true"
-          placeholder="Nome do usuário"
+          placeholder="Nome do member"
         />
         <FormField
           label="Email"
@@ -255,8 +255,8 @@ watch(
 
         <DialogFooter>
           <Button variant="outline" :disabled="creating" @click="closeCreateModal">Cancelar</Button>
-          <Button :disabled="creating" @click="handleCreateUser">
-            {{ creating ? 'Criando...' : 'Criar Usuário' }}
+          <Button :disabled="creating" @click="handleCreateMember">
+            {{ creating ? 'Criando...' : 'Criar Member' }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -265,29 +265,29 @@ watch(
 </template>
 
 <style scoped>
-.user-list {
+.member-list {
   padding: 1.5rem;
 }
 
-.user-list__header {
+.member-list__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
 }
 
-.user-list__title {
+.member-list__title {
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--foreground);
 }
 
-.user-list__new-btn {
+.member-list__new-btn {
   font-size: 0.875rem;
   font-weight: 500;
 }
 
-.user-list__error {
+.member-list__error {
   text-align: center;
   padding: 2rem;
   background: var(--card);
@@ -295,27 +295,28 @@ watch(
   border-radius: 0.5rem;
 }
 
-.user-list__modal-error {
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.user-list__error-message {
+.member-list__error-message {
   color: var(--destructive);
-  margin-bottom: 1rem;
+  margin: 0;
 }
 
-.user-list__retry-btn {
+.member-list__modal-error {
+  border-color: var(--destructive);
+  background-color: hsl(var(--destructive) / 0.1);
+}
+
+.member-list__retry-btn {
   padding: 0.5rem 1rem;
+  margin-top: 1rem;
   background: var(--primary);
   color: var(--primary-foreground);
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   cursor: pointer;
   font-size: 0.875rem;
 }
 
-.user-list__retry-btn:hover {
-  filter: brightness(1.08);
+.member-list__retry-btn:hover {
+  opacity: 0.9;
 }
 </style>

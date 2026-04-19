@@ -24,7 +24,9 @@ type responseBodyWriter struct {
 }
 
 func (w *responseBodyWriter) Write(b []byte) (int, error) {
-	w.buf.Write(b)
+	if w.buf != nil {
+		w.buf.Write(b)
+	}
 	return w.ResponseWriter.Write(b)
 }
 

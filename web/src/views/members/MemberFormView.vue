@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import FormField from '@/components/FormField.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { useCrud } from '@/composables/useCrud'
+import { api } from '@/services/http'
 import { useToast } from '@/composables/useToast'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import type { User, CreateUserRequest, UpdateUserRequest, ApiError } from '@/types'
@@ -11,10 +12,10 @@ import type { User, CreateUserRequest, UpdateUserRequest, ApiError } from '@/typ
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { getById, create, update, loading } = useCrud<User>('/v1/users')
+const { getById, create, loading } = useCrud<User>('/v1/members')
 
-const userId = computed(() => route.params.id as string | undefined)
-const isEditMode = computed(() => !!userId.value)
+const memberId = computed(() => route.params.id as string | undefined)
+const isEditMode = computed(() => !!memberId.value)
 
 const name = ref('')
 const email = ref('')
@@ -37,21 +38,21 @@ const roleOptions = [
   { value: 'member', label: 'Member' },
 ]
 
-const pageTitle = computed(() => (isEditMode.value ? 'Editar Usuário' : 'Novo Usuário'))
+const pageTitle = computed(() => (isEditMode.value ? 'Editar Member' : 'Novo Member'))
 
-async function loadUser() {
-  if (!userId.value) return
+async function loadMember() {
+  if (!memberId.value) return
   fetchError.value = ''
   notFound.value = false
   try {
-    const user = await getById(userId.value)
-    name.value = user.name
-    role.value = user.role as 'admin' | 'member'
+    const member = await getById(memberId.value)
+    name.value = member.name
+    role.value = member.role as 'admin' | 'member'
   } catch (e) {
     const err = e as ApiError
-    const handled = handleError(err, loadUser)
+    const handled = handleError(err, loadMember)
     if (!handled) {
-      fetchError.value = err.message || 'Erro ao carregar usuário'
+      fetchError.value = err.message || 'Erro ao carregar member'
     }
   }
 }
@@ -66,8 +67,8 @@ async function handleSubmit() {
         name: name.value,
         role: role.value,
       }
-      await update(userId.value!, payload as unknown as Partial<User>)
-      toast.success('Usuário atualizado com sucesso')
+      await api.put(`/v1/members/${memberId.value}/role`, payload)
+      toast.success('Member atualizado com sucesso')
     } else {
       const payload: CreateUserRequest = {
         name: name.value,
@@ -75,10 +76,10 @@ async function handleSubmit() {
         password: password.value,
         role: role.value,
       }
-      await create(payload as unknown as Partial<User>)
-      toast.success('Usuário criado com sucesso')
+      await create(payload)
+      toast.success('Member criado com sucesso')
     }
-    router.push('/users')
+    router.push('/members')
   } catch (e) {
     const err = e as ApiError
     if (err.status === 400 && err.validationErrors) {
@@ -92,7 +93,7 @@ async function handleSubmit() {
     } else {
       const handled = handleError(err)
       if (!handled) {
-        formError.value = err.message || 'Erro ao salvar usuário'
+        formError.value = err.message || 'Erro ao salvar member'
       }
     }
   }
@@ -100,29 +101,29 @@ async function handleSubmit() {
 
 onMounted(() => {
   if (isEditMode.value) {
-    loadUser()
+    loadMember()
   }
 })
 </script>
 
 <template>
-  <div class="user-form">
-    <h1 class="user-form__title">{{ pageTitle }}</h1>
+  <div class="member-form">
+    <h1 class="member-form__title">{{ pageTitle }}</h1>
 
-    <div v-if="notFound" class="user-form__not-found">
-      <p class="user-form__not-found-message">Usuário não encontrado</p>
-      <router-link to="/users" class="user-form__back-link">Voltar para listagem</router-link>
+    <div v-if="notFound" class="member-form__not-found">
+      <p class="member-form__not-found-message">Member não encontrado</p>
+      <router-link to="/members" class="member-form__back-link">Voltar para listagem</router-link>
     </div>
 
-    <div v-else-if="fetchError" class="user-form__fetch-error">
-      <p class="user-form__fetch-error-message">{{ fetchError }}</p>
-      <button class="user-form__retry-btn" @click="loadUser">Tentar novamente</button>
+    <div v-else-if="fetchError" class="member-form__fetch-error">
+      <p class="member-form__fetch-error-message">{{ fetchError }}</p>
+      <button class="member-form__retry-btn" @click="loadMember">Tentar novamente</button>
     </div>
 
     <LoadingSpinner v-else-if="loading && isEditMode && !name" size="lg" />
 
-    <form v-else class="user-form__form" @submit.prevent="handleSubmit">
-      <div v-if="formError" class="user-form__error">
+    <form v-else class="member-form__form" @submit.prevent="handleSubmit">
+      <div v-if="formError" class="member-form__error">
         {{ formError }}
       </div>
 
@@ -132,7 +133,7 @@ onMounted(() => {
         @update:modelValue="name = $event as string"
         :error="fieldErrors.name"
         :required="true"
-        placeholder="Nome do usuário"
+        placeholder="Nome do member"
       />
 
       <template v-if="!isEditMode">
@@ -167,17 +168,17 @@ onMounted(() => {
         :options="roleOptions"
       />
 
-      <div class="user-form__actions">
+      <div class="member-form__actions">
         <button
           type="button"
-          class="user-form__cancel-btn"
-          @click="router.push('/users')"
+          class="member-form__cancel-btn"
+          @click="router.push('/members')"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          class="user-form__submit-btn"
+          class="member-form__submit-btn"
           :disabled="loading"
         >
           {{ loading ? 'Salvando...' : (isEditMode ? 'Salvar' : 'Criar') }}
@@ -188,25 +189,25 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.user-form {
+.member-form {
   max-width: 600px;
   margin: 0 auto;
   padding: 1.5rem;
 }
 
-.user-form__title {
+.member-form__title {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--foreground);
   margin-bottom: 1.5rem;
 }
 
-.user-form__form {
+.member-form__form {
   display: flex;
   flex-direction: column;
 }
 
-.user-form__error {
+.member-form__error {
   background-color: var(--card);
   border: 1px solid var(--destructive);
   color: var(--destructive);
@@ -216,12 +217,12 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-.user-form__fetch-error {
+.member-form__fetch-error {
   text-align: center;
   padding: 2rem;
 }
 
-.user-form__not-found {
+.member-form__not-found {
   text-align: center;
   padding: 2rem;
   background: var(--card);
@@ -229,29 +230,29 @@ onMounted(() => {
   border-radius: 0.5rem;
 }
 
-.user-form__not-found-message {
+.member-form__not-found-message {
   color: var(--destructive);
   margin-bottom: 1rem;
   font-size: 1rem;
 }
 
-.user-form__back-link {
+.member-form__back-link {
   color: var(--primary);
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
 }
 
-.user-form__back-link:hover {
+.member-form__back-link:hover {
   text-decoration: underline;
 }
 
-.user-form__fetch-error-message {
+.member-form__fetch-error-message {
   color: var(--destructive);
   margin-bottom: 1rem;
 }
 
-.user-form__retry-btn {
+.member-form__retry-btn {
   padding: 0.5rem 1rem;
   background-color: var(--primary);
   color: var(--primary-foreground);
@@ -261,18 +262,18 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-.user-form__retry-btn:hover {
+.member-form__retry-btn:hover {
   filter: brightness(1.08);
 }
 
-.user-form__actions {
+.member-form__actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
 
-.user-form__cancel-btn {
+.member-form__cancel-btn {
   padding: 0.5rem 1rem;
   background-color: var(--secondary);
   color: var(--secondary-foreground);
@@ -282,11 +283,11 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-.user-form__cancel-btn:hover {
+.member-form__cancel-btn:hover {
   filter: brightness(1.08);
 }
 
-.user-form__submit-btn {
+.member-form__submit-btn {
   padding: 0.5rem 1.5rem;
   background-color: var(--primary);
   color: var(--primary-foreground);
@@ -297,11 +298,11 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.user-form__submit-btn:hover:not(:disabled) {
+.member-form__submit-btn:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
-.user-form__submit-btn:disabled {
+.member-form__submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

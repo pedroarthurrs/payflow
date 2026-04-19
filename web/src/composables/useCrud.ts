@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
-import http from '@/services/http'
-import type { ApiError } from '@/types'
+import { api } from '@/services/http'
+import type { ApiError, PagedResponse } from '@/types'
 
 export function useCrud<T>(basePath: string) {
   const loading: Ref<boolean> = ref(false)
@@ -10,8 +10,8 @@ export function useCrud<T>(basePath: string) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await http.get<T[]>(basePath)
-      return data
+      const response = await api.get<PagedResponse<T>>(basePath)
+      return response.data
     } catch (e) {
       error.value = e as ApiError
       throw e
@@ -24,8 +24,7 @@ export function useCrud<T>(basePath: string) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await http.get<T>(`${basePath}/${id}`)
-      return data
+      return await api.get<T>(`${basePath}/${id}`)
     } catch (e) {
       error.value = e as ApiError
       throw e
@@ -38,8 +37,7 @@ export function useCrud<T>(basePath: string) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await http.post<T>(basePath, payload)
-      return data
+      return await api.post<T>(basePath, payload)
     } catch (e) {
       error.value = e as ApiError
       throw e
@@ -52,8 +50,7 @@ export function useCrud<T>(basePath: string) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await http.put<T>(`${basePath}/${id}`, payload)
-      return data
+      return await api.put<T>(`${basePath}/${id}`, payload)
     } catch (e) {
       error.value = e as ApiError
       throw e
@@ -67,7 +64,7 @@ export function useCrud<T>(basePath: string) {
     error.value = null
     try {
       const url = hard ? `${basePath}/${id}?hard=true` : `${basePath}/${id}`
-      await http.delete(url)
+      await api.delete(url)
     } catch (e) {
       error.value = e as ApiError
       throw e

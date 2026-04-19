@@ -1,11 +1,16 @@
 // === Autenticação ===
 
 export type Role = 'owner' | 'admin' | 'member'
+export type AuthType = 'user' | 'system'
 
 export interface LoginRequest {
   email?: string
   password?: string
   api_key?: string
+}
+
+export interface RefreshRequest {
+  refresh_token: string
 }
 
 export interface TokenPair {
@@ -42,8 +47,11 @@ export interface SelectOrganizationRequest {
 
 export interface MeResponse {
   organization_id: string
-  issued_at: string
-  expires_at: string
+  user_id?: string
+  role?: Role
+  permissions?: string[]
+  issued_at: string | number
+  expires_at: string | number
 }
 
 // === Clientes ===
@@ -115,14 +123,14 @@ export interface CreateAddressRequest {
 
 export interface UpdateAddressRequest extends CreateAddressRequest { }
 
-// === Usuários ===
+// === Members ===
 
 export interface User {
   id: string
   name: string
   email: string
   role: Role
-  created_at: string
+  joined_at: string
 }
 
 export interface CreateUserRequest {
@@ -137,16 +145,47 @@ export interface UpdateUserRequest {
   role: 'admin' | 'member'
 }
 
+// === Paginação ===
+
+export interface PagedResponse<T> {
+  data: T[]
+  limit: number
+  offset: number
+}
+
 // === Erros da API ===
 
 export interface ApiError {
   message: string
   status: number
   validationErrors?: Record<string, string>
+  code?: string
 }
 
 export interface ApiValidationError {
   field: string
   rejected_value: string
   message: string
+}
+
+// Common error codes from backend
+export enum ApiErrorCode {
+  UNAUTHORIZED = 'unauthorized',
+  FORBIDDEN = 'forbidden',
+  NOT_FOUND = 'not_found',
+  CONFLICT = 'conflict',
+  INVALID_REQUEST = 'invalid_request',
+  INTERNAL_ERROR = 'internal_error',
+  MAINTENANCE = 'maintenance',
+  RATE_LIMIT = 'rate_limit',
+}
+
+// Auth error codes
+export enum AuthErrorCode {
+  INVALID_CREDENTIALS = 'invalid_credentials',
+  ACCOUNT_LOCKED = 'account_locked',
+  ACCOUNT_DISABLED = 'account_disabled',
+  SESSION_EXPIRED = 'session_expired',
+  TOKEN_INVALID = 'token_invalid',
+  TOKEN_EXPIRED = 'token_expired',
 }

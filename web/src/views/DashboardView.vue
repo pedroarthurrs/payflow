@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import http from '@/services/http'
-import type { MeResponse, Customer, User, ApiError } from '@/types'
+import { api } from '@/services/http'
+import type { MeResponse, Customer, User, ApiError, PagedResponse } from '@/types'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
@@ -18,15 +18,15 @@ async function fetchData() {
   error.value = null
 
   try {
-    const [meRes, customersRes, usersRes] = await Promise.all([
-      http.get<MeResponse>('/v1/me'),
-      http.get<Customer[]>('/v1/customers'),
-      http.get<User[]>('/v1/users'),
+    const [me, customers, members] = await Promise.all([
+      api.get<MeResponse>('/v1/me'),
+      api.get<PagedResponse<Customer>>('/v1/customers'),
+      api.get<PagedResponse<User>>('/v1/members'),
     ])
 
-    organizationId.value = meRes.data.organization_id
-    customerCount.value = customersRes.data.length
-    userCount.value = usersRes.data.length
+    organizationId.value = me.organization_id
+    customerCount.value = customers.data.length
+    userCount.value = members.data.length
   } catch (e: any) {
     const apiErr = e as ApiError
     const handled = handleError(apiErr, fetchData)
@@ -66,7 +66,7 @@ onMounted(fetchData)
       </div>
 
       <div class="dashboard__card">
-        <h2 class="dashboard__card-title">Usuários</h2>
+        <h2 class="dashboard__card-title">Membros</h2>
         <p class="dashboard__card-value">{{ userCount }}</p>
       </div>
     </div>

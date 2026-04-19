@@ -71,18 +71,18 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/users',
-      component: () => import('@/views/users/UserListView.vue'),
+      path: '/members',
+      component: () => import('@/views/members/MemberListView.vue'),
       meta: { requiresAuth: true, requiredRole: 'admin', keepAlive: true },
     },
     {
-      path: '/users/new',
-      component: () => import('@/views/users/UserListView.vue'),
+      path: '/members/new',
+      component: () => import('@/views/members/MemberListView.vue'),
       meta: { requiresAuth: true, requiredRole: 'owner', keepAlive: true },
     },
     {
-      path: '/users/:id/edit',
-      component: () => import('@/views/users/UserFormView.vue'),
+      path: '/members/:id/edit',
+      component: () => import('@/views/members/MemberFormView.vue'),
       meta: { requiresAuth: true, requiredRole: 'owner' },
     },
     {
