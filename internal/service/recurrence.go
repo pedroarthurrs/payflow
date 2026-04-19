@@ -206,13 +206,11 @@ func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subI
 		// Update subscription status based on failure.
 		s.handleChargeFailure(ctx, orgID, subID, statusBeforeCharge, attemptNum)
 
-		// Unlock so the subscription can be retried.
-		_ = s.recRepo.UnlockBilling(ctx, orgID, subID)
+		// Keep billing lock — the worker will extend it for the next retry window.
 		return chargeErr
 	}
 
-	// Gateway unavailable or unexpected error — unlock and propagate.
-	_ = s.recRepo.UnlockBilling(ctx, orgID, subID)
+	// Gateway unavailable or unexpected error — keep lock for worker to manage.
 	return fmt.Errorf("gateway error: %w", chargeErr)
 }
 
@@ -254,4 +252,16 @@ func (s *RecurrenceService) applyPendingSchedule(ctx context.Context, orgID, sub
 	if err := s.schedules.Cancel(ctx, orgID, schedule.ID); err != nil {
 		slog.Error("failed to apply pending schedule", "subscription_id", subID, "schedule_id", schedule.ID, "error", err)
 	}
+}
+
+// ExtendBillingLock sets billing_locked_until so the scheduler will not re-enqueue
+// the subscription before the next worker retry fires.
+func (s *RecurrenceService) ExtendBillingLock(ctx context.Context, orgID, subID uuid.UUID, until time.Time) error {
+	return s.recRepo.LockForBilling(ctx, orgID, subID, until)
+}
+
+// ReleaseBillingLock clears billing_locked_until, allowing the scheduler to
+// re-enqueue the subscription on its next scan (used after dead-lettering).
+func (s *RecurrenceService) ReleaseBillingLock(ctx context.Context, orgID, subID uuid.UUID) error {
+	return s.recRepo.UnlockBilling(ctx, orgID, subID)
 }

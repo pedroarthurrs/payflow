@@ -101,6 +101,11 @@ func (w *RecurrenceWorker) process(ctx context.Context, job *domain.Job) {
 			"organization_id", billingJob.OrganizationID,
 			"attempts", attemptNum,
 			"error", err)
+		// Release the lock so the scheduler can re-evaluate this subscription later.
+		if relErr := w.svc.ReleaseBillingLock(ctx, billingJob.OrganizationID, billingJob.SubscriptionID); relErr != nil {
+			slog.Error("failed to release billing lock after dead-letter",
+				"subscription_id", billingJob.SubscriptionID, "error", relErr)
+		}
 		return
 	}
 
@@ -126,5 +131,13 @@ func (w *RecurrenceWorker) process(ctx context.Context, job *domain.Job) {
 	if enqErr := w.queue.Enqueue(ctx, nextJob); enqErr != nil {
 		slog.Error("failed to re-enqueue recurring billing job",
 			"subscription_id", billingJob.SubscriptionID, "error", enqErr)
+	}
+
+	// Extend the billing lock to cover the retry window so the scheduler does
+	// not re-enqueue a fresh attempt=1 before the worker retry fires.
+	lockUntil := nextRetryAt.Add(5 * time.Minute)
+	if lockErr := w.svc.ExtendBillingLock(ctx, billingJob.OrganizationID, billingJob.SubscriptionID, lockUntil); lockErr != nil {
+		slog.Error("failed to extend billing lock for retry",
+			"subscription_id", billingJob.SubscriptionID, "error", lockErr)
 	}
 }
