@@ -27,6 +27,10 @@ func NewGatewayService(paymentSvc *PaymentService, gateway domain.Gateway) *Gate
 
 // Charge retrieves the payment, calls the gateway, persists the reference, and drives the FSM.
 func (s *GatewayService) Charge(ctx context.Context, orgID, paymentID uuid.UUID, reason string) (*domain.Payment, error) {
+	if s.gateway == nil {
+		return nil, domain.ErrGatewayUnavailable
+	}
+
 	payment, err := s.paymentSvc.GetByID(ctx, orgID, paymentID)
 	if err != nil {
 		return nil, err
@@ -69,6 +73,10 @@ func (s *GatewayService) Charge(ctx context.Context, orgID, paymentID uuid.UUID,
 
 // Refund validates the FSM transition, calls the gateway, and drives the FSM to StatusRefunded.
 func (s *GatewayService) Refund(ctx context.Context, orgID, paymentID uuid.UUID, reason string) (*domain.Payment, error) {
+	if s.gateway == nil {
+		return nil, domain.ErrGatewayUnavailable
+	}
+
 	payment, err := s.paymentSvc.GetByID(ctx, orgID, paymentID)
 	if err != nil {
 		return nil, err
@@ -95,6 +103,10 @@ func (s *GatewayService) Refund(ctx context.Context, orgID, paymentID uuid.UUID,
 
 // Cancel validates the FSM transition, calls the gateway, and drives the FSM to StatusCanceled.
 func (s *GatewayService) Cancel(ctx context.Context, orgID, paymentID uuid.UUID, reason string) (*domain.Payment, error) {
+	if s.gateway == nil {
+		return nil, domain.ErrGatewayUnavailable
+	}
+
 	payment, err := s.paymentSvc.GetByID(ctx, orgID, paymentID)
 	if err != nil {
 		return nil, err
