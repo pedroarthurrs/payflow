@@ -1,4 +1,5 @@
 import { useToast } from '@/core/composables/useToast'
+import { useRBAC } from '@/core/rbac/composable'
 import type { ApiError } from '@/core/types'
 
 export interface ErrorHandlerOptions {
@@ -13,6 +14,7 @@ export interface ErrorHandlerOptions {
  */
 export function useErrorHandler(options: ErrorHandlerOptions = {}) {
   const toast = useToast()
+  const { refresh: refreshPermissions } = useRBAC()
 
   /**
    * Handle an API error with consistent behavior per status code.
@@ -22,6 +24,8 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
     switch (err.status) {
       case 403:
         toast.error(err.message || 'Permissão negada')
+        // Refresh permissions in case they've changed
+        refreshPermissions()
         return true
 
       case 404:

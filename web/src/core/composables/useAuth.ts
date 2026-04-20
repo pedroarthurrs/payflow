@@ -1,16 +1,12 @@
-import type { Role } from '@/core/types'
+import type { Permission, Role } from '@/core/rbac'
+import { useRBACStore } from '@/core/rbac'
 import { useAuthStore } from '@/modules/auth/store/auth'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-const ROLE_HIERARCHY: Record<Role, number> = {
-  member: 0,
-  admin: 1,
-  owner: 2,
-}
-
 export function useAuth() {
   const store = useAuthStore()
+  const rbac = useRBACStore()
   const router = useRouter()
 
   const isAuthenticated = computed(() => store.isAuthenticated)
@@ -61,16 +57,28 @@ export function useAuth() {
     }
   }
 
+  /** Role hierarchy check via centralized RBAC store. */
   function hasRole(minRole: Role): boolean {
-    const role = store.user?.role
-    if (!role) return false
-    return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minRole]
+    return rbac.hasRole(minRole)
   }
 
   function hasAnyRole(roles: Role[]): boolean {
-    const role = store.user?.role
+    const role = store.user?.role as Role | undefined
     if (!role) return false
     return roles.includes(role)
+  }
+
+  /** Permission check via centralized RBAC store. */
+  function can(perm: Permission): boolean {
+    return rbac.can(perm)
+  }
+
+  function canAny(perms: Permission[]): boolean {
+    return rbac.canAny(perms)
+  }
+
+  function canAll(perms: Permission[]): boolean {
+    return rbac.canAll(perms)
   }
 
   return {
@@ -80,6 +88,9 @@ export function useAuth() {
     refreshToken,
     hasRole,
     hasAnyRole,
+    can,
+    canAny,
+    canAll,
     isAuthenticated,
     isMultiOrgPending,
     pendingOrganizations,

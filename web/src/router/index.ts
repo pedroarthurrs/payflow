@@ -1,4 +1,5 @@
-import type { Role } from '@/core/types'
+import type { Permission, Role } from '@/core/rbac'
+import { ROLE_HIERARCHY, useRBACStore } from '@/core/rbac'
 import { authRoutes } from '@/modules/auth/router'
 import { useAuthStore } from '@/modules/auth/store/auth'
 import { useStatusStore } from '@/modules/auth/store/status'
@@ -10,15 +11,11 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     requiredRole?: Role
+    requiredPermission?: Permission
+    requiredPermissions?: Permission[]
     guestOnly?: boolean
     keepAlive?: boolean
   }
-}
-
-const ROLE_HIERARCHY: Record<Role, number> = {
-  member: 0,
-  admin: 1,
-  owner: 2,
 }
 
 const router = createRouter({
@@ -53,8 +50,6 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  // For guest-only routes (login, etc.) verify maintenance status before proceeding.
-  // For authenticated routes, a 503 response from any API call will redirect to /maintenance via the HTTP interceptor.
   if (to.meta.guestOnly) {
     const statusStore = useStatusStore()
     await statusStore.check()
@@ -73,9 +68,28 @@ router.beforeEach(async (to) => {
     return '/dashboard'
   }
 
+  const rbac = useRBACStore()
+
+  // Role hierarchy check
   if (to.meta.requiredRole) {
-    const userRole = authStore.user?.role
-    if (!userRole || ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY[to.meta.requiredRole]) {
+    const userRole = authStore.user?.role as Role | undefined
+    if (!userRole || (ROLE_HIERARCHY[userRole] ?? 0) < (ROLE_HIERARCHY[to.meta.requiredRole] ?? 0)) {
+      return '/403'
+    }
+  }
+
+  // Single permission check
+  if (to.meta.requiredPermission) {
+    if (!rbac.loaded) await rbac.fetchPermissions()
+    if (!rbac.can(to.meta.requiredPermission)) {
+      return '/403'
+    }
+  }
+
+  // Multiple permissions check (all required)
+  if (to.meta.requiredPermissions?.length) {
+    if (!rbac.loaded) await rbac.fetchPermissions()
+    if (!rbac.canAll(to.meta.requiredPermissions)) {
       return '/403'
     }
   }

@@ -1,4 +1,5 @@
 import http from '@/core/api/http'
+import { useRBACStore } from '@/core/rbac'
 import type { LoginRequest, OrgRef, Role, SelectOrganizationRequest, TokenPair } from '@/modules/auth/types'
 import { isMultiOrgLoginResponse } from '@/modules/auth/types'
 import { defineStore } from 'pinia'
@@ -115,6 +116,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       hydrateUser(data.access_token)
+      // Fetch effective permissions from /me after successful login.
+      await useRBACStore().fetchPermissions()
     } catch (err) {
       const error = new AuthError(
         err instanceof Error ? err.message : 'Login failed',
@@ -142,8 +145,14 @@ export const useAuthStore = defineStore('auth', () => {
       pendingOrganizations.value = []
 
       hydrateUser(data.access_token)
+      await useRBACStore().fetchPermissions()
     } catch (err) {
-      const error = err instanceof AuthError ? err : new AuthError('Organization selection failed')
+      if (err instanceof AuthError) {
+        lastError.value = err
+        throw err
+      }
+      const message = err instanceof Error ? err.message : 'Organization selection failed'
+      const error = new AuthError(message, 'ORG_SELECTION_ERROR')
       lastError.value = error
       throw error
     }
@@ -168,6 +177,7 @@ export const useAuthStore = defineStore('auth', () => {
     lastError.value = null
     localStorage.removeItem(USER_KEY)
     clearExpiryWarning()
+    useRBACStore().$reset()
   }
 
   async function refreshAccessToken(): Promise<void> {
@@ -177,6 +187,7 @@ export const useAuthStore = defineStore('auth', () => {
       // No token needed in the body for browser clients.
       const { data } = await http.post<TokenPair>('/v1/auth/refresh', {})
       hydrateUser(data.access_token)
+      await useRBACStore().fetchPermissions()
     } catch (err) {
       clearLocalState()
       const error = new AuthError('Token refresh failed', 'REFRESH_ERROR')
@@ -202,6 +213,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       user.value = stored
       scheduleExpiryWarning(stored.exp)
+      // Hydrate RBAC permissions from /me on page reload.
+      useRBACStore().fetchPermissions()
     } catch {
       localStorage.removeItem(USER_KEY)
     }
