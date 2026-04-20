@@ -6,6 +6,8 @@ import LoadingSpinner from '@/core/components/LoadingSpinner.vue'
 import { Button } from '@/core/components/ui/button'
 import { useErrorHandler } from '@/core/composables/useErrorHandler'
 import { useToast } from '@/core/composables/useToast'
+import Can from '@/core/rbac/Can.vue'
+import { useRBAC } from '@/core/rbac/composable'
 import type { Address, ApiError } from '@/core/types'
 import { formatDocument, formatMetadata, formatPhone } from '@/core/utils/formatting'
 import { useAddressList, useCustomerDetail, useDeleteAddress, useDeleteCustomer } from '@/modules/customers/composables/useCustomers'
@@ -15,6 +17,7 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { can } = useRBAC()
 
 const customerId = route.params.id as string
 const customerIdRef = ref(customerId)
@@ -147,8 +150,12 @@ function formatDate(value: string) {
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-semibold text-foreground">{{ customer.name }}</h1>
         <div class="flex gap-3">
-          <Button @click="navigateToEdit">Editar</Button>
-          <Button variant="destructive" @click="openDeleteCustomerDialog">Excluir</Button>
+          <Can permission="customers:write">
+            <Button @click="navigateToEdit">Editar</Button>
+          </Can>
+          <Can permission="customers:delete">
+            <Button variant="destructive" @click="openDeleteCustomerDialog">Excluir</Button>
+          </Can>
         </div>
       </div>
 
@@ -201,7 +208,9 @@ function formatDate(value: string) {
       <div class="mt-8">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold text-foreground">Endereços</h2>
-          <Button @click="navigateToNewAddress">Novo Endereço</Button>
+          <Can permission="customers:write">
+            <Button @click="navigateToNewAddress">Novo Endereço</Button>
+          </Can>
         </div>
 
         <div v-if="addressFetchError" class="text-center p-8 bg-card border border-destructive rounded-lg">

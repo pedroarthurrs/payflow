@@ -27,9 +27,11 @@ const { handleSubmit, errors, defineField, setFieldError, resetForm, setValues }
 })
 
 const [name] = defineField('name')
-const [email] = defineField('email')
-const [password] = defineField('password')
 const [role] = defineField('role')
+
+// Email and password use refs since they're create-only (not in updateMemberSchema)
+const emailRef = ref('')
+const passwordRef = ref('')
 
 const formError = ref('')
 const fetchError = ref('')
@@ -90,20 +92,24 @@ const onSubmit = handleSubmit(async (values) => {
     } else {
       const payload = {
         name: values.name,
-        email: values.email,
-        password: values.password,
+        email: emailRef.value,
+        password: passwordRef.value,
         role: values.role,
       }
       await createMutation.mutateAsync(payload)
       toast.success('Member criado com sucesso')
       resetForm()
+      emailRef.value = ''
+      passwordRef.value = ''
     }
     router.push('/members')
   } catch (e) {
     const err = e as ApiError
     if (err.status === 400 && err.validationErrors) {
       for (const [field, message] of Object.entries(err.validationErrors)) {
-        setFieldError(field, message)
+        if (field === 'name' || field === 'role') {
+          setFieldError(field, message as string)
+        }
       }
     } else if (err.status === 403) {
       formError.value = err.message || 'Operação não permitida'
@@ -128,7 +134,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[600px] p-6">
+  <div class="flex flex-col h-full w-full p-6">
     <h1 class="text-2xl font-bold text-foreground mb-6">{{ pageTitle }}</h1>
 
     <div v-if="notFound" class="text-center p-8 bg-card border border-destructive rounded-lg">
@@ -161,9 +167,8 @@ onMounted(() => {
         <FormField
           label="Email"
           type="email"
-          :modelValue="email ?? ''"
-          @update:modelValue="email = $event as string"
-          :error="errors.email"
+          :modelValue="emailRef"
+          @update:modelValue="emailRef = String($event)"
           :required="true"
           placeholder="email@exemplo.com"
         />
@@ -171,9 +176,8 @@ onMounted(() => {
         <FormField
           label="Senha"
           type="password"
-          :modelValue="password ?? ''"
-          @update:modelValue="password = $event as string"
-          :error="errors.password"
+          :modelValue="passwordRef"
+          @update:modelValue="passwordRef = String($event)"
           :required="true"
           placeholder="Mínimo 8 caracteres"
         />
@@ -183,7 +187,7 @@ onMounted(() => {
         label="Role"
         type="select"
         :modelValue="role ?? 'member'"
-        @update:modelValue="role = $event as string"
+        @update:modelValue="role = $event as 'admin' | 'member'"
         :error="errors.role"
         :required="true"
         :options="roleOptions"

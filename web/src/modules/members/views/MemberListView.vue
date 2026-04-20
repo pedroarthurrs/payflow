@@ -2,15 +2,10 @@
 import ConfirmDialog from '@/core/components/ConfirmDialog.vue'
 import type { Column } from '@/core/components/DataTable.vue'
 import DataTable from '@/core/components/DataTable.vue'
-import FormField from '@/core/components/FormField.vue'
 import { Button } from '@/core/components/ui/button'
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
 } from '@/core/components/ui/dialog'
 import { useAuth } from '@/core/composables/useAuth'
 import { useErrorHandler } from '@/core/composables/useErrorHandler'
@@ -19,6 +14,7 @@ import type { ApiError, CreateUserRequest, User } from '@/core/types'
 import { useCreateMember, useDeleteMember, useMemberList } from '@/modules/members/composables/useMembers'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import MemberFormView from './MemberFormView.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -192,58 +188,8 @@ watch(
     />
 
     <Dialog v-if="isOwner" :open="showCreateModal" @update:open="(open) => !open && closeCreateModal()">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Novo Member</DialogTitle>
-          <DialogDescription>Preencha os campos para criar um novo member.</DialogDescription>
-        </DialogHeader>
-
-        <div v-if="formError" class="text-center py-3 px-4 bg-card border border-destructive rounded-lg mb-3">
-          <p class="text-destructive">{{ formError }}</p>
-        </div>
-
-        <FormField
-          label="Nome"
-          :modelValue="name"
-          @update:modelValue="name = $event as string"
-          :error="fieldErrors.name"
-          :required="true"
-          placeholder="Nome do member"
-        />
-        <FormField
-          label="Email"
-          type="email"
-          :modelValue="email"
-          @update:modelValue="email = $event as string"
-          :error="fieldErrors.email"
-          :required="true"
-          placeholder="email@exemplo.com"
-        />
-        <FormField
-          label="Senha"
-          type="password"
-          :modelValue="password"
-          @update:modelValue="password = $event as string"
-          :error="fieldErrors.password"
-          :required="true"
-          placeholder="Mínimo 8 caracteres"
-        />
-        <FormField
-          label="Role"
-          type="select"
-          :modelValue="role"
-          @update:modelValue="role = $event as 'admin' | 'member'"
-          :error="fieldErrors.role"
-          :required="true"
-          :options="roleOptions"
-        />
-
-        <DialogFooter>
-          <Button variant="outline" :disabled="creating" @click="closeCreateModal">Cancelar</Button>
-          <Button :disabled="creating" @click="handleCreateMember">
-            {{ creating ? 'Criando...' : 'Criar Member' }}
-          </Button>
-        </DialogFooter>
+      <DialogContent class="max-w-[600px]">
+        <MemberFormView />
       </DialogContent>
     </Dialog>
   </div>

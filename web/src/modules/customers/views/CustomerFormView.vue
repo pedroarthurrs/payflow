@@ -153,7 +153,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[600px] p-6">
+  <div class="flex flex-col h-full w-full p-6">
     <h1 class="text-2xl font-bold text-foreground mb-6">{{ pageTitle }}</h1>
 
     <div v-if="notFound" class="text-center p-8 bg-card border border-destructive rounded-lg">
