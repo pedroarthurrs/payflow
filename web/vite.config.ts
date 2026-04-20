@@ -20,9 +20,22 @@ export default defineConfig({
         target: process.env.VITE_API_PROXY_TARGET || process.env.VITE_API_URL || 'http://localhost:8080',
         rewrite: (path: string) => path.replace(/^\/api/, ''),
         changeOrigin: true,
-        // Timeout to prevent hanging requests and protect against slow-loris attacks
+        // Support WebSocket proxying (e.g. live-reload or future WS features)
+        ws: true,
+        // Protect against slow-loris and hung requests
         timeout: 30000,
         proxyTimeout: 30000,
+        onProxyReq: (_proxyReq, req) => {
+          // Log outgoing proxy requests in development for easier debugging
+          console.log(`[Proxy] ${req.method} ${req.url}`)
+        },
+        onError: (err, _req, res) => {
+          console.error('[Proxy Error]', err.message)
+          if (!res.headersSent) {
+            res.writeHead(503, { 'Content-Type': 'application/json' })
+          }
+          res.end(JSON.stringify({ error: 'API unavailable — backend may be down' }))
+        },
       }
     }
   },

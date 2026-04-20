@@ -2,12 +2,13 @@ import http from '@/services/http'
 import type { LoginRequest, OrgRef, Role, SelectOrganizationRequest, TokenPair } from '@/types'
 import { isMultiOrgLoginResponse } from '@/types'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-// localStorage namespace to prevent key collisions
+// localStorage stores only non-sensitive user metadata decoded from the JWT.
+// The actual tokens are kept in HttpOnly cookies (set by the backend) and are
+// never accessible to JavaScript — this eliminates the XSS token-theft vector.
 const AUTH_STORAGE_PREFIX = 'i9pay:auth'
-const ACCESS_TOKEN_KEY = `${AUTH_STORAGE_PREFIX}:accessToken`
-const REFRESH_TOKEN_KEY = `${AUTH_STORAGE_PREFIX}:refreshToken`
+const USER_KEY = `${AUTH_STORAGE_PREFIX}:user`
 
 interface AuthUser {
   organizationId: string
@@ -15,6 +16,8 @@ interface AuthUser {
   memberId: string
   role?: Role
   authType: 'user' | 'system'
+  // exp is stored so isAuthenticated can check expiry without the raw token
+  exp?: number
 }
 
 interface JwtPayload {
@@ -56,55 +59,45 @@ function decodeJwtPayload(token: string): JwtPayload {
   }
 }
 
-function isTokenExpired(token: string): boolean {
-  try {
-    const payload = decodeJwtPayload(token)
-    if (!payload.exp) return false
-    const now = Math.floor(Date.now() / 1000)
-    return payload.exp < now
-  } catch {
-    return true
-  }
+function isUserExpired(u: AuthUser | null): boolean {
+  if (!u?.exp) return false
+  return Math.floor(Date.now() / 1000) >= u.exp
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(null)
-  const refreshToken = ref<string | null>(null)
   const user = ref<AuthUser | null>(null)
   const lastError = ref<AuthError | null>(null)
 
   const pendingSessionToken = ref<string | null>(null)
   const pendingOrganizations = ref<OrgRef[]>([])
 
-  const isAuthenticated = computed(() => !!accessToken.value && !isTokenExpired(accessToken.value))
+  // isAuthenticated is derived from the stored user metadata expiry.
+  // The actual token validity is enforced by the backend on every request.
+  const isAuthenticated = computed(() => !!user.value && !isUserExpired(user.value))
   const userRole = computed(() => user.value?.role ?? null)
   const isOwner = computed(() => user.value?.role === 'owner')
   const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'owner')
   const isMultiOrgPending = computed(() => !!pendingSessionToken.value)
   const organizationId = computed(() => user.value?.organizationId ?? null)
 
-  function setTokens(access: string, refresh: string) {
-    try {
-      accessToken.value = access
-      refreshToken.value = refresh
-      localStorage.setItem(ACCESS_TOKEN_KEY, access)
-      localStorage.setItem(REFRESH_TOKEN_KEY, refresh)
-      lastError.value = null
-
-      const claims = decodeJwtPayload(access)
-      user.value = {
-        organizationId: claims.sub,
-        userId: claims.user_id,
-        memberId: claims.member_id ?? '',
-        role: claims.role,
-        authType: claims.auth_type,
-      }
-    } catch (err) {
-      const error = err instanceof AuthError ? err : new AuthError('Failed to set tokens')
-      lastError.value = error
-      logout()
-      throw error
+  // Decode claims from the access token returned in the response body and
+  // persist only the non-sensitive user metadata to localStorage.
+  // The raw token is NOT stored — it lives in the HttpOnly cookie only.
+  function hydrateUser(accessToken: string) {
+    const claims = decodeJwtPayload(accessToken)
+    const u: AuthUser = {
+      organizationId: claims.sub,
+      userId: claims.user_id,
+      memberId: claims.member_id ?? '',
+      role: claims.role,
+      authType: claims.auth_type,
+      exp: claims.exp,
     }
+    user.value = u
+    localStorage.setItem(USER_KEY, JSON.stringify(u))
+    lastError.value = null
+
+    scheduleExpiryWarning(claims.exp)
   }
 
   async function login(email: string, password: string): Promise<void> {
@@ -121,7 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
         return
       }
 
-      setTokens(data.access_token, data.refresh_token)
+      hydrateUser(data.access_token)
     } catch (err) {
       const error = new AuthError(
         err instanceof Error ? err.message : 'Login failed',
@@ -132,7 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function selectOrganization(organizationId: string): Promise<void> {
+  async function selectOrganization(orgId: string): Promise<void> {
     try {
       lastError.value = null
       const sessionToken = pendingSessionToken.value
@@ -142,13 +135,13 @@ export const useAuthStore = defineStore('auth', () => {
 
       const { data } = await http.post<TokenPair>('/v1/auth/select-organization', {
         session_token: sessionToken,
-        organization_id: organizationId,
+        organization_id: orgId,
       } satisfies SelectOrganizationRequest)
 
       pendingSessionToken.value = null
       pendingOrganizations.value = []
 
-      setTokens(data.access_token, data.refresh_token)
+      hydrateUser(data.access_token)
     } catch (err) {
       const error = err instanceof AuthError ? err : new AuthError('Organization selection failed')
       lastError.value = error
@@ -156,74 +149,95 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function logout(): void {
-    accessToken.value = null
-    refreshToken.value = null
+  async function logout(): Promise<void> {
+    // Ask the backend to expire the HttpOnly cookies. Best-effort — clear
+    // local state regardless of whether the request succeeds.
+    try {
+      await http.post('/v1/auth/logout', {})
+    } catch {
+      // ignore — local cleanup always runs
+    } finally {
+      clearLocalState()
+    }
+  }
+
+  function clearLocalState(): void {
     user.value = null
     pendingSessionToken.value = null
     pendingOrganizations.value = []
     lastError.value = null
-    localStorage.removeItem(ACCESS_TOKEN_KEY)
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    clearExpiryWarning()
   }
 
   async function refreshAccessToken(): Promise<void> {
     try {
       lastError.value = null
-      const currentRefresh = refreshToken.value ?? localStorage.getItem(REFRESH_TOKEN_KEY)
-      if (!currentRefresh) {
-        throw new AuthError('No refresh token available', 'NO_REFRESH_TOKEN')
-      }
-
-      const { data } = await http.post<TokenPair>('/v1/auth/refresh', {
-        refresh_token: currentRefresh,
-      })
-
-      setTokens(data.access_token, data.refresh_token)
+      // The backend reads the refresh token from the HttpOnly cookie.
+      // No token needed in the body for browser clients.
+      const { data } = await http.post<TokenPair>('/v1/auth/refresh', {})
+      hydrateUser(data.access_token)
     } catch (err) {
-      logout()
+      clearLocalState()
       const error = new AuthError('Token refresh failed', 'REFRESH_ERROR')
       lastError.value = error
       throw error
     }
   }
 
+  // Restore user metadata from localStorage on page load.
+  // The actual token is in the HttpOnly cookie — the backend will validate it.
+  // If the stored metadata is expired, clear it; the 401 interceptor in http.ts
+  // will attempt a silent refresh on the first protected request.
   function loadFromStorage(): void {
     try {
-      const storedAccess = localStorage.getItem(ACCESS_TOKEN_KEY)
-      const storedRefresh = localStorage.getItem(REFRESH_TOKEN_KEY)
+      const raw = localStorage.getItem(USER_KEY)
+      if (!raw) return
 
-      if (!storedAccess) {
+      const stored = JSON.parse(raw) as AuthUser
+      if (isUserExpired(stored)) {
+        localStorage.removeItem(USER_KEY)
         return
       }
 
-      if (isTokenExpired(storedAccess)) {
-        localStorage.removeItem(ACCESS_TOKEN_KEY)
-        localStorage.removeItem(REFRESH_TOKEN_KEY)
-        return
-      }
-
-      accessToken.value = storedAccess
-      refreshToken.value = storedRefresh
-
-      const claims = decodeJwtPayload(storedAccess)
-      user.value = {
-        organizationId: claims.sub,
-        userId: claims.user_id,
-        memberId: claims.member_id ?? '',
-        role: claims.role,
-        authType: claims.auth_type,
-      }
-      lastError.value = null
-    } catch (err) {
-      logout()
-      lastError.value = err instanceof AuthError ? err : new AuthError('Failed to load auth from storage')
+      user.value = stored
+      scheduleExpiryWarning(stored.exp)
+    } catch {
+      localStorage.removeItem(USER_KEY)
     }
   }
 
+  // ---- Token expiry warning ----
+  // Emits "i9pay:tokenExpiring" 5 min before expiry so the UI can notify the user.
+
+  let expiryWarningTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearExpiryWarning() {
+    if (expiryWarningTimer !== null) {
+      clearTimeout(expiryWarningTimer)
+      expiryWarningTimer = null
+    }
+  }
+
+  function scheduleExpiryWarning(exp?: number) {
+    clearExpiryWarning()
+    if (!exp) return
+
+    const expiresAt = new Date(exp * 1000)
+    const delay = expiresAt.getTime() - 5 * 60 * 1000 - Date.now()
+    if (delay > 0) {
+      expiryWarningTimer = setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('i9pay:tokenExpiring', { detail: { expiresAt } }))
+      }, delay)
+    }
+  }
+
+  // Keep expiry warning in sync when user changes (e.g. after refresh)
+  watch(user, (u) => {
+    if (!u) clearExpiryWarning()
+  })
+
   return {
-    accessToken,
-    refreshToken,
     user,
     lastError,
     pendingSessionToken,

@@ -79,9 +79,15 @@ func (h *testAuthHandler) Login(c *gin.Context) {
 
 func (h *testAuthHandler) Refresh(c *gin.Context) {
 	var req refreshRequest
-	if e := c.ShouldBindJSON(&req); e != nil {
-		_ = c.Error(apierr.BadRequest(e.Error()))
-		return
+	_ = c.ShouldBindJSON(&req)
+
+	if req.RefreshToken == "" {
+		cookie, err := c.Cookie(refreshTokenCookieName)
+		if err != nil || cookie == "" {
+			_ = c.Error(apierr.BadRequest("refresh_token required (body or cookie)"))
+			return
+		}
+		req.RefreshToken = cookie
 	}
 	pair, e := h.svc.RefreshToken(req.RefreshToken)
 	if e != nil {

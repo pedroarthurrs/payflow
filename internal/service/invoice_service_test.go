@@ -167,9 +167,11 @@ func TestInvoiceCreate_WithItems_HappyPath(t *testing.T) {
 	invoice, err := svc.Create(context.Background(), orgID, input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if invoice == nil {
 		t.Fatal("expected invoice, got nil")
+		return
 	}
 	// amount_cents should be sum of total_price_cents: 2000 + 500 = 2500
 	if invoice.AmountCents != 2500 {
@@ -480,12 +482,15 @@ func TestInvoiceGenerateFromSubscription_HappyPath(t *testing.T) {
 	invoice, err := svc.GenerateFromSubscription(context.Background(), orgID, subID, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if invoice == nil {
 		t.Fatal("expected invoice, got nil")
+		return
 	}
 	if invoice.AmountCents != 2000 {
 		t.Errorf("expected amount_cents=2000 (2 * 1000), got %d", invoice.AmountCents)
+		return
 	}
 }
 

@@ -38,7 +38,7 @@ func TestAuth_MissingHeader_Returns401(t *testing.T) {
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
-	if body := w.Body.String(); body != `{"error":"authorization header required"}` {
+	if body := w.Body.String(); body != `{"error":"authorization required"}` {
 		t.Errorf("unexpected body: %s", body)
 	}
 }

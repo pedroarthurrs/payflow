@@ -40,6 +40,22 @@ export function isMultiOrgLoginResponse(r: LoginResponse): r is MultiOrgLoginRes
   return 'session_token' in r
 }
 
+/**
+ * Type-safe discriminated union for login responses.
+ *
+ * @example
+ * const response = await login(email, password)
+ * if (isMultiOrgLoginResponse(response)) {
+ *   // TypeScript narrows to MultiOrgLoginResponse
+ *   const orgs = response.organizations
+ * } else {
+ *   // TypeScript narrows to TokenPair
+ *   const token = response.access_token
+ * }
+ */
+export type AuthResponse<T extends 'single' | 'multi'> =
+  T extends 'single' ? TokenPair : MultiOrgLoginResponse
+
 export interface SelectOrganizationRequest {
   session_token: string
   organization_id: string

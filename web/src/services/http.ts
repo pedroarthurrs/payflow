@@ -1,88 +1,73 @@
-import axios, { AxiosHeaders } from 'axios'
-import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import type { ApiError, ApiValidationError, TokenPair } from '@/types'
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosHeaders } from 'axios'
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
-  _isAuthRequest?: boolean
 }
 
 const http = axios.create({
   baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
+  // Required so the browser sends HttpOnly auth cookies on every request,
+  // including cross-origin requests to the Vite dev proxy.
+  withCredentials: true,
 })
 
-// Track if we're currently refreshing to prevent multiple refresh attempts
-let isRefreshing = false
-let refreshPromise: Promise<boolean> | null = null
-
-// Request interceptor: inject Authorization header and X-Request-ID
+// ---- Request interceptor ----
+// Injects X-Request-ID for traceability and X-CSRF-Token for state-changing
+// requests (Double Submit Cookie pattern). The Authorization header is NOT
+// injected here — browser clients rely on the HttpOnly cookie; programmatic
+// clients (API key) must set the header themselves via the `api` helpers or
+// by passing a custom config.
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const headers = config.headers ?? new AxiosHeaders()
-  
-  // Add X-Request-ID for traceability (uses crypto.randomUUID for cryptographic randomness)
+
   if (!headers.has('X-Request-ID')) {
     headers.set('X-Request-ID', generateUUID())
   }
 
-  // Add Authorization header if token exists
-  const token = localStorage.getItem('i9pay:auth:accessToken')
-  if (token && !config.url?.includes('/auth/login') && !config.url?.includes('/auth/refresh')) {
-    headers.set('Authorization', `Bearer ${token}`)
+  // Echo the CSRF token cookie back in the header for state-changing requests.
+  const method = (config.method ?? '').toUpperCase()
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = getCsrfTokenFromCookie()
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken)
+    }
   }
 
   config.headers = headers
   return config
 })
 
-async function refreshToken(): Promise<boolean> {
-  const refresh = localStorage.getItem('i9pay:auth:refreshToken')
-  if (!refresh) return false
+// ---- Response interceptor ----
+// Handles 401 with a single silent refresh attempt, then redirects to /login
+// on failure. Redirects to /maintenance on 503.
+let isRefreshing = false
+let refreshPromise: Promise<boolean> | null = null
 
-  try {
-    const { data } = await axios.post<TokenPair>('/api/v1/auth/refresh', {
-      refresh_token: refresh,
-    })
-    localStorage.setItem('i9pay:auth:accessToken', data.access_token)
-    localStorage.setItem('i9pay:auth:refreshToken', data.refresh_token)
-    return true
-  } catch (error) {
-    // Clear auth on refresh failure
-    localStorage.removeItem('i9pay:auth:accessToken')
-    localStorage.removeItem('i9pay:auth:refreshToken')
-    return false
-  }
-}
-
-// Response interceptor: auto-refresh on 401, redirect on 503
 http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const config = error.config as RetryableRequestConfig | undefined
 
-    // Redirect to maintenance page on 503
     if (error.response?.status === 503) {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/maintenance'
-      }
+      if (typeof window !== 'undefined') window.location.href = '/maintenance'
       return Promise.reject(error)
     }
 
-    // Check if this is an auth endpoint
     const isAuthEndpoint =
       config?.url?.includes('/auth/login') ||
       config?.url?.includes('/auth/refresh') ||
+      config?.url?.includes('/auth/logout') ||
       config?.url?.includes('/auth/select-organization')
 
-    // Auto-refresh on 401 (unless already retried or is auth endpoint)
     if (error.response?.status === 401 && config && !config._retry && !isAuthEndpoint) {
       config._retry = true
 
       if (!isRefreshing) {
         isRefreshing = true
-        refreshPromise = refreshToken().finally(() => {
+        refreshPromise = silentRefresh().finally(() => {
           isRefreshing = false
           refreshPromise = null
         })
@@ -90,24 +75,28 @@ http.interceptors.response.use(
 
       const refreshed = await refreshPromise
       if (refreshed) {
-        const newToken = localStorage.getItem('i9pay:auth:accessToken')
-        const headers = config.headers ?? new AxiosHeaders()
-        headers.set('Authorization', `Bearer ${newToken}`)
-        config.headers = headers
+        // Retry the original request — the new access token is in the cookie,
+        // no need to update any header manually.
         return http(config)
       }
 
-      // Refresh failed — clear session and redirect to login
-      localStorage.removeItem('i9pay:auth:accessToken')
-      localStorage.removeItem('i9pay:auth:refreshToken')
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login'
-      }
+      if (typeof window !== 'undefined') window.location.href = '/login'
     }
 
     return Promise.reject(normalizeError(error))
   },
 )
+
+// Attempts a silent token refresh using the HttpOnly refresh cookie.
+// Returns true on success, false on any failure.
+async function silentRefresh(): Promise<boolean> {
+  try {
+    await http.post<TokenPair>('/v1/auth/refresh', {})
+    return true
+  } catch {
+    return false
+  }
+}
 
 export function normalizeError(error: AxiosError): ApiError {
   if (error.response) {
@@ -115,7 +104,6 @@ export function normalizeError(error: AxiosError): ApiError {
       status: number
       data: { error?: string; errors?: ApiValidationError[] }
     }
-    // Sanitize error message to prevent reflected XSS from server-controlled strings
     const rawMessage = data?.error || error.message || 'Erro desconhecido'
     const message = typeof rawMessage === 'string' ? rawMessage.slice(0, 500) : 'Erro desconhecido'
 
@@ -124,7 +112,6 @@ export function normalizeError(error: AxiosError): ApiError {
     if (status === 400 && Array.isArray(data?.errors) && data.errors.length > 0) {
       apiError.validationErrors = {}
       for (const ve of data.errors) {
-        // Sanitize validation error messages too
         if (ve.field && typeof ve.field === 'string' && typeof ve.message === 'string') {
           apiError.validationErrors[ve.field.slice(0, 100)] = ve.message.slice(0, 500)
         }
@@ -134,23 +121,22 @@ export function normalizeError(error: AxiosError): ApiError {
     return apiError
   }
 
-  // Network error or no response
-  return {
-    message: 'Erro de conexão com o servidor',
-    status: 0,
-  }
+  return { message: 'Erro de conexão com o servidor', status: 0 }
 }
 
 /**
- * Generate a UUID v4 using crypto.randomUUID() for cryptographically
- * strong randomness. Falls back to Math.random-based implementation
- * in environments where crypto is unavailable.
+ * Read the non-HttpOnly "csrf_token" cookie set by the server on login.
+ * JavaScript can read it to echo back in X-CSRF-Token (Double Submit Cookie).
  */
+function getCsrfTokenFromCookie(): string | null {
+  const match = document.cookie.split('; ').find((c) => c.startsWith('csrf_token='))
+  return match ? decodeURIComponent(match.split('=')[1]) : null
+}
+
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
-  // Fallback for environments without crypto.randomUUID
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
     const v = c === 'x' ? r : (r & 0x3) | 0x8
@@ -159,8 +145,7 @@ function generateUUID(): string {
 }
 
 /**
- * Add X-Idempotency-Key header for idempotent operations
- * Use for POST and PATCH requests that should be idempotent
+ * Add X-Idempotency-Key header for idempotent POST/PATCH operations.
  */
 export function withIdempotencyKey(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
   const headers = config.headers ?? new AxiosHeaders()
@@ -173,12 +158,9 @@ export function withIdempotencyKey(config: InternalAxiosRequestConfig): Internal
 
 /**
  * Typed API helpers that unwrap AxiosResponse automatically.
- * Use instead of `http` when you want the response body directly,
- * avoiding the `response.data` boilerplate on every call.
  *
  * @example
  * const customers = await api.get<PagedResponse<Customer>>('/v1/customers')
- * customers.data // Customer[]  — no double .data needed
  */
 export const api = {
   get: <T>(url: string, config?: Parameters<typeof http.get>[1]): Promise<T> =>

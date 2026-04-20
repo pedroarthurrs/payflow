@@ -453,9 +453,11 @@ func TestGatewayRefund_Success_ReturnsUpdatedPayment(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+		return
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
+		return
 	}
 	if result.Status != domain.StatusRefunded {
 		t.Errorf("expected refunded status in result, got %s", result.Status)

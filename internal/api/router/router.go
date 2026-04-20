@@ -49,6 +49,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	r := gin.New()
 	r.RedirectTrailingSlash = false
 	r.RedirectFixedPath = false
+	r.Use(middleware.CORS(cfg.AllowedOrigins))
 	r.Use(middleware.Recovery())
 	r.Use(monitor.Middleware())
 	r.Use(middleware.RequestID())
@@ -150,7 +151,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 
 	// Handlers
 	rootHandler := handler.NewRootHandler()
-	authHandler := handler.NewAuthHandler(authSvc, loginRL)
+	authHandler := handler.NewAuthHandler(authSvc, loginRL, cfg.IsProduction)
 	healthHandler := handler.NewHealthHandler(adapters.HealthCheck, maintenanceProvider)
 	meHandler := handler.NewMeHandler(permSvc)
 	customerHandler := handler.NewCustomerHandler(customerSvc)
@@ -180,6 +181,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger, adapters Adapters) *gin.
 	// Rotas protegidas
 	protected := v1.Group("/")
 	protected.Use(middleware.Auth(tokenSvc))
+	protected.Use(middleware.CSRFProtect(cfg.IsProduction))
 	protected.Use(middleware.Idempotency(idempotencyRepo))
 	protected.Use(middleware.CredentialLog(credentialLogRepo))
 	protected.Use(middleware.MemberLog(memberLogRepo))
