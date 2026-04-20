@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/core/components/ui/button';
+import { useRouter } from 'vue-router';
 
 const router = useRouter()
 </script>

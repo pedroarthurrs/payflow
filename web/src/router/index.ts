@@ -1,6 +1,9 @@
-import { useAuthStore } from '@/stores/auth'
-import { useStatusStore } from '@/stores/status'
-import type { Role } from '@/types'
+import type { Role } from '@/core/types'
+import { authRoutes } from '@/modules/auth/router'
+import { useAuthStore } from '@/modules/auth/store/auth'
+import { useStatusStore } from '@/modules/auth/store/status'
+import { customerRoutes } from '@/modules/customers/router'
+import { memberRoutes } from '@/modules/members/router'
 import { createRouter, createWebHistory } from 'vue-router'
 
 declare module 'vue-router' {
@@ -25,69 +28,17 @@ const router = createRouter({
       path: '/',
       redirect: '/dashboard',
     },
-    {
-      path: '/login',
-      component: () => import('@/views/login/LoginView.vue'),
-      meta: { guestOnly: true },
-    },
-    {
-      path: '/select-organization',
-      component: () => import('@/views/login/SelectOrganizationView.vue'),
-      meta: { guestOnly: true },
-    },
+    ...authRoutes,
     {
       path: '/dashboard',
       component: () => import('@/views/dashboard/DashboardView.vue'),
       meta: { requiresAuth: true, keepAlive: true },
     },
-    {
-      path: '/customers',
-      component: () => import('@/views/customers/CustomerListView.vue'),
-      meta: { requiresAuth: true, keepAlive: true },
-    },
-    {
-      path: '/customers/new',
-      component: () => import('@/views/customers/CustomerListView.vue'),
-      meta: { requiresAuth: true, keepAlive: true },
-    },
-    {
-      path: '/customers/:id',
-      component: () => import('@/views/customers/CustomerDetailView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/customers/:id/edit',
-      component: () => import('@/views/customers/CustomerFormView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/customers/:id/addresses/new',
-      component: () => import('@/views/addresses/AddressFormView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/customers/:id/addresses/:addressId/edit',
-      component: () => import('@/views/addresses/AddressFormView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/members',
-      component: () => import('@/views/members/MemberListView.vue'),
-      meta: { requiresAuth: true, requiredRole: 'admin', keepAlive: true },
-    },
-    {
-      path: '/members/new',
-      component: () => import('@/views/members/MemberListView.vue'),
-      meta: { requiresAuth: true, requiredRole: 'owner', keepAlive: true },
-    },
-    {
-      path: '/members/:id/edit',
-      component: () => import('@/views/members/MemberFormView.vue'),
-      meta: { requiresAuth: true, requiredRole: 'owner' },
-    },
+    ...customerRoutes,
+    ...memberRoutes,
     {
       path: '/403',
-      component: () => import('@/components/AccessDenied.vue'),
+      component: () => import('@/core/components/AccessDenied.vue'),
       meta: { requiresAuth: true },
     },
     {

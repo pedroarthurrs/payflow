@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { useAuthStore } from '@/modules/auth/store/auth'
+import { useStatusStore } from '@/modules/auth/store/status'
 import { createPinia, setActivePinia } from 'pinia'
-import { useAuthStore } from '@/stores/auth'
-import { useStatusStore } from '@/stores/status'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import router from './index'
 
 function authenticateAs(

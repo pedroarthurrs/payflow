@@ -13,9 +13,9 @@
   "iconLibrary": "hugeicons",
   "rtl": false,
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
+    "components": "@/core/components/",
+    "utils": "@/core/utils/formatting";,
+    "ui": "@/core/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

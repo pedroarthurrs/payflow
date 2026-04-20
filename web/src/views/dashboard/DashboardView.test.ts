@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock http
-vi.mock('@/services/http', () => ({
+vi.mock('@/api/http', () => ({
   default: { get: vi.fn() },
 }))
 
 import DashboardView from './DashboardView.vue'
 
 async function getHttp() {
-  return (await import('@/services/http')).default
+  return (await import('@/core/api/http')).default
 }
 
 describe('DashboardView', () => {

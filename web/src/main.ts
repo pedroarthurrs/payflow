@@ -1,9 +1,10 @@
-import { createApp } from 'vue'
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { createPinia } from 'pinia'
-import './assets/index.css'
+import { createApp } from 'vue'
 import App from './App.vue'
+import './core/assets/index.css'
+import { useAuthStore } from './modules/auth/store/auth'
 import router from './router'
-import { useAuthStore } from './stores/auth'
 
 document.documentElement.classList.add('dark')
 
@@ -15,5 +16,16 @@ app.use(pinia)
 const authStore = useAuthStore()
 authStore.loadFromStorage()
 
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 60_000,
+            gcTime: 5 * 60_000,
+            retry: 1,
+        },
+    },
+})
+
+app.use(VueQueryPlugin, { queryClient })
 app.use(router)
 app.mount('#app')

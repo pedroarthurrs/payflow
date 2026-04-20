@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { api } from '@/services/http'
-import type { MeResponse, Customer, User, ApiError, PagedResponse } from '@/types'
-import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import { Button } from '@/components/ui/button'
-import { useErrorHandler } from '@/composables/useErrorHandler'
+import { api } from '@/core/api/http'
+import LoadingSpinner from '@/core/components/LoadingSpinner.vue'
+import { Button } from '@/core/components/ui/button'
+import { useErrorHandler } from '@/core/composables/useErrorHandler'
+import type { ApiError, Customer, MeResponse, PagedResponse, User } from '@/core/types'
+import { onMounted, ref } from 'vue'
 
 const loading = ref(false)
 const error = ref<string | null>(null)
