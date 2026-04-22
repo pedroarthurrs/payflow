@@ -3,6 +3,7 @@ module i9pay
 go 1.26.1
 
 require (
+	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/getsentry/sentry-go v0.44.1
 	github.com/getsentry/sentry-go/gin v0.44.1
 	github.com/gin-gonic/gin v1.12.0

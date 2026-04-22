@@ -7,7 +7,7 @@ DOCKER_COMPOSE_DEV = deploy/docker/dev/docker-compose.yml
 MIGRATIONS_PATH = deploy/migrations
 DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?sslmode=disable
 
-.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test coverage lint vet fmt check setup-hooks help
+.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test coverage lint vet fmt check setup-hooks seed help
 
 # --- DOCKER COMMANDS ---
 
@@ -36,6 +36,10 @@ sqlc:
 ## tidy: Limpa e atualiza as dependências do Go
 tidy:
 	go mod tidy
+
+## seed: Popula o banco de dados com dados de desenvolvimento (apenas dev)
+seed:
+	DB_HOST=localhost DB_PORT=5433 go run ./cmd/seed $(SEED_FLAGS)
 
 ## test: Roda os testes do projeto
 test:
