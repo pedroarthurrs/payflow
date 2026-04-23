@@ -51,10 +51,17 @@ make build-dev
 
 Este comando constrói as imagens Docker, sobe os containers (API + PostgreSQL + frontend) e aplica as migrations automaticamente.
 
-No ambiente de desenvolvimento, um usuário de teste é criado automaticamente no primeiro bootstrap do banco:
+Após subir os containers, popule o banco com dados de desenvolvimento:
+
+```bash
+make seed
+```
+
+Isso cria organizações, usuários, clientes, produtos, assinaturas, faturas e pagamentos fake. O usuário fixo `dev@i9pay.local` é criado como `owner` da primeira organização e `admin` das restantes.
+
 - Email: `dev@i9pay.local`
 - Senha: `Dev@123456`
-- Role: `owner`
+- Role: `owner` da primeira, `admin` das restantes
 
 | Serviço | URL |
 |---------|-----|

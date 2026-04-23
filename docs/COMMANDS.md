@@ -74,6 +74,37 @@ Reverte a última migration aplicada.
 make migrate-down
 ```
 
+### `make seed`
+
+Popula o banco com dados fake para desenvolvimento.
+
+```bash
+make seed
+```
+
+Cria organizações, usuários, clientes, produtos, planos, assinaturas, faturas, pagamentos, wallets e entradas de ledger. O usuário `dev@i9pay.local` (senha `Dev@123456`) é inserido como `owner` da primeira organização e `admin` das restantes.
+
+Volumetria customizável via flags:
+
+```bash
+SEED_FLAGS="-orgs 3 -customers-per-org 20" make seed
+```
+
+| Flag | Padrão | Descrição |
+|------|--------|-----------|
+| `-orgs` | `2` | Número de organizações |
+| `-users-per-org` | `15` | Usuários por organização |
+| `-customers-per-org` | `50` | Clientes por organização |
+| `-products-per-org` | `5` | Produtos por organização |
+| `-plans-per-product` | `7` | Planos por produto |
+| `-subs-per-customer` | `3` | Assinaturas por cliente |
+| `-invoices-per-sub` | `6` | Faturas por assinatura |
+| `-payments-per-invoice` | `3` | Pagamentos por fatura |
+
+> O seed é idempotente para o usuário dev (upsert), mas insere novos dados a cada execução para os demais registros. Use `make remove` + `make dev` para limpar tudo antes de resetar.
+
+---
+
 ### `make migrate-create`
 
 Cria um novo par de arquivos de migration.
