@@ -3,7 +3,7 @@ import { api } from '@/core/api/http'
 import LoadingSpinner from '@/core/components/LoadingSpinner.vue'
 import { Button } from '@/core/components/ui/button'
 import { useErrorHandler } from '@/core/composables/useErrorHandler'
-import type { ApiError, Customer, MeResponse, PagedResponse, User } from '@/core/types'
+import type { ApiError, Customer, PagedResponse, User } from '@/core/types'
 import { onMounted, ref } from 'vue'
 
 const loading = ref(false)
@@ -19,13 +19,11 @@ async function fetchData() {
   error.value = null
 
   try {
-    const [me, customers, members] = await Promise.all([
-      api.get<MeResponse>('/v1/me'),
+    const [customers, members] = await Promise.all([
       api.get<PagedResponse<Customer>>('/v1/customers'),
       api.get<PagedResponse<User>>('/v1/members'),
     ])
 
-    organizationId.value = me.organization_id
     customerCount.value = customers.data.length
     userCount.value = members.data.length
   } catch (e: any) {
@@ -56,11 +54,6 @@ onMounted(fetchData)
     </div>
 
     <div v-else class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="bg-card border border-border rounded-lg p-6 shadow-sm">
-        <h2 class="text-sm font-medium text-muted-foreground mb-2">Organização</h2>
-        <p class="text-2xl font-bold text-foreground break-all">{{ organizationId }}</p>
-      </div>
-
       <div class="bg-card border border-border rounded-lg p-6 shadow-sm">
         <h2 class="text-sm font-medium text-muted-foreground mb-2">Clientes</h2>
         <p class="text-2xl font-bold text-foreground break-all">{{ customerCount }}</p>

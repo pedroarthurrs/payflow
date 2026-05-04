@@ -139,7 +139,7 @@ function handleLogout() {
         <Separator class="mt-auto bg-sidebar-border" />
         <button
           :class="cn(
-            'group relative flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-left text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            'group relative flex justify-center w-full items-center gap-3 rounded-none px-3 py-2.5 text-left text-base transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
             sidebarCollapsed && 'md:justify-center md:px-2'
           )"
           @click="handleLogout"

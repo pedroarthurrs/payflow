@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import FormField from '@/core/components/FormField.vue'
+import PixelBlast from '@/core/components/PixelBlast.vue'
 import { Button } from '@/core/components/ui/button'
 import { useAuth } from '@/core/composables/useAuth'
 import type { ApiError } from '@/core/types'
@@ -41,8 +42,26 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <div class="flex min-h-svh items-center justify-center bg-background px-4">
-    <div class="w-full max-w-sm rounded-xl border bg-card p-8 shadow-sm">
+  <div class="relative flex min-h-svh items-center justify-center bg-background px-4">
+    <!-- PixelBlast Background -->
+    <div class="fixed inset-0 z-0">
+      <PixelBlast
+        variant="square"
+        :pixel-size="10"
+        color="#bfbebd"
+        :pattern-scale="0.5"
+        :pattern-density="1"
+        :speed="0.25"
+        :pixel-size-jitter="2"
+        :enable-ripples="false"
+        :ripple-intensity-scale="0.8"
+        :edge-fade="0"
+        transparent
+      />
+    </div>
+
+    <!-- Login Card -->
+    <div class="relative z-10 w-full max-w-sm rounded-xl border backdrop-blur-md p-8 shadow-lg">
       <h1 class="mb-6 text-center text-3xl font-bold text-foreground">i9pay</h1>
       <form class="flex flex-col" novalidate @submit.prevent="onSubmit">
         <FormField
