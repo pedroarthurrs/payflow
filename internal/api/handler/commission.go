@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"i9pay/internal/api/dto"
-	apierr "i9pay/internal/api/err"
-	"i9pay/internal/api/middleware"
-	"i9pay/internal/domain"
+	"payflow/internal/api/dto"
+	apierr "payflow/internal/api/err"
+	"payflow/internal/api/middleware"
+	"payflow/internal/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

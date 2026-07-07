@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
-	addressdb "i9pay/internal/database/dbgen/address"
-	"i9pay/internal/domain"
+	addressdb "payflow/internal/database/dbgen/address"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

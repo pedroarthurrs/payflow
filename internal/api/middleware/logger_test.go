@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"i9pay/internal/auth/token"
+	"payflow/internal/auth/token"
 
 	"github.com/gin-gonic/gin"
 )

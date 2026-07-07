@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
-	plandb "i9pay/internal/database/dbgen/plan"
-	"i9pay/internal/domain"
+	plandb "payflow/internal/database/dbgen/plan"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

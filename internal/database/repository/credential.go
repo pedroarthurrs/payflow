@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	credentialdb "i9pay/internal/database/dbgen/credential"
-	credentiallogdb "i9pay/internal/database/dbgen/credentiallog"
-	"i9pay/internal/domain"
+	credentialdb "payflow/internal/database/dbgen/credential"
+	credentiallogdb "payflow/internal/database/dbgen/credentiallog"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"

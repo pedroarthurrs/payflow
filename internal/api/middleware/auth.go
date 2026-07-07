@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	i9token "i9pay/internal/auth/token"
+	i9token "payflow/internal/auth/token"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,7 +16,7 @@ const ClaimsKey = "claims"
 // Auth returns a middleware that validates a Bearer access token on every
 // request. It accepts the token from two sources, tried in order:
 //  1. Authorization: Bearer <token>  — used by API key / programmatic clients.
-//  2. "i9pay_access_token" HttpOnly cookie — used by browser clients.
+//  2. "payflow_access_token" HttpOnly cookie — used by browser clients.
 //
 // On success the parsed *token.Claims are stored in the context under ClaimsKey
 // and the next handler in the chain is called. On failure the request is
@@ -58,10 +58,10 @@ func tokenFromBearer(c *gin.Context) string {
 	return parts[1]
 }
 
-// tokenFromCookie extracts a token from the "i9pay_access_token" HttpOnly cookie.
+// tokenFromCookie extracts a token from the "payflow_access_token" HttpOnly cookie.
 // Returns an empty string if the cookie is absent.
 func tokenFromCookie(c *gin.Context) string {
-	cookie, err := c.Cookie("i9pay_access_token")
+	cookie, err := c.Cookie("payflow_access_token")
 	if err != nil {
 		return ""
 	}

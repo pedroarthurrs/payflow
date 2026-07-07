@@ -64,7 +64,7 @@ function handleLogout() {
       )"
     >
       <div class="flex items-center justify-between border-b border-sidebar-border px-3 py-3">
-        <span :class="cn('text-xl font-extrabold tracking-tight', sidebarCollapsed && 'md:hidden')">i9pay</span>
+        <span :class="cn('text-xl font-extrabold tracking-tight', sidebarCollapsed && 'md:hidden')">payflow</span>
         <Button
           variant="ghost"
           size="icon"

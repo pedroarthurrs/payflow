@@ -2,7 +2,7 @@
 
 ## Visão Geral
 
-O banco de dados do i9pay é estruturado em torno da entidade `organizations`, que isola todos os dados por tenant. Cada tabela possui `organization_id` como chave de particionamento lógico, garantindo isolamento multi-tenant.
+O banco de dados do PayFlow é estruturado em torno da entidade `organizations`, que isola todos os dados por tenant. Cada tabela possui `organization_id` como chave de particionamento lógico, garantindo isolamento multi-tenant.
 
 ## Diagrama de Entidade-Relacionamento
 

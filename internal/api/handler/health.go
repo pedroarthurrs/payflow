@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"i9pay/internal/api/middleware"
-	"i9pay/internal/database"
+	"payflow/internal/api/middleware"
+	"payflow/internal/database"
 
 	"github.com/gin-gonic/gin"
 )

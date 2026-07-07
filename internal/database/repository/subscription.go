@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	subscriptiondb "i9pay/internal/database/dbgen/subscription"
-	"i9pay/internal/domain"
+	subscriptiondb "payflow/internal/database/dbgen/subscription"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

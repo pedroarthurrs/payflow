@@ -7,7 +7,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"i9pay/internal/domain"
+	"payflow/internal/domain"
 )
 
 // CleanupWorker executa tarefas periódicas de limpeza de dados antigos.

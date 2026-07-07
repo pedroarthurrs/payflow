@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"i9pay/internal/api/middleware"
-	paymentdb "i9pay/internal/database/dbgen/payment"
-	"i9pay/internal/database/repository"
-	"i9pay/internal/domain"
-	"i9pay/internal/service"
+	"payflow/internal/api/middleware"
+	paymentdb "payflow/internal/database/dbgen/payment"
+	"payflow/internal/database/repository"
+	"payflow/internal/domain"
+	"payflow/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

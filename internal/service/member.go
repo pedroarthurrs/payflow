@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"i9pay/internal/crypto"
-	"i9pay/internal/domain"
+	"payflow/internal/crypto"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

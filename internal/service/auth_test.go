@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"i9pay/internal/auth/token"
-	"i9pay/internal/domain"
+	"payflow/internal/auth/token"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"

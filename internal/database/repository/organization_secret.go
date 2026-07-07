@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	organizationdb "i9pay/internal/database/dbgen/organization"
-	"i9pay/internal/domain"
+	organizationdb "payflow/internal/database/dbgen/organization"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

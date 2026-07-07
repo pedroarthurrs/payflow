@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
-	memberlogdb "i9pay/internal/database/dbgen/memberlog"
-	"i9pay/internal/domain"
+	memberlogdb "payflow/internal/database/dbgen/memberlog"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"

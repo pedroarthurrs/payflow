@@ -1,10 +1,10 @@
-# i9pay
+# PayFlow
 
 API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-tenant.
 
 ## Visão Geral
 
-i9pay é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, pagamentos, carteiras e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
+PayFlow é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, pagamentos, carteiras e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
 
 Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Vue 3 | TypeScript | Docker
 
@@ -13,7 +13,7 @@ Stack: Go 1.26.1 | Gin | PostgreSQL | SQLC | JWT | Vue 3 | TypeScript | Docker
 ```bash
 # 1. Clone o repositório
 git clone <repository-url>
-cd i9pay
+cd payflow
 
 # 2. Configure os Git hooks do projeto
 make setup-hooks
@@ -45,7 +45,7 @@ curl http://localhost:8080/v1/live
 ## Estrutura de Pastas
 
 ```
-i9pay/
+payflow/
 ├── cmd/server/               — ponto de entrada (main.go)
 ├── deploy/
 │   ├── docker/               — Dockerfiles (dev/prod)

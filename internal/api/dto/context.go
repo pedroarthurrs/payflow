@@ -1,9 +1,9 @@
 package dto
 
 import (
-	apierr "i9pay/internal/api/err"
-	"i9pay/internal/api/middleware"
-	"i9pay/internal/auth/token"
+	apierr "payflow/internal/api/err"
+	"payflow/internal/api/middleware"
+	"payflow/internal/auth/token"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

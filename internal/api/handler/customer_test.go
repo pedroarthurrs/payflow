@@ -12,11 +12,11 @@ import (
 	"testing/quick"
 	"time"
 
-	apierr "i9pay/internal/api/err"
-	"i9pay/internal/api/middleware"
-	customerdb "i9pay/internal/database/dbgen/customer"
-	"i9pay/internal/database/repository"
-	"i9pay/internal/service"
+	apierr "payflow/internal/api/err"
+	"payflow/internal/api/middleware"
+	customerdb "payflow/internal/database/dbgen/customer"
+	"payflow/internal/database/repository"
+	"payflow/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

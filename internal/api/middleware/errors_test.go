@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	apierr "i9pay/internal/api/err"
+	apierr "payflow/internal/api/err"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"

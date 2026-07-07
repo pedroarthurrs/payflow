@@ -1,6 +1,6 @@
 // Package main provides a development-only database seeder.
 // It generates realistic fake data using gofakeit and respects the full
-// FK dependency tree of the i9pay schema.
+// FK dependency tree of the payflow schema.
 //
 // Usage:
 //
@@ -32,13 +32,13 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 
-	"i9pay/internal/config"
+	"payflow/internal/config"
 )
 
 // devPasswordHash is bcrypt(cost=10) of "Dev@123456".
 const devPasswordHash = "$2a$10$U2ShqBynvPjAUiCnPTypnO6Hjs4IwsLU7dJAmcU.qQkUXfeWBXU1e"
 
-// devUserID is the fixed UUID for the shared dev@i9pay.local user.
+// devUserID is the fixed UUID for the shared dev@payflow.local user.
 var devUserID = uuid.MustParse("a0000001-0000-0000-0000-000000000001")
 
 // seedConfig controls the volume of generated data.
@@ -103,8 +103,8 @@ func run(ctx context.Context, db *sql.DB, fake *gofakeit.Faker, sc *seedConfig) 
 		return fmt.Errorf("organizations: %w", err)
 	}
 
-	// 2a. Fixed dev user (dev@i9pay.local) — member of all orgs
-	slog.Info("seeding dev user", "email", "dev@i9pay.local")
+	// 2a. Fixed dev user (dev@payflow.local) — member of all orgs
+	slog.Info("seeding dev user", "email", "dev@payflow.local")
 	if err := seedDevUser(ctx, db, orgIDs); err != nil {
 		return fmt.Errorf("dev user: %w", err)
 	}
@@ -209,12 +209,12 @@ func seedOrganizations(ctx context.Context, db *sql.DB, fake *gofakeit.Faker, n 
 
 // ─── Fixed dev user ─────────────────────────────────────────────────────────
 
-// seedDevUser inserts dev@i9pay.local with a fixed UUID and adds it as a
+// seedDevUser inserts dev@payflow.local with a fixed UUID and adds it as a
 // member of every generated organization: owner of the first, admin of the rest.
 func seedDevUser(ctx context.Context, db *sql.DB, orgIDs []uuid.UUID) error {
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO "user" (id, email, name, password)
-		VALUES ($1, 'dev@i9pay.local', 'Dev User', $2)
+		VALUES ($1, 'dev@payflow.local', 'Dev User', $2)
 		ON CONFLICT (email) DO UPDATE SET
 			name     = EXCLUDED.name,
 			password = EXCLUDED.password,

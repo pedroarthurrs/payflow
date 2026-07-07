@@ -22,6 +22,6 @@ func (h *RootHandler) RegisterRoutes(rg *gin.RouterGroup) {
 // Get returns basic API information.
 func (h *RootHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"name": "i9pay",
+		"name": "payflow",
 	})
 }

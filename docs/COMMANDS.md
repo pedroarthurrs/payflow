@@ -82,7 +82,7 @@ Popula o banco com dados fake para desenvolvimento.
 make seed
 ```
 
-Cria organizações, usuários, clientes, produtos, planos, assinaturas, faturas, pagamentos, wallets e entradas de ledger. O usuário `dev@i9pay.local` (senha `Dev@123456`) é inserido como `owner` da primeira organização e `admin` das restantes.
+Cria organizações, usuários, clientes, produtos, planos, assinaturas, faturas, pagamentos, wallets e entradas de ledger. O usuário `dev@payflow.local` (senha `Dev@123456`) é inserido como `owner` da primeira organização e `admin` das restantes.
 
 Volumetria customizável via flags:
 

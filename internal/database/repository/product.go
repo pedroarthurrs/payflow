@@ -6,8 +6,8 @@ import (
 	"errors"
 	"log/slog"
 
-	productdb "i9pay/internal/database/dbgen/product"
-	"i9pay/internal/domain"
+	productdb "payflow/internal/database/dbgen/product"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"

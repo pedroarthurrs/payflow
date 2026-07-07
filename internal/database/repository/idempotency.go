@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	idempotencydb "i9pay/internal/database/dbgen/idempotency"
-	"i9pay/internal/domain"
+	idempotencydb "payflow/internal/database/dbgen/idempotency"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"

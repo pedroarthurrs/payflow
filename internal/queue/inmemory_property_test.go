@@ -7,7 +7,7 @@ import (
 	"time"
 	"unicode"
 
-	"i9pay/internal/domain"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"pgregory.net/rapid"

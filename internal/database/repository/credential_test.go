@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	credentiallogdb "i9pay/internal/database/dbgen/credentiallog"
-	"i9pay/internal/domain"
+	credentiallogdb "payflow/internal/database/dbgen/credentiallog"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

@@ -47,7 +47,7 @@ Informações básicas sobre a API.
 **Resposta (200 OK):**
 ```json
 {
-  "name": "i9pay"
+  "name": "PayFlow"
 }
 ```
 
@@ -2093,7 +2093,7 @@ A URL deve usar HTTPS.
 **Requisição:**
 ```json
 {
-  "url": "https://meu-sistema.com/webhooks/i9pay",
+  "url": "https://meu-sistema.com/webhooks/payflow",
   "description": "Notificações de pagamento",
   "enabled_events": ["invoice.paid", "invoice.payment_failed"],
   "environment": "production"
@@ -2114,7 +2114,7 @@ subscription.created  subscription.updated  subscription.canceled
 {
   "id": "550e8400-e29b-41d4-a716-446655440060",
   "organization_id": "550e8400-e29b-41d4-a716-446655440000",
-  "url": "https://meu-sistema.com/webhooks/i9pay",
+  "url": "https://meu-sistema.com/webhooks/payflow",
   "description": "Notificações de pagamento",
   "enabled_events": ["invoice.paid", "invoice.payment_failed"],
   "environment": "production",
@@ -2136,7 +2136,7 @@ Lista os endpoints de webhook da organization. Requer role `admin` ou superior.
   {
     "id": "550e8400-e29b-41d4-a716-446655440060",
     "organization_id": "550e8400-e29b-41d4-a716-446655440000",
-    "url": "https://meu-sistema.com/webhooks/i9pay",
+    "url": "https://meu-sistema.com/webhooks/payflow",
     "description": "Notificações de pagamento",
     "enabled_events": ["invoice.paid", "invoice.payment_failed"],
     "environment": "production",
@@ -2444,7 +2444,7 @@ Além dos roles, o sistema oferece **permissões granulares** gerenciadas via `/
   {
     "sub": "550e8400-e29b-41d4-a716-446655440000",
     "token_type": "access",
-    "iss": "i9pay",
+    "iss": "payflow",
     "iat": 1615634400,
     "exp": 1615635300
   }
@@ -2459,7 +2459,7 @@ Além dos roles, o sistema oferece **permissões granulares** gerenciadas via `/
   {
     "sub": "550e8400-e29b-41d4-a716-446655440000",
     "token_type": "refresh",
-    "iss": "i9pay",
+    "iss": "payflow",
     "iat": 1615634400,
     "exp": 1622016000
   }

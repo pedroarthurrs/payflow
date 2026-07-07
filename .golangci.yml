@@ -43,7 +43,7 @@ formatters:
     gofmt:
       simplify: true
     goimports:
-      local-prefixes: i9pay
+      local-prefixes: payflow
 
 issues:
   exclude-rules:

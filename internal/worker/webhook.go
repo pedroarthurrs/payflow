@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"i9pay/internal/crypto"
-	"i9pay/internal/domain"
+	"payflow/internal/crypto"
+	"payflow/internal/domain"
 )
 
 var backoffSchedule = []time.Duration{

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"i9pay/internal/api/middleware"
-	"i9pay/internal/auth/token"
-	"i9pay/internal/domain"
+	"payflow/internal/api/middleware"
+	"payflow/internal/auth/token"
+	"payflow/internal/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,7 +30,7 @@ func buildTestEngine() *gin.Engine {
 
 	// Root route (outside version group)
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"name": "i9pay"})
+		c.JSON(http.StatusOK, gin.H{"name": "payflow"})
 	})
 
 	// Version group /api/v1
@@ -98,8 +98,8 @@ func TestRootRouteOutsideVersionGroup(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET / expected status 200, got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "i9pay") {
-		t.Fatalf("GET / expected body to contain 'i9pay', got %s", w.Body.String())
+	if !strings.Contains(w.Body.String(), "payflow") {
+		t.Fatalf("GET / expected body to contain 'payflow', got %s", w.Body.String())
 	}
 
 	// Verify the root route is registered at "/" not "/api/v1/"
@@ -452,7 +452,7 @@ func buildRequestIDTestEngine() *gin.Engine {
 
 	// Root route
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"name": "i9pay"})
+		c.JSON(http.StatusOK, gin.H{"name": "payflow"})
 	})
 
 	v1 := r.Group("/api/v1")

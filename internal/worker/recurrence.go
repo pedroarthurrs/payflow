@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"i9pay/internal/domain"
-	"i9pay/internal/service"
+	"payflow/internal/domain"
+	"payflow/internal/service"
 
 	"github.com/google/uuid"
 )

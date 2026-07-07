@@ -7,8 +7,8 @@ import (
 	"errors"
 	"log/slog"
 
-	paymentdb "i9pay/internal/database/dbgen/payment"
-	"i9pay/internal/domain"
+	paymentdb "payflow/internal/database/dbgen/payment"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"

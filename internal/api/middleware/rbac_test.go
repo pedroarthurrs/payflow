@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	i9token "i9pay/internal/auth/token"
-	"i9pay/internal/domain"
+	i9token "payflow/internal/auth/token"
+	"payflow/internal/domain"
 
 	"github.com/gin-gonic/gin"
 	"pgregory.net/rapid"

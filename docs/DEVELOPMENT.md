@@ -3,7 +3,7 @@
 ## Estrutura de Pastas
 
 ```
-i9pay/
+payflow/
 ├── cmd/
 │   └── server/               — servidor HTTP principal
 ├── internal/
@@ -67,10 +67,10 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/google/uuid"
 
-    "i9pay/internal/api/dto"
-    apierr "i9pay/internal/api/err"
-    "i9pay/internal/domain"
-    "i9pay/internal/service"
+    "payflow/internal/api/dto"
+    apierr "payflow/internal/api/err"
+    "payflow/internal/domain"
+    "payflow/internal/service"
 )
 
 type PlanHandler struct {
@@ -157,7 +157,7 @@ import (
 
     "github.com/google/uuid"
 
-    "i9pay/internal/domain"
+    "payflow/internal/domain"
 )
 
 type PlanService struct {
@@ -253,8 +253,8 @@ import (
 
     "github.com/google/uuid"
 
-    plandb "i9pay/internal/database/dbgen/plan"
-    "i9pay/internal/domain"
+    plandb "payflow/internal/database/dbgen/plan"
+    "payflow/internal/domain"
 )
 
 type PlanRepo struct {

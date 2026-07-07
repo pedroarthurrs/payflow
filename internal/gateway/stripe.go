@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"i9pay/internal/domain"
+	"payflow/internal/domain"
 )
 
 const stripeBaseURL = "https://api.stripe.com/v1"

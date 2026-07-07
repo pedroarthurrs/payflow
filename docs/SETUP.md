@@ -14,7 +14,7 @@
 ```bash
 # 1. Clone o repositório
 git clone <repository-url>
-cd i9pay
+cd payflow
 
 # 2. Configure os Git hooks do projeto
 make setup-hooks
@@ -57,9 +57,9 @@ Após subir os containers, popule o banco com dados de desenvolvimento:
 make seed
 ```
 
-Isso cria organizações, usuários, clientes, produtos, assinaturas, faturas e pagamentos fake. O usuário fixo `dev@i9pay.local` é criado como `owner` da primeira organização e `admin` das restantes.
+Isso cria organizações, usuários, clientes, produtos, assinaturas, faturas e pagamentos fake. O usuário fixo `dev@payflow.local` é criado como `owner` da primeira organização e `admin` das restantes.
 
-- Email: `dev@i9pay.local`
+- Email: `dev@payflow.local`
 - Senha: `Dev@123456`
 - Role: `owner` da primeira, `admin` das restantes
 
@@ -103,7 +103,7 @@ curl http://localhost:8080/v1/ready
 ```bash
 curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "dev@i9pay.local", "password": "Dev@123456"}'
+  -d '{"email": "dev@payflow.local", "password": "Dev@123456"}'
 ```
 
 ---
@@ -255,7 +255,7 @@ services:
   postgres:
     image: postgres:18-alpine
     variables:
-      POSTGRES_DB: i9pay_test
+      POSTGRES_DB: payflow_test
       POSTGRES_PASSWORD: password
 ```
 
@@ -267,7 +267,7 @@ services:
 
 **Kubernetes:**
 ```bash
-kubectl create secret generic i9pay-secrets \
+kubectl create secret generic payflow-secrets \
   --from-literal=DB_USER=prod_user \
   --from-literal=DB_PASSWORD=secure_password \
   --from-literal=JWT_SECRET=$(openssl rand -base64 32)
@@ -284,7 +284,7 @@ docker run --rm \
   -v "$(pwd)/deploy/migrations:/migrations" \
   migrate/migrate \
   -path /migrations \
-  -database "postgres://user:pass@db:5432/i9pay" \
+  -database "postgres://user:pass@db:5432/payflow" \
   up
 ```
 

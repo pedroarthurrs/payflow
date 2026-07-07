@@ -3,7 +3,7 @@ package database
 import (
 	"testing"
 
-	"i9pay/internal/config"
+	"payflow/internal/config"
 )
 
 func TestBuildDSN_WithDefaultDriver(t *testing.T) {

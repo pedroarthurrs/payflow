@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 
-	authdb "i9pay/internal/database/dbgen/auth"
-	"i9pay/internal/domain"
+	authdb "payflow/internal/database/dbgen/auth"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

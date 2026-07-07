@@ -4,15 +4,15 @@ import (
 	"context"
 	"log/slog"
 
-	"i9pay/internal/database"
-	addressdb "i9pay/internal/database/dbgen/address"
-	credentialdb "i9pay/internal/database/dbgen/credential"
-	customerdb "i9pay/internal/database/dbgen/customer"
-	invoicedb "i9pay/internal/database/dbgen/invoice"
-	paymentdb "i9pay/internal/database/dbgen/payment"
-	subscriptiondb "i9pay/internal/database/dbgen/subscription"
-	walletdb "i9pay/internal/database/dbgen/wallet"
-	"i9pay/internal/domain"
+	"payflow/internal/database"
+	addressdb "payflow/internal/database/dbgen/address"
+	credentialdb "payflow/internal/database/dbgen/credential"
+	customerdb "payflow/internal/database/dbgen/customer"
+	invoicedb "payflow/internal/database/dbgen/invoice"
+	paymentdb "payflow/internal/database/dbgen/payment"
+	subscriptiondb "payflow/internal/database/dbgen/subscription"
+	walletdb "payflow/internal/database/dbgen/wallet"
+	"payflow/internal/domain"
 )
 
 // TxManager implements domain.TxManager using the underlying *sql.DB.

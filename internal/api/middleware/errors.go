@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	apierr "i9pay/internal/api/err"
-	"i9pay/internal/domain"
-	"i9pay/internal/monitor"
+	apierr "payflow/internal/api/err"
+	"payflow/internal/domain"
+	"payflow/internal/monitor"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"

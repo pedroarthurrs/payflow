@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"i9pay/internal/api/middleware"
-	i9token "i9pay/internal/auth/token"
-	"i9pay/internal/domain"
-	"i9pay/internal/service"
+	"payflow/internal/api/middleware"
+	i9token "payflow/internal/auth/token"
+	"payflow/internal/domain"
+	"payflow/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

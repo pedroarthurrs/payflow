@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"i9pay/internal/domain"
+	"payflow/internal/domain"
 )
 
 // New returns the appropriate Gateway implementation based on the provider name.

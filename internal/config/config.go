@@ -30,7 +30,7 @@ type Config struct {
 	GatewayProviderName   string // GATEWAY_PROVIDER_NAME (e.g. "stripe")
 
 	// CORS — comma-separated list of allowed frontend origins.
-	// Example: "https://app.i9pay.io,https://dashboard.i9pay.io"
+	// Example: "https://app.payflow.io,https://dashboard.payflow.io"
 	// In development, defaults to http://localhost:3000.
 	AllowedOrigins []string
 

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"i9pay/internal/config"
+	"payflow/internal/config"
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"

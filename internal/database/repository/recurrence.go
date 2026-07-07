@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	recurrencedb "i9pay/internal/database/dbgen/recurrence"
-	"i9pay/internal/domain"
+	recurrencedb "payflow/internal/database/dbgen/recurrence"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

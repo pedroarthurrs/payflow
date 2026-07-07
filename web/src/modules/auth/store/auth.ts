@@ -8,7 +8,7 @@ import { computed, ref, watch } from 'vue'
 // localStorage stores only non-sensitive user metadata decoded from the JWT.
 // The actual tokens are kept in HttpOnly cookies (set by the backend) and are
 // never accessible to JavaScript — this eliminates the XSS token-theft vector.
-const AUTH_STORAGE_PREFIX = 'i9pay:auth'
+const AUTH_STORAGE_PREFIX = 'payflow:auth'
 const USER_KEY = `${AUTH_STORAGE_PREFIX}:user`
 
 interface AuthUser {
@@ -221,7 +221,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // ---- Token expiry warning ----
-  // Emits "i9pay:tokenExpiring" 5 min before expiry so the UI can notify the user.
+  // Emits "payflow:tokenExpiring" 5 min before expiry so the UI can notify the user.
 
   let expiryWarningTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -240,7 +240,7 @@ export const useAuthStore = defineStore('auth', () => {
     const delay = expiresAt.getTime() - 5 * 60 * 1000 - Date.now()
     if (delay > 0) {
       expiryWarningTimer = setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('i9pay:tokenExpiring', { detail: { expiresAt } }))
+        window.dispatchEvent(new CustomEvent('payflow:tokenExpiring', { detail: { expiresAt } }))
       }, delay)
     }
   }

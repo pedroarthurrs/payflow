@@ -9,6 +9,10 @@ main
 vendor/
 .agents
 
+# Tooling de IA / skills
+.ai/
+skills-lock.json
+
 # IDEs
 .vscode/
 .idea/
@@ -27,3 +31,5 @@ web/tsconfig.*.tsbuildinfo
 # Cobertura de testes
 coverage.out
 coverage.html
+
+graphify-out

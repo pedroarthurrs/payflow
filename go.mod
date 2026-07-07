@@ -1,4 +1,4 @@
-module i9pay
+module payflow
 
 go 1.26.1
 

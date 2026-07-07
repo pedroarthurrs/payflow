@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"time"
 
-	credentiallogdb "i9pay/internal/database/dbgen/credentiallog"
-	idempotencydb "i9pay/internal/database/dbgen/idempotency"
-	webhooklogdb "i9pay/internal/database/dbgen/webhooklog"
-	"i9pay/internal/domain"
+	credentiallogdb "payflow/internal/database/dbgen/credentiallog"
+	idempotencydb "payflow/internal/database/dbgen/idempotency"
+	webhooklogdb "payflow/internal/database/dbgen/webhooklog"
+	"payflow/internal/domain"
 )
 
 // CleanupRepo implements domain.CleanupRepository backed by PostgreSQL via sqlc.

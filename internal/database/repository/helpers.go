@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	addressdb "i9pay/internal/database/dbgen/address"
+	addressdb "payflow/internal/database/dbgen/address"
 
 	"github.com/google/uuid"
 	"github.com/sqlc-dev/pqtype"

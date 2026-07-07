@@ -1,6 +1,6 @@
 package queue
 
-import "i9pay/internal/domain"
+import "payflow/internal/domain"
 
 // New returns a domain.Queue implementation based on the given backend name.
 // Currently only "memory" is supported. Returns nil for unrecognized backends.

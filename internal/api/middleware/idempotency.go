@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	apierr "i9pay/internal/api/err"
-	"i9pay/internal/auth/token"
-	"i9pay/internal/domain"
+	apierr "payflow/internal/api/err"
+	"payflow/internal/auth/token"
+	"payflow/internal/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

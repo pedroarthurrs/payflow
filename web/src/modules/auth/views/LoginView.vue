@@ -62,7 +62,7 @@ const onSubmit = handleSubmit(async (values) => {
 
     <!-- Login Card -->
     <div class="relative z-10 w-full max-w-sm rounded-xl border backdrop-blur-md p-8 shadow-lg">
-      <h1 class="mb-6 text-center text-3xl font-bold text-foreground">i9pay</h1>
+      <h1 class="mb-6 text-center text-3xl font-bold text-foreground">payflow</h1>
       <form class="flex flex-col" novalidate @submit.prevent="onSubmit">
         <FormField
           label="Email"

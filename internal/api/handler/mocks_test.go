@@ -3,9 +3,9 @@ package handler
 import (
 	"context"
 
-	"i9pay/internal/auth/token"
-	"i9pay/internal/domain"
-	"i9pay/internal/service"
+	"payflow/internal/auth/token"
+	"payflow/internal/domain"
+	"payflow/internal/service"
 
 	"github.com/google/uuid"
 )

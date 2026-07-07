@@ -3,7 +3,7 @@ package queue
 import (
 	"context"
 
-	"i9pay/internal/domain"
+	"payflow/internal/domain"
 )
 
 // InMemoryQueue implements domain.Queue using a buffered Go channel.

@@ -1,6 +1,6 @@
 # Segurança e Observabilidade
 
-Documentação das capacidades de segurança e observabilidade implementadas na API i9pay.
+Documentação das capacidades de segurança e observabilidade implementadas na API PayFlow.
 
 ## Visão Geral
 

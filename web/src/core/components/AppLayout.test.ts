@@ -66,7 +66,7 @@ describe('AppLayout', () => {
 
   it('renders header with brand name', async () => {
     const wrapper = await mountLayout()
-    expect(wrapper.find('.header__brand').text()).toBe('i9pay')
+    expect(wrapper.find('.header__brand').text()).toBe('payflow')
   })
 
   it('renders slot content in main area', async () => {

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"log/slog"
 
-	invoicedb "i9pay/internal/database/dbgen/invoice"
-	"i9pay/internal/domain"
+	invoicedb "payflow/internal/database/dbgen/invoice"
+	"payflow/internal/domain"
 
 	"github.com/google/uuid"
 )

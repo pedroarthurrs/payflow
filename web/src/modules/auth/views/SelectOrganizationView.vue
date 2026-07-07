@@ -30,7 +30,7 @@ async function handleSelect(orgId: string) {
 <template>
   <div class="flex min-h-svh items-center justify-center bg-background px-4">
     <div class="w-full max-w-sm rounded-xl border bg-card p-8 shadow-sm">
-      <h1 class="mb-2 text-center text-3xl font-bold text-foreground">i9pay</h1>
+      <h1 class="mb-2 text-center text-3xl font-bold text-foreground">payflow</h1>
       <p class="mb-6 text-center text-sm text-muted-foreground">Selecione a organização para continuar</p>
 
       <div class="flex flex-col gap-3">

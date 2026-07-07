@@ -1,6 +1,6 @@
-# i9pay Web
+# PayFlow Web
 
-Frontend SPA do i9pay, construído com Vue 3 + TypeScript + Vite.
+Frontend SPA do PayFlow, construído com Vue 3 + TypeScript + Vite.
 
 ## Tech Stack
 

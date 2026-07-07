@@ -1,4 +1,4 @@
-// Package token provides JWT creation and validation for i9pay.
+// Package token provides JWT creation and validation for payflow.
 //
 // It defines a Service that issues short-lived access tokens and long-lived
 // refresh tokens, and validates each according to its expected type. Keeping
@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"time"
 
-	"i9pay/internal/domain"
+	"payflow/internal/domain"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -33,7 +33,7 @@ const (
 	// with this token to obtain a full access/refresh pair for the chosen org.
 	TypeOrgSelect TokenType = "org_selection"
 
-	issuer = "i9pay"
+	issuer = "payflow"
 )
 
 // Claims is the JWT payload shared by both access and refresh tokens.

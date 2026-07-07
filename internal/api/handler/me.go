@@ -3,11 +3,11 @@ package handler
 import (
 	"net/http"
 
-	"i9pay/internal/api/err"
-	"i9pay/internal/api/middleware"
-	"i9pay/internal/auth/token"
-	"i9pay/internal/domain"
-	"i9pay/internal/service"
+	"payflow/internal/api/err"
+	"payflow/internal/api/middleware"
+	"payflow/internal/auth/token"
+	"payflow/internal/domain"
+	"payflow/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
