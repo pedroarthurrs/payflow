@@ -2,6 +2,21 @@
 
 API de gerenciamento de pagamentos e assinaturas para plataformas SaaS multi-tenant.
 
+[![CI](https://github.com/pedroarthurrs/payflow/actions/workflows/ci.yml/badge.svg)](https://github.com/pedroarthurrs/payflow/actions/workflows/ci.yml)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
+![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+
+## Destaques Técnicos
+
+- **Ledger imutável** — toda movimentação de saldo gera um `ledger_entry` append-only; saldos são derivados, nunca sobrescritos.
+- **Máquinas de estado (FSM)** para pagamentos (8 estados, `SELECT FOR UPDATE`) e assinaturas, evitando transições inválidas sob concorrência.
+- **Multi-tenancy** com isolamento por `organization_id` em todas as tabelas.
+- **Property-based testing** (17 suítes) além de testes de tabela — **mais código de teste que de produção** (~22k vs ~18k LOC, 524 testes).
+- **Clean Architecture** pragmática (Ports & Adapters): domínio com contratos, infraestrutura em repositórios, queries type-safe geradas por SQLC.
+- **Segurança**: RBAC hierárquico com 30 permissões granulares, JWT + API Key, idempotência (`X-Idempotency-Key`), rate limiting em 3 tiers, webhooks com HMAC-SHA256.
+
 ## Visão Geral
 
 PayFlow é uma plataforma backend desenvolvida em Go 1.26.1 com Gin Framework, projetada para gerenciar organizations, clientes, assinaturas, pagamentos, carteiras e transações. A arquitetura é modular em camadas orientada a princípios de Clean Architecture, com contratos no domínio e implementações de infraestrutura em repositórios (abordagem pragmática de Ports and Adapters).
