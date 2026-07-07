@@ -7,9 +7,29 @@ main
 
 # Dependências
 vendor/
+.agents
+
+# Tooling de IA / skills
+.ai/
+skills-lock.json
 
 # IDEs
 .vscode/
 .idea/
+.kiro/
 
+# AIR
 /tmp
+
+# Node.js / Frontend
+web/node_modules/
+web/dist/
+web/coverage/
+web/*.tsbuildinfo
+web/tsconfig.*.tsbuildinfo
+
+# Cobertura de testes
+coverage.out
+coverage.html
+
+graphify-out

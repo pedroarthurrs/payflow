@@ -1,12 +1,188 @@
 version: "2"
 sql:
-  - schema: "migrations"
-    queries: "internal/database/queries.sql"
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/organization.sql"
     engine: "postgresql"
     gen:
       go:
-        package: "dbgen"
-        out: "internal/database/dbgen"
+        package: "organizationdb"
+        out: "internal/database/dbgen/organization"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/customer.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "customerdb"
+        out: "internal/database/dbgen/customer"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/address.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "addressdb"
+        out: "internal/database/dbgen/address"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/product.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "productdb"
+        out: "internal/database/dbgen/product"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/auth.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "authdb"
+        out: "internal/database/dbgen/auth"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/credentials.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "credentialdb"
+        out: "internal/database/dbgen/credential"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/credential_logs.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "credentiallogdb"
+        out: "internal/database/dbgen/credentiallog"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/webhooks.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "webhookdb"
+        out: "internal/database/dbgen/webhook"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/webhook_logs.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "webhooklogdb"
+        out: "internal/database/dbgen/webhooklog"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/payment_fsm.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "paymentdb"
+        out: "internal/database/dbgen/payment"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/idempotency.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "idempotencydb"
+        out: "internal/database/dbgen/idempotency"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/plan.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "plandb"
+        out: "internal/database/dbgen/plan"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/subscription.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "subscriptiondb"
+        out: "internal/database/dbgen/subscription"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/recurrence.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "recurrencedb"
+        out: "internal/database/dbgen/recurrence"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/member_logs.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "memberlogdb"
+        out: "internal/database/dbgen/memberlog"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/wallet.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "walletdb"
+        out: "internal/database/dbgen/wallet"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: true
+
+  - schema: "deploy/migrations"
+    queries: "internal/database/queries/invoice.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "invoicedb"
+        out: "internal/database/dbgen/invoice"
         emit_json_tags: true
         emit_prepared_queries: false
         emit_interface: true

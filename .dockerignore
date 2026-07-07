@@ -1,0 +1,38 @@
+# IDEs
+.vscode/
+.idea/
+.kiro/
+
+# Git e metadados
+.git
+.gitignore
+.dockerignore
+README.md
+docs/
+
+# Backend (Go)
+bin/
+tmp/
+vendor/
+out/
+.air.toml
+sqlc.yml
+internal/**/testdata/
+**/*_test.go
+
+# Frontend (Node/Web)
+web/node_modules/
+web/dist/
+web/.npm/
+web/pnpm-debug.log*
+web/coverage/
+web/*.tsbuildinfo
+
+# Logs e arquivos de sistema
+*.log
+.DS_Store
+.env*
+*.yml
+
+# Infra e Deploy 
+deploy/

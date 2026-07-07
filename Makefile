@@ -3,11 +3,11 @@ include .env
 export $(shell sed 's/=.*//' .env)
 
 # Variáveis de caminhos
-DOCKER_COMPOSE_DEV = docker/dev/docker-compose.yml
-MIGRATIONS_PATH = migrations
+DOCKER_COMPOSE_DEV = deploy/docker/dev/docker-compose.yml
+MIGRATIONS_PATH = deploy/migrations
 DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?sslmode=disable
 
-.PHONY: dev stop build-dev sqlc migrate-up migrate-down migrate-create tidy test help
+.PHONY: dev down build-dev sqlc migrate-up migrate-down migrate-create tidy test coverage lint vet fmt check setup-hooks seed help
 
 # --- DOCKER COMMANDS ---
 
@@ -15,9 +15,13 @@ DATABASE_URL = postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5433/$(DB_NAME)?ss
 dev:
 	docker compose -f $(DOCKER_COMPOSE_DEV) up
 
-## stop: Para os containers
-stop:
+## down: Para os containers
+down:
 	docker compose -f $(DOCKER_COMPOSE_DEV) down
+
+## remove: Remove os containers
+remove:
+	docker compose -f $(DOCKER_COMPOSE_DEV) down -v --remove-orphans
 
 ## build-dev: Força o build das imagens de dev
 build-dev:
@@ -33,9 +37,32 @@ sqlc:
 tidy:
 	go mod tidy
 
+## seed: Popula o banco de dados com dados de desenvolvimento (apenas dev)
+seed:
+	DB_HOST=localhost DB_PORT=5433 go run ./cmd/seed $(SEED_FLAGS)
+
 ## test: Roda os testes do projeto
 test:
 	go test -v ./...
+
+## coverage: Gera relatório de cobertura de testes (HTML + terminal)
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Relatório HTML gerado em coverage.html"
+
+## lint: Roda o golangci-lint
+lint:
+	golangci-lint run ./...
+
+## vet: Roda o vet do projeto
+vet:
+	go vet -v ./...
+
+## fmt: Formata o código com gofmt
+fmt:
+	gofmt -w .
 
 # --- MIGRATIONS COMMANDS ---
 
@@ -50,6 +77,21 @@ migrate-down:
 ## migrate-create name=exemplo: Cria um novo par de arquivos de migration
 migrate-create:
 	migrate create -ext sql -dir $(MIGRATIONS_PATH) -seq $(name)
+
+# --- QUALITY COMMANDS ---
+
+## check: Roda fmt, tidy, vet, lint e test em sequência
+check:
+	$(MAKE) fmt
+	$(MAKE) tidy
+	$(MAKE) vet
+	$(MAKE) lint
+	$(MAKE) test
+
+## setup-hooks: Configura o Git para usar os hooks do projeto
+setup-hooks:
+	git config core.hooksPath .githooks
+	@echo "Git hooks configurados (.githooks/)"
 
 # --- HELP ---
 

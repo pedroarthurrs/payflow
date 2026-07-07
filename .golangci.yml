@@ -1,0 +1,56 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck        # verifica erros não tratados
+    - govet           # relatório de erros suspeitos
+    - ineffassign     # detecta atribuições ineficazes
+    - staticcheck     # suite de análises estáticas
+    - unused          # detecta código não utilizado
+    - misspell        # corrige erros ortográficos em comentários
+    - gocritic        # checagens de estilo e performance
+    - bodyclose       # verifica se response bodies são fechados
+    - noctx           # detecta funções HTTP sem context
+    - exhaustive      # verifica switch exhaustiveness em enums
+    - nilerr          # detecta retorno de nil junto com erros
+    - revive          # linter estilo Go (substituto do golint)
+
+  settings:
+    misspell:
+      locale: US
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+
+formatters:
+  enable:
+    - gofmt           # garante formatação padrão
+    - goimports       # organização de imports
+
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes: payflow
+
+issues:
+  exclude-rules:
+    # Testes podem ter erros não verificados
+    - path: _test\.go
+      linters:
+        - errcheck
+        - bodyclose
+  max-issues-per-linter: 0
+  max-same-issues: 0

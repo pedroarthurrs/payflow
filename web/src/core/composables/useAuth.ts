@@ -1,0 +1,102 @@
+import type { Permission, Role } from '@/core/rbac'
+import { useRBACStore } from '@/core/rbac'
+import { useAuthStore } from '@/modules/auth/store/auth'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+export function useAuth() {
+  const store = useAuthStore()
+  const rbac = useRBACStore()
+  const router = useRouter()
+
+  const isAuthenticated = computed(() => store.isAuthenticated)
+  const isMultiOrgPending = computed(() => store.isMultiOrgPending)
+  const pendingOrganizations = computed(() => store.pendingOrganizations)
+  const user = computed(() => store.user)
+  const userRole = computed(() => store.userRole)
+  const organizationId = computed(() => store.organizationId)
+  const lastError = computed(() => store.lastError)
+
+  async function login(email: string, password: string): Promise<void> {
+    try {
+      await store.login(email, password)
+
+      if (store.isMultiOrgPending) {
+        await router.push('/select-organization')
+        return
+      }
+
+      await router.push('/dashboard')
+    } catch (err) {
+      console.error('Login failed:', err)
+      throw err
+    }
+  }
+
+  async function selectOrganization(orgId: string): Promise<void> {
+    try {
+      await store.selectOrganization(orgId)
+      await router.push('/dashboard')
+    } catch (err) {
+      console.error('Organization selection failed:', err)
+      throw err
+    }
+  }
+
+  function logout(): void {
+    store.logout()
+    router.push('/login')
+  }
+
+  async function refreshToken(): Promise<void> {
+    try {
+      await store.refreshAccessToken()
+    } catch (err) {
+      console.error('Token refresh failed:', err)
+      throw err
+    }
+  }
+
+  /** Role hierarchy check via centralized RBAC store. */
+  function hasRole(minRole: Role): boolean {
+    return rbac.hasRole(minRole)
+  }
+
+  function hasAnyRole(roles: Role[]): boolean {
+    const role = store.user?.role as Role | undefined
+    if (!role) return false
+    return roles.includes(role)
+  }
+
+  /** Permission check via centralized RBAC store. */
+  function can(perm: Permission): boolean {
+    return rbac.can(perm)
+  }
+
+  function canAny(perms: Permission[]): boolean {
+    return rbac.canAny(perms)
+  }
+
+  function canAll(perms: Permission[]): boolean {
+    return rbac.canAll(perms)
+  }
+
+  return {
+    login,
+    selectOrganization,
+    logout,
+    refreshToken,
+    hasRole,
+    hasAnyRole,
+    can,
+    canAny,
+    canAll,
+    isAuthenticated,
+    isMultiOrgPending,
+    pendingOrganizations,
+    user,
+    userRole,
+    organizationId,
+    lastError,
+  }
+}

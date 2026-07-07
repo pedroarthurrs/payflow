@@ -1,0 +1,32 @@
+#!/bin/sh
+set -e
+
+# Avoid locale warnings in WSL environments where LC_ALL points to a locale
+# that is not generated, such as en_US.UTF-8.
+unset LC_ALL
+export LANG="${LANG:-C.UTF-8}"
+export LC_CTYPE="${LC_CTYPE:-$LANG}"
+
+export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"
+
+printf '%s\n' "Running pre-commit checks..."
+
+printf '%s\n' "make tidy"
+make tidy
+
+# Check if go.mod or go.sum were modified by tidy
+if ! git diff --quiet go.mod go.sum 2>/dev/null; then
+  printf '%s\n' "go.mod or go.sum changed after 'make tidy'. Stage the changes and try again."
+  exit 1
+fi
+
+printf '%s\n' "make vet"
+make vet
+
+printf '%s\n' "make lint"
+make lint
+
+printf '%s\n' "make test"
+make test
+
+printf '%s\n' "All checks passed."

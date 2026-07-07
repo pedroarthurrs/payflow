@@ -1,0 +1,267 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"payflow/internal/domain"
+
+	"github.com/google/uuid"
+)
+
+// RecurrenceService handles the recurring billing cycle for subscriptions.
+type RecurrenceService struct {
+	subs        domain.SubscriptionRepository
+	items       domain.SubscriptionItemRepository
+	schedules   domain.SubscriptionScheduleRepository
+	plans       domain.PlanRepository
+	recRepo     domain.RecurrenceRepository
+	payments    domain.PaymentRepository
+	gatewaySvc  *GatewayService
+	invoiceSvc  *InvoiceService
+	subSvc      *SubscriptionService
+	subFSM      *domain.SubscriptionStateMachine
+	txMgr       domain.TxManager
+	maxAttempts int
+}
+
+// NewRecurrenceService creates a RecurrenceService.
+func NewRecurrenceService(
+	subs domain.SubscriptionRepository,
+	items domain.SubscriptionItemRepository,
+	schedules domain.SubscriptionScheduleRepository,
+	plans domain.PlanRepository,
+	recRepo domain.RecurrenceRepository,
+	payments domain.PaymentRepository,
+	gatewaySvc *GatewayService,
+	invoiceSvc *InvoiceService,
+	txMgr domain.TxManager,
+	maxAttempts int,
+	subSvc *SubscriptionService,
+) *RecurrenceService {
+	return &RecurrenceService{
+		subs:        subs,
+		items:       items,
+		schedules:   schedules,
+		plans:       plans,
+		recRepo:     recRepo,
+		payments:    payments,
+		gatewaySvc:  gatewaySvc,
+		invoiceSvc:  invoiceSvc,
+		subSvc:      subSvc,
+		subFSM:      domain.NewSubscriptionStateMachine(),
+		txMgr:       txMgr,
+		maxAttempts: maxAttempts,
+	}
+}
+
+// ProcessBillingCycle runs a full billing cycle for a single subscription.
+// attemptNum is 1-based (first attempt = 1).
+func (s *RecurrenceService) ProcessBillingCycle(ctx context.Context, orgID, subID uuid.UUID, attemptNum int) error {
+	now := time.Now().UTC()
+
+	// Step 1: Load subscription.
+	sub, err := s.subs.GetByID(ctx, orgID, subID)
+	if err != nil {
+		return err
+	}
+
+	// Step 2: Skip terminal states.
+	if s.subFSM.IsTerminal(sub.Status) {
+		slog.Info("skipping terminal subscription", "subscription_id", subID, "status", sub.Status)
+		_ = s.recRepo.UnlockBilling(ctx, orgID, subID)
+		return nil
+	}
+
+	// Step 3: Cancel if cancel_at_period_end and period has ended.
+	if sub.CancelAtPeriodEnd && !sub.CurrentPeriodEnd.After(now) {
+		if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusCanceled, domain.TransitionEvent{
+			Source: "system",
+			Reason: "cancel_at_period_end",
+		}); err != nil {
+			return fmt.Errorf("canceling subscription at period end: %w", err)
+		}
+		_ = s.recRepo.UnlockBilling(ctx, orgID, subID)
+		return nil
+	}
+
+	// Step 4: Transition trial → active when trial period has ended.
+	if sub.Status == domain.SubStatusTrialing && !sub.CurrentPeriodEnd.After(now) {
+		if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusActive, domain.TransitionEvent{
+			Source: "system",
+			Reason: "trial_ended",
+		}); err != nil {
+			return fmt.Errorf("transitioning trial to active: %w", err)
+		}
+		// Reload sub after transition so billing uses updated status.
+		sub, err = s.subs.GetByID(ctx, orgID, subID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Step 5: Load items and plans to compute billing amount.
+	subItems, err := s.items.ListBySubscription(ctx, orgID, subID)
+	if err != nil {
+		return err
+	}
+
+	var totalAmountCents int32
+	var currency string
+	var billingInterval string
+	var billingIntervalCount int
+
+	for i, item := range subItems {
+		plan, err := s.plans.GetByID(ctx, orgID, item.PlanID)
+		if err != nil {
+			return fmt.Errorf("loading plan %s: %w", item.PlanID, err)
+		}
+		totalAmountCents += plan.AmountCents * item.Quantity
+		if i == 0 {
+			currency = plan.Currency
+			billingInterval = plan.Interval
+			billingIntervalCount = int(plan.IntervalCount)
+		}
+	}
+
+	// Step 6: Billing amount must be positive.
+	if totalAmountCents <= 0 {
+		slog.Warn("billing amount is zero, skipping", "subscription_id", subID)
+		_ = s.recRepo.UnlockBilling(ctx, orgID, subID)
+		return domain.ErrBillingAmountZero
+	}
+
+	// Step 7: Idempotency key based on subscription + period start + attempt number.
+	// Including attemptNum ensures each retry creates a distinct payment record while
+	// still preventing double-processing of the same attempt (e.g. duplicate queue messages).
+	idempotencyKey := fmt.Sprintf("sub_%s_%s_attempt_%d", subID, sub.CurrentPeriodStart.Format("2006-01-02"), attemptNum)
+
+	// Step 8: Create payment record.
+	payment, err := s.payments.Create(ctx, orgID, domain.PaymentInput{
+		CustomerID:     sub.CustomerID,
+		SubscriptionID: &subID,
+		PaymentMethod:  sub.PaymentMethod,
+		AmountCents:    totalAmountCents,
+		Currency:       currency,
+		IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		return fmt.Errorf("creating payment: %w", err)
+	}
+
+	// Remember the subscription status before the charge for post-charge decisions.
+	statusBeforeCharge := sub.Status
+
+	// Step 9: Charge via gateway (handles FSM transitions internally).
+	charged, chargeErr := s.gatewaySvc.Charge(ctx, orgID, payment.ID, "recurring_billing")
+
+	// Step 10: Success path.
+	if chargeErr == nil {
+		slog.Info("recurring charge succeeded",
+			"subscription_id", subID,
+			"payment_id", charged.ID,
+			"amount_cents", totalAmountCents)
+
+		// Generate invoice from subscription (non-fatal).
+		if s.invoiceSvc != nil {
+			if _, err := s.invoiceSvc.GenerateFromSubscription(ctx, orgID, subID, &charged.ID); err != nil {
+				slog.Warn("failed to generate invoice from subscription", "subscription_id", subID, "error", err)
+			}
+		}
+
+		// If subscription was past_due, restore to active.
+		if statusBeforeCharge == domain.SubStatusPastDue {
+			if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusActive, domain.TransitionEvent{
+				Source: "system",
+				Reason: "payment_succeeded",
+			}); err != nil {
+				slog.Error("failed to restore subscription to active", "subscription_id", subID, "error", err)
+			}
+		}
+
+		// Advance period (also clears billing_locked_until).
+		newPeriodStart := sub.CurrentPeriodEnd
+		newPeriodEnd := calculatePeriodEnd(newPeriodStart, billingInterval, billingIntervalCount)
+		if _, err := s.subs.AdvancePeriod(ctx, orgID, subID, newPeriodStart, newPeriodEnd); err != nil {
+			slog.Error("failed to advance subscription period", "subscription_id", subID, "error", err)
+			return fmt.Errorf("advancing subscription period: %w", err)
+		}
+
+		// Apply any pending schedule (mark as applied).
+		s.applyPendingSchedule(ctx, orgID, subID)
+		return nil
+	}
+
+	// Step 11: Failure path.
+	if errors.Is(chargeErr, domain.ErrGatewayChargeFailed) {
+		slog.Warn("recurring charge failed",
+			"subscription_id", subID,
+			"payment_id", payment.ID,
+			"attempt", attemptNum,
+			"error", chargeErr)
+
+		// Update subscription status based on failure.
+		s.handleChargeFailure(ctx, orgID, subID, statusBeforeCharge, attemptNum)
+
+		// Keep billing lock — the worker will extend it for the next retry window.
+		return chargeErr
+	}
+
+	// Gateway unavailable or unexpected error — keep lock for worker to manage.
+	return fmt.Errorf("gateway error: %w", chargeErr)
+}
+
+// handleChargeFailure updates the subscription status based on the failure context.
+func (s *RecurrenceService) handleChargeFailure(ctx context.Context, orgID, subID uuid.UUID, currentStatus domain.SubscriptionStatus, attemptNum int) {
+	switch currentStatus {
+	case domain.SubStatusActive:
+		if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusPastDue, domain.TransitionEvent{
+			Source: "system",
+			Reason: "payment_failed",
+		}); err != nil {
+			slog.Error("failed to set subscription to past_due", "subscription_id", subID, "error", err)
+		}
+	case domain.SubStatusPastDue:
+		if attemptNum >= s.maxAttempts {
+			if err := s.subSvc.Transition(ctx, orgID, subID, domain.SubStatusUnpaid, domain.TransitionEvent{
+				Source: "system",
+				Reason: "max_retries_exceeded",
+			}); err != nil {
+				slog.Error("failed to set subscription to unpaid", "subscription_id", subID, "error", err)
+			}
+		}
+	case domain.SubStatusTrialing, domain.SubStatusUnpaid,
+		domain.SubStatusCanceled, domain.SubStatusPaused, domain.SubStatusIncomplete:
+		slog.Warn("charge failure on unexpected subscription status — no status change applied",
+			"subscription_id", subID,
+			"status", currentStatus,
+			"attempt", attemptNum)
+	}
+}
+
+// applyPendingSchedule checks for a pending schedule and marks it as applied.
+func (s *RecurrenceService) applyPendingSchedule(ctx context.Context, orgID, subID uuid.UUID) {
+	schedule, err := s.schedules.GetPending(ctx, orgID, subID)
+	if err != nil {
+		// No pending schedule is the normal case.
+		return
+	}
+	if err := s.schedules.Cancel(ctx, orgID, schedule.ID); err != nil {
+		slog.Error("failed to apply pending schedule", "subscription_id", subID, "schedule_id", schedule.ID, "error", err)
+	}
+}
+
+// ExtendBillingLock sets billing_locked_until so the scheduler will not re-enqueue
+// the subscription before the next worker retry fires.
+func (s *RecurrenceService) ExtendBillingLock(ctx context.Context, orgID, subID uuid.UUID, until time.Time) error {
+	return s.recRepo.LockForBilling(ctx, orgID, subID, until)
+}
+
+// ReleaseBillingLock clears billing_locked_until, allowing the scheduler to
+// re-enqueue the subscription on its next scan (used after dead-lettering).
+func (s *RecurrenceService) ReleaseBillingLock(ctx context.Context, orgID, subID uuid.UUID) error {
+	return s.recRepo.UnlockBilling(ctx, orgID, subID)
+}
