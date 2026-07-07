@@ -48,6 +48,7 @@ curl http://localhost:8080/v1/live
 
 ## Documentação
 
+- [FINANCIAL_FEATURES.md](docs/FINANCIAL_FEATURES.md) — visão de negócio das funcionalidades financeiras e regras de domínio
 - [SETUP.md](docs/SETUP.md) — instalação e configuração local com Docker
 - [API.md](docs/API.md) — endpoints, exemplos e referência completa
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — padrões e decisões de arquitetura

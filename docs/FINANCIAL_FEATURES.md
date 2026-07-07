@@ -1,9 +1,9 @@
-# Funcionalidades Financeiras do i9pay
+# Funcionalidades Financeiras do PayFlow
 ---
 
 ## Sumário
 
-O i9pay é uma plataforma de gestão financeira projetada para modelos de negócio de **Software como Serviço (SaaS)**
+O PayFlow é uma plataforma de gestão financeira projetada para modelos de negócio de **Software como Serviço (SaaS)**
 
 Este documento apresenta uma visão de alto nível das funcionalidades financeiras, focando nas **regras de negócio** e no **valor estratégico** de cada componente.
 
@@ -29,7 +29,7 @@ Um **Plano** define como um produto é vendido.
 
 ## 2. Gestão de Assinaturas e Recorrência
 
-O motor de assinaturas é o coração do i9pay, gerenciando o relacionamento contínuo com o cliente.
+O motor de assinaturas é o coração do PayFlow, gerenciando o relacionamento contínuo com o cliente.
 
 ### 2.1. Modelo de Assinatura
 A **Assinatura** formaliza o acordo de serviço recorrente com um cliente.
@@ -67,7 +67,7 @@ Permite programar mudanças futuras em uma assinatura, como:
 
 ## 3. Processamento de Pagamentos
 
-O i9pay orquestra o fluxo de cobrança, desde a solicitação até a confirmação.
+O PayFlow orquestra o fluxo de cobrança, desde a solicitação até a confirmação.
 
 ### 3.1. Modelo de Pagamento
 Um **Pagamento** é uma única transação financeira.
@@ -86,7 +86,7 @@ O status de um pagamento indica sua fase no fluxo de cobrança:
 **Regra de Negócio:** Todas as transições de estado são controladas por uma máquina de estados (FSM) e auditadas. Isso impede, por exemplo, que um pagamento falho seja marcado como bem-sucedido.
 
 ### 3.3. Integração com Gateways de Pagamento
-O i9pay é desacoplado de provedores específicos (Stripe, MercadoPago, etc.).
+O PayFlow é desacoplado de provedores específicos (Stripe, MercadoPago, etc.).
 - **Flexibilidade:** Permite adicionar novos gateways sem alterar a lógica de negócio principal.
 - **Orquestração:** O sistema seleciona o gateway apropriado com base no método de pagamento e na configuração da organização.
 
@@ -106,10 +106,10 @@ A **Fatura** é o documento comercial que detalha uma transação.
 - **Tipos:** Suporta faturamento para transações nacionais e internacionais.
 
 ### 4.2. Integração com Sistemas Fiscais (ERP)
-O i9pay foi projetado para se integrar a sistemas de emissão de notas fiscais (NFe/NFSe).
+O PayFlow foi projetado para se integrar a sistemas de emissão de notas fiscais (NFe/NFSe).
 - **Configuração Flexível:** Cada organização pode configurar suas próprias credenciais e parâmetros fiscais.
 - **Fluxo Automatizado:**
-    1.  Uma fatura é gerada no i9pay.
+    1.  Uma fatura é gerada no PayFlow.
     2.  Um worker de sincronização envia os dados para o sistema fiscal.
     3.  O sistema aguarda a confirmação da emissão e atualiza o status da fatura.
 - **Auditoria:** Todo o processo de comunicação com o sistema fiscal é registrado em logs detalhados, incluindo tentativas, erros e sucessos.
@@ -192,6 +192,6 @@ Permite oferecer um período inicial com desconto (ex: 50% de desconto nos prime
 A segurança é um pilar fundamental em operações financeiras.
 
 - **Controle de Acesso (RBAC):** A plataforma implementa uma hierarquia de papéis (proprietário, administrador, membro) e um sistema de permissões granulares para controlar o acesso a funcionalidades críticas, como reembolsos ou alteração de configurações.
-- **Conformidade PCI-DSS:** Dados sensíveis de cartão de crédito **não são armazenados** no i9pay. Essa responsabilidade é delegada aos gateways de pagamento, que são certificados.
+- **Conformidade PCI-DSS:** Dados sensíveis de cartão de crédito **não são armazenados** no PayFlow. Essa responsabilidade é delegada aos gateways de pagamento, que são certificados.
 - **Auditoria Completa:** Todas as ações importantes (login, alterações de configuração, operações financeiras) são registradas em logs detalhados, identificando "quem", "o quê", "quando" e "de onde".
-- **Webhooks Assinados:** As notificações enviadas pelo i9pay são assinadas digitalmente, permitindo que os sistemas parceiros verifiquem sua autenticidade e integridade.
+- **Webhooks Assinados:** As notificações enviadas pelo PayFlow são assinadas digitalmente, permitindo que os sistemas parceiros verifiquem sua autenticidade e integridade.
