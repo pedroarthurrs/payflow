@@ -80,7 +80,7 @@ async function loadCustomer() {
       email: customer.email,
       phone: customer.phone ?? '',
       document: customer.document,
-      document_type: customer.document_type,
+      document_type: customer.document_type as 'cpf' | 'cnpj',
     })
     metadata.value = customer.metadata ? JSON.stringify(customer.metadata, null, 2) : ''
   } catch (e) {
@@ -132,7 +132,7 @@ const onSubmit = handleSubmit(async (values) => {
     const err = e as ApiError
     if (err.status === 400 && err.validationErrors) {
       for (const [field, message] of Object.entries(err.validationErrors)) {
-        setFieldError(field, message)
+        setFieldError(field as Parameters<typeof setFieldError>[0], message)
       }
     } else if (err.status === 409) {
       formError.value = err.message || 'Conflito: registro já existe'
@@ -214,7 +214,7 @@ onMounted(() => {
         label="Tipo de Documento"
         type="select"
         :modelValue="documentType ?? 'cpf'"
-        @update:modelValue="documentType = $event as string"
+        @update:modelValue="documentType = $event as 'cpf' | 'cnpj'"
         :error="errors.document_type"
         :required="true"
         :options="documentTypeOptions"

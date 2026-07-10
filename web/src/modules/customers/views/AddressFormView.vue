@@ -131,7 +131,7 @@ const onSubmit = handleSubmit(async (values) => {
     const err = e as ApiError
     if (err.status === 400 && err.validationErrors) {
       for (const [field, message] of Object.entries(err.validationErrors)) {
-        setFieldError(field, message)
+        setFieldError(field as Parameters<typeof setFieldError>[0], message)
       }
     } else {
       const handled = handleError(err)
@@ -174,7 +174,7 @@ onMounted(() => {
         label="Tipo"
         type="select"
         :modelValue="type ?? 'shipping'"
-        @update:modelValue="type = $event as string"
+        @update:modelValue="type = $event as 'billing' | 'shipping' | 'home'"
         :error="errors.type"
         :required="true"
         :options="addressTypeOptions"
