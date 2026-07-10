@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url'
+import type { ServerResponse } from 'node:http'
 import { defineConfig, type PluginOption } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
@@ -25,22 +26,26 @@ export default defineConfig({
         // Protect against slow-loris and hung requests
         timeout: 30000,
         proxyTimeout: 30000,
-        onProxyReq: (_proxyReq, req) => {
-          // Log outgoing proxy requests in development for easier debugging
-          console.log(`[Proxy] ${req.method} ${req.url}`)
-        },
-        onError: (err, _req, res) => {
-          console.error('[Proxy Error]', err.message)
-          if (!res.headersSent) {
-            res.writeHead(503, { 'Content-Type': 'application/json' })
-          }
-          res.end(JSON.stringify({ error: 'API unavailable — backend may be down' }))
+        configure: (proxy) => {
+          proxy.on('proxyReq', (_proxyReq, req) => {
+            // Log outgoing proxy requests in development for easier debugging
+            console.log(`[Proxy] ${req.method} ${req.url}`)
+          })
+          proxy.on('error', (err, _req, res) => {
+            console.error('[Proxy Error]', err.message)
+            const httpRes = res as ServerResponse
+            if (!httpRes.headersSent) {
+              httpRes.writeHead(503, { 'Content-Type': 'application/json' })
+            }
+            httpRes.end(JSON.stringify({ error: 'API unavailable — backend may be down' }))
+          })
         },
       }
     }
   },
   test: {
     environment: 'jsdom',
-    globals: true
+    globals: true,
+    setupFiles: ['./src/test-setup.ts']
   }
 })

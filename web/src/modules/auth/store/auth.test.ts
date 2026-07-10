@@ -2,6 +2,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from './auth'
 
+// The store keeps tokens in HttpOnly cookies (set by the backend) and persists
+// only non-sensitive user metadata — decoded from the access token — to
+// localStorage under this key.
+const USER_KEY = 'payflow:auth:user'
+
 // Helper: build a fake JWT with the given payload (no signature validation needed)
 function fakeJwt(payload: Record<string, unknown>): string {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
@@ -35,12 +40,25 @@ function makeMultiOrgResponse(orgs = [{ organization_id: 'org-1', name: 'Org 1',
   }
 }
 
-// Mock the http module
-vi.mock('@/api/http', () => ({
+// Mock the HTTP client the store depends on.
+vi.mock('@/core/api/http', () => ({
   default: {
     post: vi.fn(),
   },
 }))
+
+// Mock the RBAC store — login/refresh/logout trigger permission side effects
+// (fetchPermissions / $reset) that are out of scope for these tests.
+vi.mock('@/core/rbac', () => ({
+  useRBACStore: () => ({
+    fetchPermissions: vi.fn().mockResolvedValue(undefined),
+    $reset: vi.fn(),
+  }),
+}))
+
+async function getHttp() {
+  return (await import('@/core/api/http')).default
+}
 
 describe('Auth Store', () => {
   beforeEach(() => {
@@ -54,10 +72,8 @@ describe('Auth Store', () => {
   })
 
   describe('initial state', () => {
-    it('starts with null tokens and user', () => {
+    it('starts with no user', () => {
       const store = useAuthStore()
-      expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
       expect(store.user).toBeNull()
     })
 
@@ -78,9 +94,9 @@ describe('Auth Store', () => {
   })
 
   describe('login — single org', () => {
-    it('stores tokens and decodes user from JWT', async () => {
+    it('decodes user metadata from the access token and persists it', async () => {
       const tokens = makeTokenPair({ role: 'owner' })
-      const http = (await import('@/core/api/http')).default
+      const http = await getHttp()
       vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
 
       const store = useAuthStore()
@@ -90,22 +106,23 @@ describe('Auth Store', () => {
         email: 'test@example.com',
         password: 'password123',
       })
-      expect(store.accessToken).toBe(tokens.access_token)
-      expect(store.refreshToken).toBe(tokens.refresh_token)
       expect(store.user).toEqual({
         organizationId: 'org-123',
+        userId: 'user-456',
         memberId: 'member-789',
         role: 'owner',
         authType: 'user',
       })
-      expect(localStorage.getItem('access_token')).toBe(tokens.access_token)
-      expect(localStorage.getItem('refresh_token')).toBe(tokens.refresh_token)
+      // Only user metadata is persisted — never the raw tokens.
+      const stored = JSON.parse(localStorage.getItem(USER_KEY)!)
+      expect(stored.organizationId).toBe('org-123')
+      expect(localStorage.getItem('access_token')).toBeNull()
+      expect(localStorage.getItem('refresh_token')).toBeNull()
     })
 
     it('sets isAuthenticated to true after login', async () => {
-      const tokens = makeTokenPair()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
+      const http = await getHttp()
+      vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair() })
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
@@ -114,9 +131,8 @@ describe('Auth Store', () => {
     })
 
     it('does not set isMultiOrgPending for single-org login', async () => {
-      const tokens = makeTokenPair()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
+      const http = await getHttp()
+      vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair() })
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
@@ -132,7 +148,7 @@ describe('Auth Store', () => {
         { organization_id: 'org-1', name: 'Empresa A', role: 'owner' },
         { organization_id: 'org-2', name: 'Empresa B', role: 'member' },
       ])
-      const http = (await import('@/core/api/http')).default
+      const http = await getHttp()
       vi.mocked(http.post).mockResolvedValueOnce({ data: multiOrg })
 
       const store = useAuthStore()
@@ -144,25 +160,23 @@ describe('Auth Store', () => {
       expect(store.pendingOrganizations[0].name).toBe('Empresa A')
     })
 
-    it('does not set tokens or authenticate during multi-org login', async () => {
-      const multiOrg = makeMultiOrgResponse()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: multiOrg })
+    it('does not authenticate during multi-org login', async () => {
+      const http = await getHttp()
+      vi.mocked(http.post).mockResolvedValueOnce({ data: makeMultiOrgResponse() })
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
 
       expect(store.isAuthenticated).toBe(false)
-      expect(store.accessToken).toBeNull()
+      expect(store.user).toBeNull()
     })
   })
 
   describe('selectOrganization', () => {
     it('completes auth after org selection', async () => {
-      // Step 1: multi-org login
       const multiOrg = makeMultiOrgResponse([{ organization_id: 'org-2', name: 'Empresa B', role: 'admin' }])
       const tokens = makeTokenPair({ role: 'admin' })
-      const http = (await import('@/core/api/http')).default
+      const http = await getHttp()
       vi.mocked(http.post)
         .mockResolvedValueOnce({ data: multiOrg })
         .mockResolvedValueOnce({ data: tokens })
@@ -188,376 +202,123 @@ describe('Auth Store', () => {
   })
 
   describe('logout', () => {
-    it('clears state and localStorage', async () => {
-      // Setup: login first
-      const tokens = makeTokenPair()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
+    it('clears state and persisted user metadata', async () => {
+      const http = await getHttp()
+      vi.mocked(http.post)
+        .mockResolvedValueOnce({ data: makeTokenPair() }) // login
+        .mockResolvedValueOnce({ data: {} }) // logout
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
+      await store.logout()
 
-      delete (window as any).location
-      window.location = { href: '' } as any
-
-      store.logout()
-
-      expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
+      expect(http.post).toHaveBeenLastCalledWith('/v1/auth/logout', {})
       expect(store.user).toBeNull()
       expect(store.pendingSessionToken).toBeNull()
       expect(store.pendingOrganizations).toHaveLength(0)
-      expect(localStorage.getItem('access_token')).toBeNull()
-      expect(localStorage.getItem('refresh_token')).toBeNull()
+      expect(localStorage.getItem(USER_KEY)).toBeNull()
       expect(store.isAuthenticated).toBe(false)
     })
 
-    it('clears pending multi-org state on logout', async () => {
-      const multiOrg = makeMultiOrgResponse()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: multiOrg })
+    it('clears local state even when the logout request fails', async () => {
+      const http = await getHttp()
+      vi.mocked(http.post)
+        .mockResolvedValueOnce({ data: makeTokenPair() }) // login
+        .mockRejectedValueOnce(new Error('network')) // logout
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
+      await store.logout()
 
-      delete (window as any).location
-      window.location = { href: '' } as any
-
-      store.logout()
-
-      expect(store.isMultiOrgPending).toBe(false)
-      expect(store.pendingOrganizations).toHaveLength(0)
+      expect(store.user).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
     })
   })
 
-  describe('refresh', () => {
-    it('updates tokens after successful refresh', async () => {
+  describe('refreshAccessToken', () => {
+    it('re-hydrates the user from the refreshed access token', async () => {
       const initialTokens = makeTokenPair({ role: 'admin' })
       const newTokens = makeTokenPair({ role: 'owner' })
 
-      const http = (await import('@/core/api/http')).default
+      const http = await getHttp()
       vi.mocked(http.post)
         .mockResolvedValueOnce({ data: initialTokens })
         .mockResolvedValueOnce({ data: newTokens })
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
-      await store.refresh()
+      await store.refreshAccessToken()
 
-      expect(store.accessToken).toBe(newTokens.access_token)
+      // The refresh token lives in the HttpOnly cookie — the body is empty.
+      expect(http.post).toHaveBeenLastCalledWith('/v1/auth/refresh', {})
       expect(store.user?.role).toBe('owner')
-      expect(http.post).toHaveBeenLastCalledWith('/v1/auth/refresh', {
-        refresh_token: initialTokens.refresh_token,
-      })
+      expect(store.isAuthenticated).toBe(true)
     })
 
-    it('throws when no refresh token is available', async () => {
+    it('clears state and throws when refresh fails', async () => {
+      const http = await getHttp()
+      vi.mocked(http.post)
+        .mockResolvedValueOnce({ data: makeTokenPair() }) // login
+        .mockRejectedValueOnce(new Error('401')) // refresh
+
       const store = useAuthStore()
-      await expect(store.refresh()).rejects.toThrow('No refresh token available')
+      await store.login('test@example.com', 'pass')
+
+      await expect(store.refreshAccessToken()).rejects.toThrow('Token refresh failed')
+      expect(store.user).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
     })
   })
 
   describe('loadFromStorage', () => {
-    it('restores state from localStorage including member_id', () => {
-      const token = fakeJwt({
-        sub: 'org-789',
+    it('restores user metadata from localStorage', () => {
+      const storedUser = {
+        organizationId: 'org-789',
+        userId: 'user-1',
+        memberId: 'member-111',
         role: 'member',
-        auth_type: 'user',
-        member_id: 'member-111',
-      })
-      localStorage.setItem('access_token', token)
-      localStorage.setItem('refresh_token', 'stored-refresh')
+        authType: 'user',
+      }
+      localStorage.setItem(USER_KEY, JSON.stringify(storedUser))
 
       const store = useAuthStore()
       store.loadFromStorage()
 
-      expect(store.accessToken).toBe(token)
-      expect(store.refreshToken).toBe('stored-refresh')
+      expect(store.user).toEqual(storedUser)
       expect(store.isAuthenticated).toBe(true)
-      expect(store.user).toEqual({
+    })
+
+    it('discards expired stored metadata', () => {
+      const expiredUser = {
         organizationId: 'org-789',
         memberId: 'member-111',
         role: 'member',
         authType: 'user',
-      })
-    })
-
-    it('falls back to empty memberId when member_id is absent in token', () => {
-      const token = fakeJwt({ sub: 'org-789', role: 'member', auth_type: 'user' })
-      localStorage.setItem('access_token', token)
+        exp: Math.floor(Date.now() / 1000) - 60,
+      }
+      localStorage.setItem(USER_KEY, JSON.stringify(expiredUser))
 
       const store = useAuthStore()
       store.loadFromStorage()
 
-      expect(store.user?.memberId).toBe('')
+      expect(store.user).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
+      expect(localStorage.getItem(USER_KEY)).toBeNull()
     })
 
-    it('does nothing when no token in localStorage', () => {
+    it('does nothing when no user in localStorage', () => {
       const store = useAuthStore()
       store.loadFromStorage()
 
-      expect(store.accessToken).toBeNull()
+      expect(store.user).toBeNull()
       expect(store.isAuthenticated).toBe(false)
     })
   })
 
   describe('getters', () => {
-    it('userRole returns the role from user', async () => {
-      const tokens = makeTokenPair({ role: 'member' })
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
-
-      const store = useAuthStore()
-      await store.login('test@example.com', 'pass')
-
-      expect(store.userRole).toBe('member')
-    })
-
-    it('isOwner is true only for owner role', async () => {
-      const http = (await import('@/core/api/http')).default
-
-      // owner
-      vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'owner' }) })
-      const store = useAuthStore()
-      await store.login('a@b.com', 'p')
-      expect(store.isOwner).toBe(true)
-
-      // admin — need fresh store
-      setActivePinia(createPinia())
-      vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'admin' }) })
-      const store2 = useAuthStore()
-      await store2.login('a@b.com', 'p')
-      expect(store2.isOwner).toBe(false)
-    })
-
-    it('isAdmin is true for admin and owner roles', async () => {
-      const http = (await import('@/core/api/http')).default
-
-      // admin
-      vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'admin' }) })
-      const store = useAuthStore()
-      await store.login('a@b.com', 'p')
-      expect(store.isAdmin).toBe(true)
-
-      // owner
-      setActivePinia(createPinia())
-      vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'owner' }) })
-      const store2 = useAuthStore()
-      await store2.login('a@b.com', 'p')
-      expect(store2.isAdmin).toBe(true)
-
-      // member
-      setActivePinia(createPinia())
+    it('userRole returns the role from the user', async () => {
+      const http = await getHttp()
       vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'member' }) })
-      const store3 = useAuthStore()
-      await store3.login('a@b.com', 'p')
-      expect(store3.isAdmin).toBe(false)
-    })
-  })
-})
-
-
-// Helper: build a fake JWT with the given payload (no signature validation needed)
-function fakeJwt(payload: Record<string, unknown>): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const body = btoa(JSON.stringify(payload))
-  return `${header}.${body}.fake-signature`
-}
-
-const defaultClaims = {
-  sub: 'org-123',
-  role: 'admin',
-  auth_type: 'user',
-  user_id: 'user-456',
-  token_type: 'access',
-}
-
-function makeTokenPair(overrides: Record<string, unknown> = {}) {
-  const claims = { ...defaultClaims, ...overrides }
-  return {
-    access_token: fakeJwt(claims),
-    refresh_token: 'refresh-token-abc',
-    access_token_expires_at: new Date().toISOString(),
-    refresh_token_expires_at: new Date().toISOString(),
-  }
-}
-
-// Mock the http module
-vi.mock('@/api/http', () => ({
-  default: {
-    post: vi.fn(),
-  },
-}))
-
-describe('Auth Store', () => {
-  beforeEach(() => {
-    setActivePinia(createPinia())
-    localStorage.clear()
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  describe('initial state', () => {
-    it('starts with null tokens and user', () => {
-      const store = useAuthStore()
-      expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
-      expect(store.user).toBeNull()
-    })
-
-    it('isAuthenticated is false initially', () => {
-      const store = useAuthStore()
-      expect(store.isAuthenticated).toBe(false)
-    })
-
-    it('userRole is null initially', () => {
-      const store = useAuthStore()
-      expect(store.userRole).toBeNull()
-    })
-  })
-
-  describe('login', () => {
-    it('stores tokens and decodes user from JWT', async () => {
-      const tokens = makeTokenPair({ role: 'owner' })
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
-
-      const store = useAuthStore()
-      await store.login('test@example.com', 'password123')
-
-      expect(http.post).toHaveBeenCalledWith('/v1/auth/login', {
-        email: 'test@example.com',
-        password: 'password123',
-      })
-      expect(store.accessToken).toBe(tokens.access_token)
-      expect(store.refreshToken).toBe(tokens.refresh_token)
-      expect(store.user).toEqual({
-        organizationId: 'org-123',
-        role: 'owner',
-        authType: 'user',
-      })
-      expect(localStorage.getItem('access_token')).toBe(tokens.access_token)
-      expect(localStorage.getItem('refresh_token')).toBe(tokens.refresh_token)
-    })
-
-    it('sets isAuthenticated to true after login', async () => {
-      const tokens = makeTokenPair()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
-
-      const store = useAuthStore()
-      await store.login('test@example.com', 'pass')
-
-      expect(store.isAuthenticated).toBe(true)
-    })
-  })
-
-  describe('logout', () => {
-    it('clears state and localStorage', async () => {
-      // Setup: login first
-      const tokens = makeTokenPair()
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
-
-      const store = useAuthStore()
-      await store.login('test@example.com', 'pass')
-
-      // Mock window.location.href
-      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
-        ...window.location,
-        href: '',
-      } as Location)
-      const hrefSetter = vi.fn()
-      Object.defineProperty(window, 'location', {
-        get: () => ({ href: '' }),
-        set: () => { },
-        configurable: true,
-      })
-      // Use a simpler approach: just spy on the assignment
-      delete (window as any).location
-      window.location = { href: '' } as any
-
-      store.logout()
-
-      expect(store.accessToken).toBeNull()
-      expect(store.refreshToken).toBeNull()
-      expect(store.user).toBeNull()
-      expect(localStorage.getItem('access_token')).toBeNull()
-      expect(localStorage.getItem('refresh_token')).toBeNull()
-      expect(store.isAuthenticated).toBe(false)
-
-      // Restore
-      locationSpy?.mockRestore()
-    })
-  })
-
-  describe('refresh', () => {
-    it('updates tokens after successful refresh', async () => {
-      const initialTokens = makeTokenPair({ role: 'admin' })
-      const newTokens = makeTokenPair({ role: 'owner' })
-
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post)
-        .mockResolvedValueOnce({ data: initialTokens })
-        .mockResolvedValueOnce({ data: newTokens })
-
-      const store = useAuthStore()
-      await store.login('test@example.com', 'pass')
-      await store.refresh()
-
-      expect(store.accessToken).toBe(newTokens.access_token)
-      expect(store.user?.role).toBe('owner')
-      expect(http.post).toHaveBeenLastCalledWith('/v1/auth/refresh', {
-        refresh_token: initialTokens.refresh_token,
-      })
-    })
-
-    it('throws when no refresh token is available', async () => {
-      const store = useAuthStore()
-      await expect(store.refresh()).rejects.toThrow('No refresh token available')
-    })
-  })
-
-  describe('loadFromStorage', () => {
-    it('restores state from localStorage', () => {
-      const token = fakeJwt({
-        sub: 'org-789',
-        role: 'member',
-        auth_type: 'user',
-      })
-      localStorage.setItem('access_token', token)
-      localStorage.setItem('refresh_token', 'stored-refresh')
-
-      const store = useAuthStore()
-      store.loadFromStorage()
-
-      expect(store.accessToken).toBe(token)
-      expect(store.refreshToken).toBe('stored-refresh')
-      expect(store.isAuthenticated).toBe(true)
-      expect(store.user).toEqual({
-        organizationId: 'org-789',
-        role: 'member',
-        authType: 'user',
-      })
-    })
-
-    it('does nothing when no token in localStorage', () => {
-      const store = useAuthStore()
-      store.loadFromStorage()
-
-      expect(store.accessToken).toBeNull()
-      expect(store.isAuthenticated).toBe(false)
-    })
-  })
-
-  describe('getters', () => {
-    it('userRole returns the role from user', async () => {
-      const tokens = makeTokenPair({ role: 'member' })
-      const http = (await import('@/core/api/http')).default
-      vi.mocked(http.post).mockResolvedValueOnce({ data: tokens })
 
       const store = useAuthStore()
       await store.login('test@example.com', 'pass')
@@ -565,16 +326,14 @@ describe('Auth Store', () => {
       expect(store.userRole).toBe('member')
     })
 
-    it('isOwner is true only for owner role', async () => {
-      const http = (await import('@/core/api/http')).default
+    it('isOwner is true only for the owner role', async () => {
+      const http = await getHttp()
 
-      // owner
       vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'owner' }) })
       const store = useAuthStore()
       await store.login('a@b.com', 'p')
       expect(store.isOwner).toBe(true)
 
-      // admin — need fresh store
       setActivePinia(createPinia())
       vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'admin' }) })
       const store2 = useAuthStore()
@@ -583,22 +342,19 @@ describe('Auth Store', () => {
     })
 
     it('isAdmin is true for admin and owner roles', async () => {
-      const http = (await import('@/core/api/http')).default
+      const http = await getHttp()
 
-      // admin
       vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'admin' }) })
       const store = useAuthStore()
       await store.login('a@b.com', 'p')
       expect(store.isAdmin).toBe(true)
 
-      // owner
       setActivePinia(createPinia())
       vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'owner' }) })
       const store2 = useAuthStore()
       await store2.login('a@b.com', 'p')
       expect(store2.isAdmin).toBe(true)
 
-      // member
       setActivePinia(createPinia())
       vi.mocked(http.post).mockResolvedValueOnce({ data: makeTokenPair({ role: 'member' }) })
       const store3 = useAuthStore()

@@ -4,20 +4,41 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import router from './index'
 
-function authenticateAs(
-  store: ReturnType<typeof useAuthStore>,
-  role: 'owner' | 'admin' | 'member',
-) {
+// Some routes are gated by RBAC permissions (customers:*) rather than by role.
+// The guard consults the RBAC store for those; role-gated routes (/members)
+// use the real ROLE_HIERARCHY, so we preserve it from the actual module and
+// only stub the store instance. `rbacState.can` toggles permission outcomes.
+const rbacState = { can: true }
+vi.mock('@/core/rbac', async (importActual) => {
+  const actual = await importActual<typeof import('@/core/rbac')>()
+  return {
+    ...actual,
+    useRBACStore: () => ({
+      loaded: true,
+      can: () => rbacState.can,
+      canAll: () => rbacState.can,
+      canAny: () => rbacState.can,
+      fetchPermissions: vi.fn().mockResolvedValue(undefined),
+    }),
+  }
+})
+
+type TestRole = 'support' | 'admin' | 'owner'
+
+function authenticateAs(store: ReturnType<typeof useAuthStore>, role: TestRole) {
   store.$patch({
-    accessToken: 'fake-token',
-    refreshToken: 'refresh-token',
-    user: { organizationId: 'org-1', role, authType: 'user' },
+    // The router guard evaluates roles through the RBAC ROLE_HIERARCHY
+    // (owner/admin/developer/support), casting from the auth store's own,
+    // narrower Role union — so we exercise the RBAC roles the guard actually
+    // ranks. The cast mirrors that same widening the guard performs.
+    user: { organizationId: 'org-1', memberId: 'member-1', role, authType: 'user' } as never,
   })
 }
 
 describe('Router', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    rbacState.can = true
     // Stub status check so guestOnly routes don't make real HTTP calls
     const statusStore = useStatusStore()
     vi.spyOn(statusStore, 'check').mockResolvedValue()
@@ -36,9 +57,9 @@ describe('Router', () => {
       expect(paths).toContain('/customers/:id/edit')
       expect(paths).toContain('/customers/:id/addresses/new')
       expect(paths).toContain('/customers/:id/addresses/:addressId/edit')
-      expect(paths).toContain('/users')
-      expect(paths).toContain('/users/new')
-      expect(paths).toContain('/users/:id/edit')
+      expect(paths).toContain('/members')
+      expect(paths).toContain('/members/new')
+      expect(paths).toContain('/members/:id/edit')
       expect(paths).toContain('/403')
     })
 
@@ -48,23 +69,30 @@ describe('Router', () => {
     })
 
     it('marks protected routes with requiresAuth', () => {
-      const protectedPaths = ['/dashboard', '/customers', '/customers/new', '/users', '/403']
+      const protectedPaths = ['/dashboard', '/customers', '/customers/new', '/members', '/403']
       for (const path of protectedPaths) {
         const route = router.getRoutes().find((r) => r.path === path)
         expect(route?.meta.requiresAuth, `${path} should require auth`).toBe(true)
       }
     })
 
-    it('marks /users with requiredRole admin', () => {
-      const route = router.getRoutes().find((r) => r.path === '/users')
+    it('marks /members with requiredRole admin', () => {
+      const route = router.getRoutes().find((r) => r.path === '/members')
       expect(route?.meta.requiredRole).toBe('admin')
     })
 
-    it('marks /users/new and /users/:id/edit with requiredRole owner', () => {
-      const newRoute = router.getRoutes().find((r) => r.path === '/users/new')
-      const editRoute = router.getRoutes().find((r) => r.path === '/users/:id/edit')
+    it('marks /members/new and /members/:id/edit with requiredRole owner', () => {
+      const newRoute = router.getRoutes().find((r) => r.path === '/members/new')
+      const editRoute = router.getRoutes().find((r) => r.path === '/members/:id/edit')
       expect(newRoute?.meta.requiredRole).toBe('owner')
       expect(editRoute?.meta.requiredRole).toBe('owner')
+    })
+
+    it('gates customer routes with an RBAC permission', () => {
+      const list = router.getRoutes().find((r) => r.path === '/customers')
+      const create = router.getRoutes().find((r) => r.path === '/customers/new')
+      expect(list?.meta.requiredPermission).toBe('customers:read')
+      expect(create?.meta.requiredPermission).toBe('customers:write')
     })
   })
 
@@ -77,7 +105,7 @@ describe('Router', () => {
 
     it('redirects authenticated user from /login to /dashboard', async () => {
       const store = useAuthStore()
-      authenticateAs(store, 'member')
+      authenticateAs(store, 'admin')
 
       // Navigate to a known route first to ensure guard triggers on /login push
       await router.push('/customers')
@@ -86,38 +114,52 @@ describe('Router', () => {
       expect(router.currentRoute.value.path).toBe('/dashboard')
     })
 
-    it('allows authenticated user to access protected route', async () => {
+    it('allows a user with the permission to access a permission-gated route', async () => {
       const store = useAuthStore()
-      authenticateAs(store, 'member')
+      authenticateAs(store, 'support')
+      rbacState.can = true
 
       await router.push('/customers')
       await router.isReady()
       expect(router.currentRoute.value.path).toBe('/customers')
     })
 
-    it('redirects member to /403 when accessing admin route', async () => {
+    it('redirects to /403 when the user lacks the required permission', async () => {
       const store = useAuthStore()
-      authenticateAs(store, 'member')
+      authenticateAs(store, 'support')
+      rbacState.can = false
 
-      await router.push('/users')
+      // Navigate away first so the push to /customers is not a duplicate
+      // navigation (which would skip the guard and leave us on /customers).
+      await router.push('/dashboard')
+      await router.push('/customers')
       await router.isReady()
       expect(router.currentRoute.value.path).toBe('/403')
     })
 
-    it('allows admin to access /users', async () => {
+    it('redirects a below-rank user to /403 on an admin route', async () => {
       const store = useAuthStore()
-      authenticateAs(store, 'admin')
+      authenticateAs(store, 'support')
 
-      await router.push('/users')
+      await router.push('/members')
       await router.isReady()
-      expect(router.currentRoute.value.path).toBe('/users')
+      expect(router.currentRoute.value.path).toBe('/403')
     })
 
-    it('redirects admin to /403 when accessing owner route', async () => {
+    it('allows admin to access /members', async () => {
       const store = useAuthStore()
       authenticateAs(store, 'admin')
 
-      await router.push('/users/new')
+      await router.push('/members')
+      await router.isReady()
+      expect(router.currentRoute.value.path).toBe('/members')
+    })
+
+    it('redirects admin to /403 when accessing an owner route', async () => {
+      const store = useAuthStore()
+      authenticateAs(store, 'admin')
+
+      await router.push('/members/new')
       await router.isReady()
       expect(router.currentRoute.value.path).toBe('/403')
     })
@@ -126,14 +168,14 @@ describe('Router', () => {
       const store = useAuthStore()
       authenticateAs(store, 'owner')
 
-      await router.push('/users/new')
+      await router.push('/members/new')
       await router.isReady()
-      expect(router.currentRoute.value.path).toBe('/users/new')
+      expect(router.currentRoute.value.path).toBe('/members/new')
     })
 
     it('redirects / to /dashboard for authenticated user', async () => {
       const store = useAuthStore()
-      authenticateAs(store, 'member')
+      authenticateAs(store, 'admin')
 
       await router.push('/')
       await router.isReady()

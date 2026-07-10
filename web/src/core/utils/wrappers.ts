@@ -1,6 +1,6 @@
 import { createTestingPinia } from '@pinia/testing'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { mount, type ComponentMountingOptions } from '@vue/test-utils'
+import { mount, type ComponentMountingOptions, type VueWrapper } from '@vue/test-utils'
 import type { Component } from 'vue'
 
 /**
@@ -12,7 +12,7 @@ import type { Component } from 'vue'
 export function mountWithQuery<T extends Component>(
     component: T,
     options: ComponentMountingOptions<T> = {}
-) {
+): VueWrapper<any, any> {
     const queryClient = new QueryClient({
         defaultOptions: {
             queries: {

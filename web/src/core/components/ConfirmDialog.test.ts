@@ -1,103 +1,161 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 
+// ConfirmDialog wraps reka-ui's Dialog primitive, which teleports its content
+// (overlay + panel) to document.body and only mounts it once `visible` flips
+// to true. jsdom lacks a few pointer APIs the primitive relies on for
+// outside-click dismissal, so we polyfill them for this file only.
+;(Element.prototype as any).hasPointerCapture ??= () => false
+;(Element.prototype as any).releasePointerCapture ??= () => {}
+;(Element.prototype as any).setPointerCapture ??= () => {}
+;(globalThis as any).PointerEvent ??= class PointerEvent extends MouseEvent {}
+
+const baseProps = {
+  visible: true,
+  title: 'Excluir cliente',
+  message: 'Tem certeza que deseja excluir?',
+}
+
+let wrapper: VueWrapper<any> | undefined
+
+afterEach(() => {
+  wrapper?.unmount()
+  document.body.innerHTML = ''
+})
+
+function mountDialog(props: Record<string, unknown> = {}, slots: Record<string, string> = {}) {
+  wrapper = mount(ConfirmDialog, {
+    props: { ...baseProps, ...props },
+    slots,
+    attachTo: document.body,
+  })
+  return wrapper
+}
+
 describe('ConfirmDialog', () => {
-  const baseProps = {
-    visible: true,
-    title: 'Excluir cliente',
-    message: 'Tem certeza que deseja excluir?',
-  }
+  it('renders the dialog with title and message when visible', async () => {
+    mountDialog()
+    await nextTick()
 
-  it('renders dialog when visible is true', () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    expect(wrapper.find('.confirm-dialog').exists()).toBe(true)
-    expect(wrapper.find('.confirm-dialog__title').text()).toBe('Excluir cliente')
-    expect(wrapper.find('.confirm-dialog__message').text()).toBe('Tem certeza que deseja excluir?')
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.textContent).toContain('Excluir cliente')
+    expect(dialog?.textContent).toContain('Tem certeza que deseja excluir?')
   })
 
-  it('does not render dialog when visible is false', () => {
-    const wrapper = mount(ConfirmDialog, {
-      props: { ...baseProps, visible: false },
-    })
-    expect(wrapper.find('.confirm-dialog').exists()).toBe(false)
+  it('does not render the dialog when visible is false', async () => {
+    mountDialog({ visible: false })
+    await nextTick()
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 
-  it('renders default confirm label as Confirmar', () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    const confirmBtn = wrapper.find('.confirm-dialog__btn--danger')
-    expect(confirmBtn.text()).toBe('Confirmar')
+  it('links the dialog to its title and description for accessibility', async () => {
+    mountDialog()
+    await nextTick()
+
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+    const labelledBy = dialog.getAttribute('aria-labelledby')
+    const describedBy = dialog.getAttribute('aria-describedby')
+    expect(labelledBy).toBeTruthy()
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(labelledBy!)?.textContent).toBe('Excluir cliente')
+    expect(document.getElementById(describedBy!)?.textContent).toBe('Tem certeza que deseja excluir?')
   })
 
-  it('renders custom confirm label', () => {
-    const wrapper = mount(ConfirmDialog, {
-      props: { ...baseProps, confirmLabel: 'Excluir' },
-    })
-    const confirmBtn = wrapper.find('.confirm-dialog__btn--danger')
-    expect(confirmBtn.text()).toBe('Excluir')
+  it('renders the default confirm label', async () => {
+    mountDialog()
+    await nextTick()
+
+    const buttons = Array.from(document.querySelectorAll('button'))
+    const confirmBtn = buttons.find(b => b.textContent?.trim() === 'Confirmar')
+    expect(confirmBtn).toBeTruthy()
   })
 
-  it('emits confirm when confirm button is clicked', async () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    await wrapper.find('.confirm-dialog__btn--danger').trigger('click')
-    expect(wrapper.emitted('confirm')).toHaveLength(1)
+  it('renders a custom confirm label', async () => {
+    mountDialog({ confirmLabel: 'Excluir' })
+    await nextTick()
+
+    const buttons = Array.from(document.querySelectorAll('button'))
+    expect(buttons.some(b => b.textContent?.trim() === 'Excluir')).toBe(true)
+    expect(buttons.some(b => b.textContent?.trim() === 'Confirmar')).toBe(false)
   })
 
-  it('emits cancel when cancel button is clicked', async () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    await wrapper.find('.confirm-dialog__btn--cancel').trigger('click')
-    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  it('emits confirm when the confirm button is clicked', async () => {
+    mountDialog()
+    await nextTick()
+
+    const buttons = Array.from(document.querySelectorAll('button'))
+    const confirmBtn = buttons.find(b => b.textContent?.trim() === 'Confirmar') as HTMLElement
+    confirmBtn.click()
+    await nextTick()
+
+    expect(wrapper!.emitted('confirm')).toHaveLength(1)
   })
 
-  it('emits cancel when backdrop is clicked', async () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    await wrapper.find('.confirm-dialog__overlay').trigger('click')
-    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  it('emits cancel when the cancel button is clicked', async () => {
+    mountDialog()
+    await nextTick()
+
+    const buttons = Array.from(document.querySelectorAll('button'))
+    const cancelBtn = buttons.find(b => b.textContent?.trim() === 'Cancelar') as HTMLElement
+    cancelBtn.click()
+    await nextTick()
+
+    expect(wrapper!.emitted('cancel')).toHaveLength(1)
   })
 
-  it('does not emit cancel when dialog box is clicked', async () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    await wrapper.find('.confirm-dialog').trigger('click')
-    expect(wrapper.emitted('cancel')).toBeUndefined()
+  it('emits cancel when the overlay (backdrop) is clicked', async () => {
+    mountDialog()
+    await nextTick()
+    // The dismissable layer registers its outside-pointer listener a tick
+    // after mount to avoid reacting to the click that opened it.
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    const overlay = document.querySelector('.fixed.inset-0.z-50') as HTMLElement
+    expect(overlay).toBeTruthy()
+    overlay.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+    await nextTick()
+
+    expect(wrapper!.emitted('cancel')).toHaveLength(1)
   })
 
-  it('emits cancel on Escape key', async () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    expect(wrapper.emitted('cancel')).toHaveLength(1)
-    wrapper.unmount()
+  it('emits cancel on Escape key press', async () => {
+    mountDialog()
+    await nextTick()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await nextTick()
+
+    expect(wrapper!.emitted('cancel')).toHaveLength(1)
   })
 
-  it('applies danger variant by default', () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    expect(wrapper.find('.confirm-dialog__btn--danger').exists()).toBe(true)
+  it('applies the destructive styling for the danger variant by default', async () => {
+    mountDialog()
+    await nextTick()
+
+    const buttons = Array.from(document.querySelectorAll('button'))
+    const confirmBtn = buttons.find(b => b.textContent?.trim() === 'Confirmar') as HTMLElement
+    expect(confirmBtn.className).toContain('destructive')
   })
 
-  it('applies warning variant when specified', () => {
-    const wrapper = mount(ConfirmDialog, {
-      props: { ...baseProps, variant: 'warning' as const },
-    })
-    expect(wrapper.find('.confirm-dialog__btn--warning').exists()).toBe(true)
+  it('does not apply destructive styling for the warning variant', async () => {
+    mountDialog({ variant: 'warning' as const })
+    await nextTick()
+
+    const buttons = Array.from(document.querySelectorAll('button'))
+    const confirmBtn = buttons.find(b => b.textContent?.trim() === 'Confirmar') as HTMLElement
+    expect(confirmBtn.className).not.toContain('destructive')
   })
 
-  it('renders default slot content', () => {
-    const wrapper = mount(ConfirmDialog, {
-      props: baseProps,
-      slots: { default: '<label><input type="checkbox" /> Hard delete</label>' },
-    })
-    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Hard delete')
-  })
+  it('renders default slot content inside the dialog', async () => {
+    mountDialog({}, { default: '<label><input type="checkbox" /> Hard delete</label>' })
+    await nextTick()
 
-  it('renders overlay with semi-transparent backdrop', () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    expect(wrapper.find('.confirm-dialog__overlay').exists()).toBe(true)
-  })
-
-  it('has role dialog and aria-modal', () => {
-    const wrapper = mount(ConfirmDialog, { props: baseProps })
-    const dialog = wrapper.find('.confirm-dialog')
-    expect(dialog.attributes('role')).toBe('dialog')
-    expect(dialog.attributes('aria-modal')).toBe('true')
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(dialog.querySelector('input[type="checkbox"]')).not.toBeNull()
+    expect(dialog.textContent).toContain('Hard delete')
   })
 })

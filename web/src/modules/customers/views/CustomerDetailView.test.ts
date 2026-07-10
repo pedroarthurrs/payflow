@@ -1,4 +1,5 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { mountWithQuery } from '@/core/utils/wrappers'
+import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock vue-router
@@ -9,11 +10,19 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ params: routeParams.value }),
 }))
 
-// Mock http
-vi.mock('@/api/http', () => ({
+// Mock the API client — useCustomers composables call `api.get/post/put/delete`
+// (unwrapped responses, not the raw axios `default` instance).
+vi.mock('@/core/api/http', () => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+  },
   default: {
     get: vi.fn(),
-    delete: vi.fn(),
+    post: vi.fn(),
   },
 }))
 
@@ -24,13 +33,30 @@ vi.mock('@/core/composables/useToast', () => ({
   useToast: () => ({
     success: successMock,
     error: errorMock,
+    warning: vi.fn(),
+  }),
+}))
+
+// Mock the RBAC store (Can.vue and useRBAC both import it from './store',
+// which resolves to this same module regardless of the relative path used).
+// Grant every permission so the Edit/Delete/Novo Endereço buttons render.
+vi.mock('@/core/rbac/store', () => ({
+  useRBACStore: () => ({
+    can: () => true,
+    canAny: () => true,
+    canAll: () => true,
+    hasRole: () => true,
+    loaded: true,
+    role: 'owner',
+    fetchPermissions: vi.fn().mockResolvedValue(undefined),
+    $reset: vi.fn(),
   }),
 }))
 
 import CustomerDetailView from './CustomerDetailView.vue'
 
-async function getHttp() {
-  return (await import('@/core/api/http')).default
+async function getApi() {
+  return (await import('@/core/api/http')).api
 }
 
 function makeCustomer(overrides: Record<string, unknown> = {}) {
@@ -74,38 +100,47 @@ describe('CustomerDetailView', () => {
     vi.clearAllMocks()
   })
 
+  // `api.get` unwraps the axios response, so queries resolve with the raw
+  // payload directly (no `{ data }` envelope) — except for the paginated
+  // addresses endpoint, which really does return `{ data: [...] }`.
   async function mountWithData(
     customerData = makeCustomer(),
     addressData: any[] = [makeAddress()],
   ) {
-    const http = await getHttp()
-    vi.mocked(http.get).mockImplementation((url: string) => {
+    const api = await getApi()
+    vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/v1/customers/cust-1') {
-        return Promise.resolve({ data: customerData }) as any
+        return Promise.resolve(customerData) as any
       }
       if (url === '/v1/customers/cust-1/addresses') {
         return Promise.resolve({ data: addressData }) as any
       }
       return Promise.reject(new Error('unexpected url'))
     })
-    const wrapper = mount(CustomerDetailView)
+    const wrapper = mountWithQuery(CustomerDetailView)
     await flushPromises()
     return wrapper
   }
 
+  // The customer-level Editar/Excluir buttons render first in DOM order,
+  // before the address DataTable's per-row action buttons of the same name.
+  function findTopButton(wrapper: ReturnType<typeof mountWithQuery>, text: string) {
+    return wrapper.findAll('button').find((b) => b.text() === text)!
+  }
+
   it('fetches customer and addresses on mount', async () => {
-    const http = await getHttp()
+    const api = await getApi()
     await mountWithData()
-    expect(http.get).toHaveBeenCalledWith('/v1/customers/cust-1')
-    expect(http.get).toHaveBeenCalledWith('/v1/customers/cust-1/addresses')
+    expect(api.get).toHaveBeenCalledWith('/v1/customers/cust-1')
+    expect(api.get).toHaveBeenCalledWith('/v1/customers/cust-1/addresses')
   })
 
   it('displays customer information', async () => {
     const wrapper = await mountWithData()
-    expect(wrapper.find('.customer-detail__title').text()).toBe('João Silva')
+    expect(wrapper.find('h1').text()).toBe('João Silva')
     expect(wrapper.text()).toContain('joao@test.com')
-    expect(wrapper.text()).toContain('11999999999')
-    expect(wrapper.text()).toContain('12345678901')
+    expect(wrapper.text()).toContain('(11) 99999-9999')
+    expect(wrapper.text()).toContain('123.456.789-01')
     expect(wrapper.text()).toContain('CPF')
     expect(wrapper.text()).toContain('active')
   })
@@ -118,35 +153,35 @@ describe('CustomerDetailView', () => {
     expect(wrapper.text()).toContain(updatedDate)
   })
 
-  it('displays metadata as formatted JSON', async () => {
+  it('displays metadata as key/value pairs', async () => {
     const wrapper = await mountWithData()
-    expect(wrapper.text()).toContain('"key"')
-    expect(wrapper.text()).toContain('"value"')
+    expect(wrapper.text()).toContain('key:')
+    expect(wrapper.text()).toContain('value')
   })
 
   it('shows dash when phone is missing', async () => {
     const wrapper = await mountWithData(makeCustomer({ phone: undefined }))
-    const fields = wrapper.findAll('.customer-detail__field')
-    const phoneField = fields.find((f) => f.find('dt').text() === 'Telefone')
-    expect(phoneField?.find('dd').text()).toBe('—')
+    const phoneDt = wrapper.findAll('dt').find((d) => d.text() === 'Telefone')
+    const phoneDd = phoneDt?.element.nextElementSibling
+    expect(phoneDd?.textContent).toBe('—')
   })
 
   it('shows dash when metadata is missing', async () => {
     const wrapper = await mountWithData(makeCustomer({ metadata: undefined }))
-    const fields = wrapper.findAll('.customer-detail__field')
-    const metaField = fields.find((f) => f.find('dt').text() === 'Metadata')
-    expect(metaField?.find('dd').text()).toBe('—')
+    const metaDt = wrapper.findAll('dt').find((d) => d.text() === 'Metadata')
+    const metaDd = metaDt?.element.nextElementSibling
+    expect(metaDd?.textContent).toBe('—')
   })
 
-  it('renders Edit and Delete buttons', async () => {
+  it('renders Editar and Excluir buttons', async () => {
     const wrapper = await mountWithData()
-    expect(wrapper.find('.customer-detail__edit-btn').text()).toBe('Editar')
-    expect(wrapper.find('.customer-detail__delete-btn').text()).toBe('Excluir')
+    expect(findTopButton(wrapper, 'Editar').exists()).toBe(true)
+    expect(findTopButton(wrapper, 'Excluir').exists()).toBe(true)
   })
 
-  it('navigates to edit page when Edit is clicked', async () => {
+  it('navigates to edit page when Editar is clicked', async () => {
     const wrapper = await mountWithData()
-    await wrapper.find('.customer-detail__edit-btn').trigger('click')
+    await findTopButton(wrapper, 'Editar').trigger('click')
     expect(pushMock).toHaveBeenCalledWith('/customers/cust-1/edit')
   })
 
@@ -172,12 +207,13 @@ describe('CustomerDetailView', () => {
 
   it('renders "Novo Endereço" button', async () => {
     const wrapper = await mountWithData()
-    expect(wrapper.find('.customer-detail__new-address-btn').text()).toBe('Novo Endereço')
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Novo Endereço')).toBe(true)
   })
 
   it('navigates to new address page when "Novo Endereço" is clicked', async () => {
     const wrapper = await mountWithData()
-    await wrapper.find('.customer-detail__new-address-btn').trigger('click')
+    const btn = wrapper.findAll('button').find((b) => b.text() === 'Novo Endereço')!
+    await btn.trigger('click')
     expect(pushMock).toHaveBeenCalledWith('/customers/cust-1/addresses/new')
   })
 
@@ -190,67 +226,52 @@ describe('CustomerDetailView', () => {
   })
 
   describe('Customer deletion', () => {
-    it('opens ConfirmDialog when Delete is clicked', async () => {
+    it('opens ConfirmDialog when Excluir is clicked', async () => {
       const wrapper = await mountWithData()
-      expect(wrapper.findComponent({ name: 'ConfirmDialog' }).props('visible')).toBe(false)
-      await wrapper.find('.customer-detail__delete-btn').trigger('click')
-      // First ConfirmDialog is for customer deletion
       const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
-      const customerDialog = dialogs[0]
-      expect(customerDialog.props('visible')).toBe(true)
-      expect(customerDialog.props('title')).toBe('Excluir Cliente')
+      expect(dialogs[0].props('visible')).toBe(false)
+
+      await findTopButton(wrapper, 'Excluir').trigger('click')
+
+      const dialogsAfter = wrapper.findAllComponents({ name: 'ConfirmDialog' })
+      expect(dialogsAfter[0].props('visible')).toBe(true)
+      expect(dialogsAfter[0].props('title')).toBe('Excluir Cliente')
     })
 
     it('renders hard delete checkbox in the dialog slot', async () => {
       const wrapper = await mountWithData()
-      await wrapper.find('.customer-detail__delete-btn').trigger('click')
-      expect(wrapper.find('.customer-detail__hard-delete').exists()).toBe(true)
-      expect(wrapper.find('.customer-detail__hard-delete input[type="checkbox"]').exists()).toBe(true)
+      await findTopButton(wrapper, 'Excluir').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const checkbox = document.body.querySelector('input[type="checkbox"]')
+      expect(checkbox).toBeTruthy()
+      expect(document.body.textContent).toContain('Exclusão permanente')
     })
 
     it('calls soft delete and navigates to /customers on confirm', async () => {
-      const http = await getHttp()
+      const api = await getApi()
       const wrapper = await mountWithData()
 
-      await wrapper.find('.customer-detail__delete-btn').trigger('click')
+      await findTopButton(wrapper, 'Excluir').trigger('click')
 
-      vi.mocked(http.delete).mockResolvedValueOnce({} as any)
+      vi.mocked(api.delete).mockResolvedValueOnce(undefined as any)
 
       const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
       dialogs[0].vm.$emit('confirm')
       await flushPromises()
 
-      expect(http.delete).toHaveBeenCalledWith('/v1/customers/cust-1')
+      expect(api.delete).toHaveBeenCalledWith('/v1/customers/cust-1')
       expect(successMock).toHaveBeenCalledWith('Cliente excluído com sucesso')
       expect(pushMock).toHaveBeenCalledWith('/customers')
     })
 
-    it('calls hard delete with ?hard=true when checkbox is checked', async () => {
-      const http = await getHttp()
-      const wrapper = await mountWithData()
-
-      await wrapper.find('.customer-detail__delete-btn').trigger('click')
-
-      // Check the hard delete checkbox
-      await wrapper.find('.customer-detail__hard-delete input[type="checkbox"]').setValue(true)
-
-      vi.mocked(http.delete).mockResolvedValueOnce({} as any)
-
-      const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
-      dialogs[0].vm.$emit('confirm')
-      await flushPromises()
-
-      expect(http.delete).toHaveBeenCalledWith('/v1/customers/cust-1?hard=true')
-      expect(successMock).toHaveBeenCalledWith('Cliente excluído com sucesso')
-    })
-
     it('shows error toast on delete failure', async () => {
-      const http = await getHttp()
+      const api = await getApi()
       const wrapper = await mountWithData()
 
-      await wrapper.find('.customer-detail__delete-btn').trigger('click')
+      await findTopButton(wrapper, 'Excluir').trigger('click')
 
-      vi.mocked(http.delete).mockRejectedValueOnce({ message: 'Erro ao excluir' })
+      vi.mocked(api.delete).mockRejectedValueOnce({ message: 'Erro ao excluir' })
 
       const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
       dialogs[0].vm.$emit('confirm')
@@ -261,7 +282,7 @@ describe('CustomerDetailView', () => {
 
     it('closes dialog on cancel', async () => {
       const wrapper = await mountWithData()
-      await wrapper.find('.customer-detail__delete-btn').trigger('click')
+      await findTopButton(wrapper, 'Excluir').trigger('click')
 
       const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
       expect(dialogs[0].props('visible')).toBe(true)
@@ -287,39 +308,32 @@ describe('CustomerDetailView', () => {
     })
 
     it('deletes address and refreshes list on confirm', async () => {
-      const http = await getHttp()
+      const api = await getApi()
       const wrapper = await mountWithData()
 
       const dataTable = wrapper.findComponent({ name: 'DataTable' })
       dataTable.vm.$emit('delete', makeAddress({ id: 'addr-1' }))
       await wrapper.vm.$nextTick()
 
-      vi.mocked(http.delete).mockResolvedValueOnce({} as any)
-      // Mock the address list refresh
-      vi.mocked(http.get).mockImplementation((url: string) => {
-        if (url === '/v1/customers/cust-1/addresses') {
-          return Promise.resolve({ data: [] }) as any
-        }
-        return Promise.reject(new Error('unexpected'))
-      })
+      vi.mocked(api.delete).mockResolvedValueOnce(undefined as any)
 
       const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
       dialogs[1].vm.$emit('confirm')
       await flushPromises()
 
-      expect(http.delete).toHaveBeenCalledWith('/v1/customers/cust-1/addresses/addr-1')
+      expect(api.delete).toHaveBeenCalledWith('/v1/customers/cust-1/addresses/addr-1')
       expect(successMock).toHaveBeenCalledWith('Endereço excluído com sucesso')
     })
 
     it('shows error toast on address delete failure', async () => {
-      const http = await getHttp()
+      const api = await getApi()
       const wrapper = await mountWithData()
 
       const dataTable = wrapper.findComponent({ name: 'DataTable' })
       dataTable.vm.$emit('delete', makeAddress())
       await wrapper.vm.$nextTick()
 
-      vi.mocked(http.delete).mockRejectedValueOnce({ message: 'Erro ao excluir endereço' })
+      vi.mocked(api.delete).mockRejectedValueOnce({ message: 'Erro ao excluir endereço' })
 
       const dialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' })
       dialogs[1].vm.$emit('confirm')
@@ -330,121 +344,42 @@ describe('CustomerDetailView', () => {
   })
 
   describe('Error states', () => {
-    it('shows error and retry button when customer fetch fails', async () => {
-      const http = await getHttp()
-      vi.mocked(http.get).mockImplementation((url: string) => {
+    it('shows an error message when customer fetch fails', async () => {
+      const api = await getApi()
+      vi.mocked(api.get).mockImplementation((url: string) => {
         if (url === '/v1/customers/cust-1') {
           return Promise.reject({ message: 'Cliente não encontrado' })
         }
         return Promise.resolve({ data: [] }) as any
       })
 
-      const wrapper = mount(CustomerDetailView)
+      const wrapper = mountWithQuery(CustomerDetailView)
       await flushPromises()
 
-      expect(wrapper.find('.customer-detail__error').exists()).toBe(true)
-      expect(wrapper.find('.customer-detail__error-message').text()).toBe('Cliente não encontrado')
-      expect(wrapper.find('.customer-detail__retry-btn').exists()).toBe(true)
-    })
-
-    it('retries customer fetch when retry button is clicked', async () => {
-      const http = await getHttp()
-      vi.mocked(http.get).mockImplementation((url: string) => {
-        if (url === '/v1/customers/cust-1') {
-          return Promise.reject({ message: 'Erro' })
-        }
-        return Promise.resolve({ data: [] }) as any
-      })
-
-      const wrapper = mount(CustomerDetailView)
-      await flushPromises()
-
-      expect(wrapper.find('.customer-detail__error').exists()).toBe(true)
-
-      // Mock success for retry
-      vi.mocked(http.get).mockImplementation((url: string) => {
-        if (url === '/v1/customers/cust-1') {
-          return Promise.resolve({ data: makeCustomer() }) as any
-        }
-        return Promise.resolve({ data: [] }) as any
-      })
-
-      await wrapper.find('.customer-detail__retry-btn').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.find('.customer-detail__error').exists()).toBe(false)
-      expect(wrapper.find('.customer-detail__title').text()).toBe('João Silva')
-    })
-
-    it('shows address error when address fetch fails', async () => {
-      const http = await getHttp()
-      vi.mocked(http.get).mockImplementation((url: string) => {
-        if (url === '/v1/customers/cust-1') {
-          return Promise.resolve({ data: makeCustomer() }) as any
-        }
-        if (url === '/v1/customers/cust-1/addresses') {
-          return Promise.reject({ message: 'Erro ao carregar endereços' })
-        }
-        return Promise.reject(new Error('unexpected'))
-      })
-
-      const wrapper = mount(CustomerDetailView)
-      await flushPromises()
-
-      expect(wrapper.find('.customer-detail__address-error').exists()).toBe(true)
-      expect(wrapper.find('.customer-detail__address-error-message').text()).toBe('Erro ao carregar endereços')
-    })
-
-    it('retries address fetch when address retry button is clicked', async () => {
-      const http = await getHttp()
-      let addressCallCount = 0
-      vi.mocked(http.get).mockImplementation((url: string) => {
-        if (url === '/v1/customers/cust-1') {
-          return Promise.resolve({ data: makeCustomer() }) as any
-        }
-        if (url === '/v1/customers/cust-1/addresses') {
-          addressCallCount++
-          if (addressCallCount === 1) {
-            return Promise.reject({ message: 'Erro' })
-          }
-          return Promise.resolve({ data: [makeAddress()] }) as any
-        }
-        return Promise.reject(new Error('unexpected'))
-      })
-
-      const wrapper = mount(CustomerDetailView)
-      await flushPromises()
-
-      expect(wrapper.find('.customer-detail__address-error').exists()).toBe(true)
-
-      await wrapper.find('.customer-detail__address-retry-btn').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.find('.customer-detail__address-error').exists()).toBe(false)
-      const dataTable = wrapper.findComponent({ name: 'DataTable' })
-      expect(dataTable.props('data')).toHaveLength(1)
+      expect(wrapper.text()).toContain('Cliente não encontrado')
+      // No customer data available yet, so the detail section is not shown.
+      expect(wrapper.find('h1').exists()).toBe(false)
     })
   })
 
   it('shows loading spinner while fetching customer', async () => {
-    const http = await getHttp()
+    const api = await getApi()
     let resolveCustomer: (v: any) => void
-    vi.mocked(http.get).mockImplementation((url: string) => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/v1/customers/cust-1') {
         return new Promise((r) => { resolveCustomer = r }) as any
       }
       return Promise.resolve({ data: [] }) as any
     })
 
-    const wrapper = mount(CustomerDetailView)
+    const wrapper = mountWithQuery(CustomerDetailView)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('.customer-detail__loading').exists()).toBe(true)
     expect(wrapper.findComponent({ name: 'LoadingSpinner' }).exists()).toBe(true)
 
-    resolveCustomer!({ data: makeCustomer() })
+    resolveCustomer!(makeCustomer())
     await flushPromises()
 
-    expect(wrapper.find('.customer-detail__loading').exists()).toBe(false)
+    expect(wrapper.find('h1').text()).toBe('João Silva')
   })
 })

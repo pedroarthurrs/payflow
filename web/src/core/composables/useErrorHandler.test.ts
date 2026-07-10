@@ -1,3 +1,4 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock useToast
@@ -12,15 +13,26 @@ vi.mock('@/core/composables/useToast', () => ({
   }),
 }))
 
+// Mock the RBAC store — 403 handling triggers a permissions refresh, which is
+// out of scope for these tests.
+const fetchPermissionsMock = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/core/rbac/store', () => ({
+  useRBACStore: () => ({
+    fetchPermissions: fetchPermissionsMock,
+    $reset: vi.fn(),
+  }),
+}))
+
 import type { ApiError } from '@/core/types'
 import { useErrorHandler } from './useErrorHandler'
 
 describe('useErrorHandler', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
-  it('handles 403 with error toast', () => {
+  it('handles 403 with error toast and refreshes permissions', () => {
     const { handleError } = useErrorHandler()
     const err: ApiError = { message: 'Acesso negado', status: 403 }
 
@@ -28,6 +40,7 @@ describe('useErrorHandler', () => {
 
     expect(handled).toBe(true)
     expect(errorMock).toHaveBeenCalledWith('Acesso negado')
+    expect(fetchPermissionsMock).toHaveBeenCalled()
   })
 
   it('uses default message for 403 without message', () => {
@@ -59,6 +72,15 @@ describe('useErrorHandler', () => {
 
     expect(handled).toBe(true)
     expect(errorMock).toHaveBeenCalledWith('Recurso não existe')
+  })
+
+  it('uses default message for 404 without message and no callback', () => {
+    const { handleError } = useErrorHandler()
+    const err: ApiError = { message: '', status: 404 }
+
+    handleError(err)
+
+    expect(errorMock).toHaveBeenCalledWith('Recurso não encontrado')
   })
 
   it('handles 429 with warning toast', () => {
